@@ -104,35 +104,7 @@ const registerSC = async (req, res) => {
       status: 'pending',
     });
 
-    // GRD Section 2.1 — 2 admin accounts, notify both
-    const adminEmails = [
-      process.env.ADMIN_EMAIL_1,
-      process.env.ADMIN_EMAIL_2,
-    ].filter(Boolean);
 
-    for (const adminEmail of adminEmails) {
-      try {
-        await sendEmail({
-          to: adminEmail,
-          subject: 'New Service Centre Registration — Microvison',
-          htmlContent: `
-            <h2>New Registration Pending Approval</h2>
-            <p>A new service centre has registered and is awaiting your approval.</p>
-            <ul>
-              <li><strong>Business Name:</strong> ${businessName}</li>
-              <li><strong>Owner Name:</strong> ${ownerName}</li>
-              <li><strong>City:</strong> ${city}, ${district}, ${state}</li>
-              <li><strong>Phone:</strong> ${phone1}</li>
-              <li><strong>Email:</strong> ${email1}</li>
-              <li><strong>Product Capability:</strong> ${productCapability}</li>
-            </ul>
-            <p>Please log in to the admin panel to approve or reject this registration.</p>
-          `,
-        });
-      } catch (emailErr) {
-        console.log(`Admin notification to ${adminEmail} failed, but registration succeeded.`);
-      }
-    }
 
     res.status(201).json({ message: 'Registration successful. Waiting for admin approval.' });
   } catch (error) {

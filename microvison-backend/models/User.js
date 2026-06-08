@@ -7,16 +7,15 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['admin', 'service_centre'], required: true },
-    status: { type: String, enum: ['active', 'pending', 'rejected'], default: 'pending' },
+    status: { type: String, enum: ['active', 'pending', 'rejected', 'inactive'], default: 'pending' },
   },
   { timestamps: true }
 );
 
 // Hash password before save
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('passwordHash')) return next();
+userSchema.pre('save', async function () {
+  if (!this.isModified('passwordHash')) return;
   this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
-  next();
 });
 
 // Compare password helper
