@@ -30,11 +30,12 @@
   - [ ] React ProtectedRoute in `App.jsx`
   - [ ] Auth UI Pages (`Login.jsx`, `Register.jsx`, `ForgotPassword.jsx`, `VerifyOtp.jsx`, `ResetPassword.jsx`)
 
-- [ ] **Phase 4 — Presets & Cities API (Day 3)**
-  - [ ] City controller & routes (`/cities`, `/cities/district/:district`)
-  - [ ] Preset controller & routes (CRUD & toggleActive)
-  - [ ] `PresetSelector` UI component
-  - [ ] Admin Presets page (`pages/admin/Presets.jsx`)
+- [x] **Phase 4 — Presets & Cities API (Day 3)**
+  - [x] City controller & routes (`/cities`, `/cities/district/:district`)
+  - [x] Preset controller & routes (CRUD & toggleActive)
+  - [x] `PresetSelector` UI component
+  - [x] Admin Presets page (`pages/admin/Presets.jsx`)
+  - [x] 3-way Cascading State/District/City dropdown UI in Register form
 
 - [ ] **Phase 5 — Service Centre Management (Day 4-5)**
   - [ ] Service Centre controllers (getAll with filters/pagination, getById, approve, reject, update, deactivate, getStats)

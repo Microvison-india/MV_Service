@@ -8,6 +8,9 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import VerifyOtp from './pages/auth/VerifyOtp';
 import ResetPassword from './pages/auth/ResetPassword';
 
+// Admin Pages
+import Presets from './pages/admin/Presets';
+
 // ProtectedRoute: blocks access if no token
 function ProtectedRoute({ children, allowedRole }) {
   const { token, user } = useAuth();
@@ -41,12 +44,20 @@ function AppRoutes() {
       <Route path="/verify-otp" element={<VerifyOtp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Admin routes — placeholder, built in later phases */}
+      {/* Admin routes */}
       <Route
-        path="/admin/*"
+        path="/admin"
         element={
           <ProtectedRoute allowedRole="admin">
             <div>Admin Dashboard — Phase 5+</div>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/presets"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <Presets />
           </ProtectedRoute>
         }
       />

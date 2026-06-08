@@ -43,17 +43,61 @@ export default function Register() {
     setError('');
   };
 
-  // Auto-fill district + state when city is selected per GRD Section 4.1
-  const handleCityChange = (e) => {
-    const selectedCity = cities.find((c) => c.name === e.target.value);
+  // 3-way cascading logic
+  const handleStateChange = (e) => {
+    const newState = e.target.value;
     setFormData((prev) => ({
       ...prev,
-      city: selectedCity?.name || '',
-      district: selectedCity?.district || '',
-      state: selectedCity?.state || '',
+      state: newState,
+      district: '',
+      city: '',
     }));
     setError('');
   };
+
+  const handleDistrictChange = (e) => {
+    const newDistrict = e.target.value;
+    // Find which state this district belongs to
+    const matchingCity = cities.find((c) => c.district === newDistrict);
+    setFormData((prev) => ({
+      ...prev,
+      district: newDistrict,
+      state: matchingCity ? matchingCity.state : prev.state,
+      city: '',
+    }));
+    setError('');
+  };
+
+  const handleCityChange = (e) => {
+    const newCity = e.target.value;
+    const selectedCityObj = cities.find((c) => c.name === newCity);
+    setFormData((prev) => ({
+      ...prev,
+      city: newCity,
+      district: selectedCityObj?.district || prev.district,
+      state: selectedCityObj?.state || prev.state,
+    }));
+    setError('');
+  };
+
+  // Compute dropdown options based on current selection
+  const uniqueStates = [...new Set(cities.map((c) => c.state))].sort();
+  
+  const filteredDistricts = [...new Set(
+    cities
+      .filter((c) => (formData.state ? c.state === formData.state : true))
+      .map((c) => c.district)
+  )].sort();
+
+  const filteredCities = [...new Set(
+    cities
+      .filter((c) => {
+        if (formData.district) return c.district === formData.district;
+        if (formData.state) return c.state === formData.state;
+        return true;
+      })
+      .map((c) => c.name)
+  )].sort();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -135,7 +179,43 @@ export default function Register() {
             <Field label="Full Address *" id="fullAddress" name="fullAddress" value={formData.fullAddress} onChange={handleChange} required placeholder="Street, locality, area" />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* City dropdown — from master list, no free text per GRD 4.1 */}
+              {/* State Dropdown */}
+              <div className="space-y-1">
+                <label htmlFor="state" className="text-sm font-medium text-foreground">State *</label>
+                <select
+                  id="state"
+                  name="state"
+                  required
+                  value={formData.state}
+                  onChange={handleStateChange}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                >
+                  <option value="">Select state</option>
+                  {uniqueStates.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* District Dropdown */}
+              <div className="space-y-1">
+                <label htmlFor="district" className="text-sm font-medium text-foreground">District *</label>
+                <select
+                  id="district"
+                  name="district"
+                  required
+                  value={formData.district}
+                  onChange={handleDistrictChange}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                >
+                  <option value="">Select district</option>
+                  {filteredDistricts.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* City Dropdown */}
               <div className="space-y-1">
                 <label htmlFor="city" className="text-sm font-medium text-foreground">City *</label>
                 <select
@@ -147,14 +227,11 @@ export default function Register() {
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                 >
                   <option value="">Select city</option>
-                  {cities.map((c) => (
-                    <option key={`${c.name}-${c.district}`} value={c.name}>{c.name}</option>
+                  {filteredCities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               </div>
-              {/* Auto-filled fields per GRD 4.1 */}
-              <Field label="District" id="district" name="district" value={formData.district} readOnly placeholder="Auto-filled" className="bg-muted cursor-not-allowed" />
-              <Field label="State" id="state" name="state" value={formData.state} readOnly placeholder="Auto-filled" className="bg-muted cursor-not-allowed" />
             </div>
 
             {/* Product Capability — 3 options per GRD Section 5.2 */}
