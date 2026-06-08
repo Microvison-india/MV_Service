@@ -103,5 +103,15 @@ Each entry follows this structure:
 
 ---
 
+## Phase 6 — File Uploads
+
+### DEV-TBP-012
+- **Phase:** 6
+- **TBP Section:** Phase 6 — `components/forms/ImageUploader.jsx`
+- **Type:** CHANGED
+- **Summary:** TBP specified a drag-and-drop area. To maximize reliability on mobile devices and simplify the UX, this was explicitly changed to a standard "Click to Upload" file input button with thumbnail previews.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
