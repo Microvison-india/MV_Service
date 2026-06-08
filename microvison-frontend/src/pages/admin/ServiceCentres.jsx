@@ -1,0 +1,176 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../../api/axios';
+import SCFilters from '../../components/filters/SCFilters';
+
+const CAPABILITY_LABELS = {
+  led_only: 'LED Only',
+  cooler_only: 'Cooler Only',
+  both: 'LED + Cooler',
+};
+
+const STATUS_STYLES = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  active: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
+  inactive: 'bg-gray-100 text-gray-600',
+};
+
+export default function ServiceCentres() {
+  const navigate = useNavigate();
+  const [serviceCentres, setServiceCentres] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1 });
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    state: '',
+    district: '',
+    productCapability: '',
+    page: 1,
+  });
+
+  const fetchSCs = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+      const { data } = await api.get(`/api/service-centres?${params.toString()}`);
+      setServiceCentres(data.serviceCentres);
+      setPagination({ total: data.total, page: data.page, totalPages: data.totalPages });
+    } catch (err) {
+      setError('Failed to load service centres. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    fetchSCs();
+  }, [fetchSCs]);
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+  };
+
+  const handlePageChange = (newPage) => {
+    setFilters((prev) => ({ ...prev, page: newPage }));
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Service Centres</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {pagination.total} total service centres registered
+          </p>
+        </div>
+
+        {/* Filters */}
+        <SCFilters filters={filters} onChange={handleFilterChange} />
+
+        {/* Error */}
+        {error && (
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Business Name</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Owner</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">City / District</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Capability</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Registered</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  // Loading skeleton rows
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border">
+                      {Array.from({ length: 6 }).map((_, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : serviceCentres.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                      No service centres found matching your filters.
+                    </td>
+                  </tr>
+                ) : (
+                  serviceCentres.map((sc) => (
+                    <tr
+                      key={sc._id}
+                      onClick={() => navigate(`/admin/service-centres/${sc._id}`)}
+                      className="border-b border-border hover:bg-muted/40 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-foreground">{sc.businessName}</td>
+                      <td className="px-4 py-3 text-foreground">{sc.ownerName}</td>
+                      <td className="px-4 py-3 text-foreground">
+                        <span>{sc.city}</span>
+                        <span className="text-muted-foreground">, {sc.district}</span>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {CAPABILITY_LABELS[sc.productCapability] || sc.productCapability}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[sc.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {sc.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {new Date(sc.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  id="sc-prev-page"
+                  disabled={pagination.page <= 1}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Previous
+                </button>
+                <button
+                  id="sc-next-page"
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

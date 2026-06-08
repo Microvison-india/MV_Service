@@ -10,6 +10,9 @@ import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin Pages
 import Presets from './pages/admin/Presets';
+import ActionCentre from './pages/admin/ActionCentre';
+import ServiceCentres from './pages/admin/ServiceCentres';
+import SCDetail from './pages/admin/SCDetail';
 
 // ProtectedRoute: blocks access if no token
 function ProtectedRoute({ children, allowedRole }) {
@@ -45,14 +48,17 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Admin routes */}
+      {/* Tab 1 — Action Centre (GRD 11.1) */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute allowedRole="admin">
-            <div>Admin Dashboard — Phase 5+</div>
+            <ActionCentre />
           </ProtectedRoute>
         }
       />
+
+      {/* Presets management (GRD 4.2) */}
       <Route
         path="/admin/presets"
         element={
@@ -62,7 +68,25 @@ function AppRoutes() {
         }
       />
 
-      {/* SC routes — placeholder, built in later phases */}
+      {/* Tab 2 — Service Centres (GRD 11.2) */}
+      <Route
+        path="/admin/service-centres"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <ServiceCentres />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/service-centres/:id"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <SCDetail />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* SC routes — placeholder, built in Phase 8+ */}
       <Route
         path="/sc/*"
         element={
