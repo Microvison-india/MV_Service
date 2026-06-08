@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import api from '../../../api/axios';
+import api from '../../api/axios';
 
 export default function VoiceRecorder({ onUpload, uploadedUrl = '' }) {
   const [isRecording, setIsRecording] = useState(false);

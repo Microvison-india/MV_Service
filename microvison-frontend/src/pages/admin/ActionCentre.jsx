@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 
 // GRD Section 11.1 — Action Centre
@@ -9,10 +9,12 @@ import api from '../../api/axios';
 
 export default function ActionCentre() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [pendingSCs, setPendingSCs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
   const [messages, setMessages] = useState({});
+  const [successMessage, setSuccessMessage] = useState(location.state?.successMessage || '');
 
   const fetchPending = async () => {
     setLoading(true);
@@ -57,12 +59,29 @@ export default function ActionCentre() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Action Centre</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Items requiring your attention, ordered newest first.
-          </p>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Action Centre</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Items requiring your attention, ordered newest first.
+            </p>
+          </div>
+          <button
+            id="action-centre-new-complaint"
+            onClick={() => navigate('/admin/new-complaint')}
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition shrink-0"
+          >
+            + New Complaint
+          </button>
         </div>
+
+        {/* Success message from complaint creation */}
+        {successMessage && (
+          <div className="mb-5 rounded-xl bg-green-50 border border-green-300 px-4 py-3 text-sm text-green-800 font-medium flex items-center justify-between">
+            <span>✓ {successMessage}</span>
+            <button onClick={() => setSuccessMessage('')} className="text-green-600 hover:text-green-800 font-bold ml-4">✕</button>
+          </div>
+        )}
 
         {/* Pending SC Registrations */}
         <section>

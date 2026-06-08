@@ -111,6 +111,38 @@ Each entry follows this structure:
 - **Type:** CHANGED
 - **Summary:** TBP specified a drag-and-drop area. To maximize reliability on mobile devices and simplify the UX, this was explicitly changed to a standard "Click to Upload" file input button with thumbnail previews.
 
+### DEV-TBP-014
+- **Phase:** 6
+- **TBP Section:** Phase 6 — `middleware/upload.js` — Image Size Limit
+- **Type:** CHANGED
+- **Summary:** TBP specified a 5MB max file size per image. This was increased to **20MB** per explicit user decision, to support modern smartphone photos that commonly exceed 5MB. Cloudinary automatically compresses the uploaded image to ~200KB via its `transformation` rules, so storage cost is unchanged.
+
+---
+
+## Phase 7B — Complaint Frontend Wizard
+
+### DEV-TBP-015
+- **Phase:** 7B
+- **TBP Section:** Phase 7, File 9 — `components/forms/Step1CustomerInfo.jsx`
+- **Type:** CHANGED
+- **Summary:** TBP specifies the reopen check fires on `phone1` blur and shows the ReopenBanner immediately. Our implementation fires the check **only if** `product` and `complaintType` are already set (they live in Step 2). If they are not yet set (admin is on Step 1 for the first time), the check is silently skipped and no banner is shown. The check can be manually triggered later if the admin navigates back and forth. This prevents a confusing partial-data API call.
+
+### DEV-TBP-016
+- **Phase:** 7B
+- **TBP Section:** Phase 7, File 8 — `pages/admin/NewComplaint.jsx` — Submit sequence
+- **Type:** CHANGED
+- **Summary:** TBP describes a single combined POST that creates and assigns in one transaction. The implementation uses **two sequential API calls**: `POST /api/complaints` (creates with `status=new`) then immediately `PATCH /api/complaints/:id/assign` (moves to `status=assigned`). This matches the actual backend route design and ensures the complaint is safely stored in the DB even if the assign step fails (which would alert the admin with an error but not lose the complaint data).
+
+---
+
+## Phase 7A — Complaint Backend
+
+### DEV-TBP-013
+- **Phase:** 7A
+- **TBP Section:** Phase 7, File 3 — `utils/sendWhatsApp.js`
+- **Type:** DEFERRED
+- **Summary:** TBP lists `sendWhatsApp.js` as part of Phase 7. As explicitly agreed by the user, all WhatsApp integration is deferred to Phase 13. The utility file will NOT be created until then.
+
 ---
 
 ## Future Phases

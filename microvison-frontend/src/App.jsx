@@ -13,6 +13,7 @@ import Presets from './pages/admin/Presets';
 import ActionCentre from './pages/admin/ActionCentre';
 import ServiceCentres from './pages/admin/ServiceCentres';
 import SCDetail from './pages/admin/SCDetail';
+import NewComplaint from './pages/admin/NewComplaint';
 
 // ProtectedRoute: blocks access if no token
 function ProtectedRoute({ children, allowedRole }) {
@@ -82,6 +83,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRole="admin">
             <SCDetail />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* New Complaint Wizard (GRD Section 6) */}
+      <Route
+        path="/admin/new-complaint"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <NewComplaint />
           </ProtectedRoute>
         }
       />

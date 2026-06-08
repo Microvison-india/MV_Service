@@ -102,8 +102,7 @@ const complaintSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Indexes for common queries
-complaintSchema.index({ complaintId: 1 });
+// Indexes for common queries (complaintId is already indexed via unique:true above)
 complaintSchema.index({ phone1: 1 });
 complaintSchema.index({ assignedCentreId: 1 });
 complaintSchema.index({ status: 1 });

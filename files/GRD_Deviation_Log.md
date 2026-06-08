@@ -67,5 +67,41 @@ Each entry follows this structure:
 
 ---
 
+## Phase 7A — Complaint Backend
+
+### DEV-GRD-007
+- **Phase:** 7A
+- **GRD Section:** 6.4 / 8 (Assign + Reopen)
+- **Type:** DECISION
+- **Summary:** GRD Section 6.4 states that WhatsApp is sent to the SC on assignment. As agreed, all WhatsApp integration is deferred to Phase 13. A `// TODO (Phase 13)` comment marks the exact location in `assignComplaint` where the trigger will go.
+
+### DEV-GRD-008
+- **Phase:** 7A
+- **GRD Section:** 6.3 (Extra Charges)
+- **Type:** DECISION
+- **Summary:** Admin-added extra charges at complaint creation time are automatically set to `status: 'approved'`. Only SC-requested extras (Phase 8) require admin approval. This distinction is clearly enforced in the `createComplaint` controller.
+
+---
+
+## Phase 6 — File Uploads
+
+### DEV-GRD-009
+- **Phase:** 6
+- **GRD Section:** 6.3 (Notes and Media)
+- **Type:** CHANGED
+- **Summary:** GRD Section 6.3 does not specify a maximum image file size. The TBP set 5MB; this was overridden to **20MB** per user decision. Cloudinary compression ensures storage size remains small regardless.
+
+---
+
+## Phase 7B — Complaint Frontend Wizard
+
+### DEV-GRD-010
+- **Phase:** 7B
+- **GRD Section:** 6.1 (Step 1 — Customer Information / Reopen Check)
+- **Type:** CHANGED
+- **Summary:** GRD states the reopen check fires when the admin enters Phone 1. Our implementation fires it on `phone1` blur **only if** `product` and `complaintType` are also set. Since these fields live in Step 2, on first visit to Step 1 the check is silently skipped. If the admin navigates back to Step 1 after filling Step 2, the check fires correctly. This prevents a confusing empty-result API call.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

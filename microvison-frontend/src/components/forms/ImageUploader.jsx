@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import api from '../../../api/axios';
+import api from '../../api/axios';
 
 export default function ImageUploader({ maxFiles = 2, onUpload, uploadedUrls = [] }) {
   const [loading, setLoading] = useState(false);
