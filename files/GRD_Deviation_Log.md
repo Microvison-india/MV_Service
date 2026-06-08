@@ -101,6 +101,24 @@ Each entry follows this structure:
 - **Type:** CHANGED
 - **Summary:** GRD states the reopen check fires when the admin enters Phone 1. Our implementation fires it on `phone1` blur **only if** `product` and `complaintType` are also set. Since these fields live in Step 2, on first visit to Step 1 the check is silently skipped. If the admin navigates back to Step 1 after filling Step 2, the check fires correctly. This prevents a confusing empty-result API call.
 
+### DEV-GRD-010B
+- **Phase:** 7B
+- **GRD Section:** 6.1 (Step 1 — Customer Information)
+- **Type:** CHANGED
+- **Summary:** GRD states that District and State are read-only auto-filled fields based on the City selection. Per explicit user direction, this was changed to use the exact same **3-way interactive cascading dropdown** system (State -> District -> City) that was built for the Service Centre registration in Phase 4. This greatly improves flexibility.
+
+### DEV-GRD-011
+- **Phase:** 7B
+- **GRD Section:** 5.1 (Product and Complaint Type)
+- **Type:** CHANGED
+- **Summary:** GRD allows selecting "Both" (LED + Cooler) as the product for a single complaint. Per explicit user correction, a single complaint record can only be for **one** product (either LED or Cooler). The "Both" capability is only applicable to Service Centres, not individual complaints. The "Both" option was removed from the complaint registration UI.
+
+### DEV-GRD-012
+- **Phase:** 7B
+- **GRD Section:** 6.3 (Step 3 — Charges & Media)
+- **Type:** ADDED
+- **Summary:** GRD states the preset price must be pulled from the database for in-warranty complaints. Per user request, an explicit "**Custom / Manual Entry**" option was added to the Preset dropdown. This allows the admin to manually input a Custom Preset Title and Price directly during registration without needing to pre-configure it in the Preset Management screen.
+
 ---
 
 ## Future Phases

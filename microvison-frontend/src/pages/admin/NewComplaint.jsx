@@ -32,8 +32,13 @@ const validateStep = (step, formData, reopenData) => {
     return null;
   }
   if (step === 3) {
-    if (formData.warrantyStatus === 'in_warranty' && !formData.presetId) {
-      return 'Please select a pricing preset for in-warranty complaints.';
+    if (formData.warrantyStatus === 'in_warranty') {
+      if (!formData.presetId) {
+        return 'Please select a pricing preset or choose Manual Entry for in-warranty complaints.';
+      }
+      if (formData.presetId === 'manual' && (!formData.customPresetName?.trim() || !formData.customPresetPrice)) {
+        return 'Please provide a title and price for the manual preset.';
+      }
     }
     // Validate extra charges: if any row has label but no amount, block
     const extras = formData.extraCharges || [];
@@ -69,6 +74,8 @@ export default function NewComplaint() {
     warrantyStatus: '',
     // Step 3
     presetId: '',
+    customPresetName: '',
+    customPresetPrice: '',
     petrolAdmin: '',
     extraCharges: [],
     notes: '',
@@ -129,7 +136,9 @@ export default function NewComplaint() {
         product: formData.product,
         complaintType: formData.complaintType,
         warrantyStatus: formData.warrantyStatus,
-        presetId: formData.warrantyStatus === 'in_warranty' ? formData.presetId : null,
+        presetId: formData.warrantyStatus === 'in_warranty' && formData.presetId !== 'manual' ? formData.presetId : null,
+        presetName: formData.presetId === 'manual' ? formData.customPresetName.trim() : undefined,
+        presetPrice: formData.presetId === 'manual' ? Number(formData.customPresetPrice) : undefined,
         petrolAdmin: formData.warrantyStatus === 'in_warranty' && formData.petrolAdmin
           ? Number(formData.petrolAdmin)
           : null,

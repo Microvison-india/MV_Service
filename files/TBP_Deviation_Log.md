@@ -111,6 +111,18 @@ Each entry follows this structure:
 - **Type:** CHANGED
 - **Summary:** TBP specified a drag-and-drop area. To maximize reliability on mobile devices and simplify the UX, this was explicitly changed to a standard "Click to Upload" file input button with thumbnail previews.
 
+### DEV-TBP-015
+- **Phase:** 7B
+- **TBP Section:** Phase 6/7 — `components/forms/Step1CustomerInfo.jsx`
+- **Type:** ADDED
+- **Summary:** TBP specified a simpler auto-fill behavior for District and State based on City. Per user instruction, the robust 3-way cascading dropdown hook (`states -> districts -> cities`) built for Service Centre registration was adapted and implemented here instead.
+
+### DEV-TBP-016
+- **Phase:** 7B
+- **TBP Section:** Phase 6/7 — `components/complaint/ReopenBanner.jsx`
+- **Type:** ADDED
+- **Summary:** The ReopenBanner was built to include the full `reopenNotes` and `reopenPhotos` form directly inside the banner dialog, ensuring all reopen data is captured upfront before hitting the unified submission endpoint.
+
 ### DEV-TBP-014
 - **Phase:** 6
 - **TBP Section:** Phase 6 — `middleware/upload.js` — Image Size Limit

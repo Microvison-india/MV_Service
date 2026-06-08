@@ -32,14 +32,36 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // When city is selected, auto-fill district and state from the city record
-  const handleCityChange = (cityName) => {
-    const selected = cities.find((c) => c.city === cityName);
+  // 3-way cascading logic
+  const handleStateChange = (e) => {
+    const newState = e.target.value;
     setFormData((prev) => ({
       ...prev,
-      city: cityName,
-      district: selected?.district || '',
-      state: selected?.state || '',
+      state: newState,
+      district: '',
+      city: '',
+    }));
+  };
+
+  const handleDistrictChange = (e) => {
+    const newDistrict = e.target.value;
+    const matchingCity = cities.find((c) => c.district === newDistrict);
+    setFormData((prev) => ({
+      ...prev,
+      district: newDistrict,
+      state: matchingCity ? matchingCity.state : prev.state,
+      city: '',
+    }));
+  };
+
+  const handleCityChange = (e) => {
+    const newCity = e.target.value;
+    const selectedCityObj = cities.find((c) => c.name === newCity);
+    setFormData((prev) => ({
+      ...prev,
+      city: newCity,
+      district: selectedCityObj?.district || prev.district,
+      state: selectedCityObj?.state || prev.state,
     }));
   };
 
@@ -85,11 +107,24 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
     setShowBanner(false);
   };
 
-  // Get unique states and districts for filter cascading
+  // Compute dropdown options based on current selection
   const uniqueStates = [...new Set(cities.map((c) => c.state))].sort();
-  const filteredCities = formData.state
-    ? cities.filter((c) => c.state === formData.state)
-    : cities;
+  
+  const filteredDistricts = [...new Set(
+    cities
+      .filter((c) => (formData.state ? c.state === formData.state : true))
+      .map((c) => c.district)
+  )].sort();
+
+  const filteredCities = [...new Set(
+    cities
+      .filter((c) => {
+        if (formData.district) return c.district === formData.district;
+        if (formData.state) return c.state === formData.state;
+        return true;
+      })
+      .map((c) => c.name)
+  )].sort();
 
   const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition';
   const labelCls = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1';
@@ -171,56 +206,61 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
           />
         </div>
 
-        {/* State */}
-        <div>
-          <label className={labelCls}>State <span className="text-red-500">*</span></label>
-          <select
-            id="step1-state"
-            value={formData.state || ''}
-            onChange={(e) => {
-              setFormData((prev) => ({ ...prev, state: e.target.value, city: '', district: '' }));
-            }}
-            className={inputCls}
-            required
-          >
-            <option value="">Select State</option>
-            {uniqueStates.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* City */}
-        <div>
-          <label className={labelCls}>City <span className="text-red-500">*</span></label>
-          {loadingCities ? (
-            <div className="h-9 bg-muted rounded-lg animate-pulse" />
-          ) : (
+        <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {/* State */}
+          <div>
+            <label className={labelCls}>State <span className="text-red-500">*</span></label>
             <select
-              id="step1-city"
-              value={formData.city || ''}
-              onChange={(e) => handleCityChange(e.target.value)}
+              id="step1-state"
+              value={formData.state || ''}
+              onChange={handleStateChange}
               className={inputCls}
               required
             >
-              <option value="">Select City</option>
-              {filteredCities.map((c) => (
-                <option key={c._id} value={c.city}>{c.city}</option>
+              <option value="">Select State</option>
+              {uniqueStates.map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
-          )}
-        </div>
+          </div>
 
-        {/* District — auto-filled */}
-        <div>
-          <label className={labelCls}>District</label>
-          <input
-            type="text"
-            value={formData.district || ''}
-            readOnly
-            placeholder="Auto-filled from city"
-            className={`${inputCls} bg-muted text-muted-foreground cursor-not-allowed`}
-          />
+          {/* District */}
+          <div>
+            <label className={labelCls}>District <span className="text-red-500">*</span></label>
+            <select
+              id="step1-district"
+              value={formData.district || ''}
+              onChange={handleDistrictChange}
+              className={inputCls}
+              required
+            >
+              <option value="">Select District</option>
+              {filteredDistricts.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* City */}
+          <div>
+            <label className={labelCls}>City <span className="text-red-500">*</span></label>
+            {loadingCities ? (
+              <div className="h-9 bg-muted rounded-lg animate-pulse" />
+            ) : (
+              <select
+                id="step1-city"
+                value={formData.city || ''}
+                onChange={handleCityChange}
+                className={inputCls}
+                required
+              >
+                <option value="">Select City</option>
+                {filteredCities.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       </div>
     </div>

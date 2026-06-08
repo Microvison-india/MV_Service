@@ -92,25 +92,50 @@ export default function Step3Charges({ formData, setFormData }) {
           </p>
           {loadingPresets ? (
             <div className="h-9 bg-muted rounded-lg animate-pulse w-full" />
-          ) : presets.length === 0 ? (
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
-              No active presets found for this product and complaint type. Please add one in Preset Management.
-            </div>
           ) : (
-            <select
-              id="step3-preset"
-              value={formData.presetId || ''}
-              onChange={(e) => handleChange('presetId', e.target.value)}
-              className={inputCls}
-              required
-            >
-              <option value="">Select a preset...</option>
-              {presets.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.packageName} — ₹{p.price} ({p.modelNo})
-                </option>
-              ))}
-            </select>
+            <div className="space-y-3">
+              <select
+                id="step3-preset"
+                value={formData.presetId || ''}
+                onChange={(e) => handleChange('presetId', e.target.value)}
+                className={inputCls}
+                required
+              >
+                <option value="">Select a preset...</option>
+                <option value="manual" className="font-bold">➕ Custom / Manual Entry</option>
+                {presets.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.packageName} — ₹{p.price} ({p.modelNo})
+                  </option>
+                ))}
+              </select>
+
+              {formData.presetId === 'manual' && (
+                <div className="p-4 rounded-lg bg-muted/50 border border-border flex gap-3 items-end">
+                  <div className="flex-1">
+                    <label className={labelCls}>Custom Preset Title</label>
+                    <input
+                      type="text"
+                      value={formData.customPresetName || ''}
+                      onChange={(e) => handleChange('customPresetName', e.target.value)}
+                      placeholder="e.g. Special Motor Repair"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <label className={labelCls}>Price (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.customPresetPrice || ''}
+                      onChange={(e) => handleChange('customPresetPrice', e.target.value)}
+                      placeholder="e.g. 500"
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

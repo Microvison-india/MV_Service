@@ -84,11 +84,11 @@ const createComplaint = async (req, res) => {
       .json({ message: 'Coolers do not support installation complaints.' });
   }
 
-  // In-warranty: preset is required
-  if (warrantyStatus === 'in_warranty' && !presetId) {
+  // In-warranty: preset is required (either presetId OR custom presetName & presetPrice)
+  if (warrantyStatus === 'in_warranty' && !presetId && (!req.body.presetName || req.body.presetPrice == null)) {
     return res
       .status(400)
-      .json({ message: 'A preset must be selected for in-warranty complaints.' });
+      .json({ message: 'A preset or custom manual preset must be provided for in-warranty complaints.' });
   }
 
   // Reopen: reopenNotes is required (GRD Section 8)
@@ -102,13 +102,18 @@ const createComplaint = async (req, res) => {
   let snapshotPresetName = '';
   let snapshotPresetPrice = null;
 
-  if (warrantyStatus === 'in_warranty' && presetId) {
-    const preset = await Preset.findById(presetId).lean();
-    if (!preset) {
-      return res.status(404).json({ message: 'Selected preset not found.' });
+  if (warrantyStatus === 'in_warranty') {
+    if (presetId) {
+      const preset = await Preset.findById(presetId).lean();
+      if (!preset) {
+        return res.status(404).json({ message: 'Selected preset not found.' });
+      }
+      snapshotPresetName = preset.packageName;
+      snapshotPresetPrice = preset.price;
+    } else {
+      snapshotPresetName = req.body.presetName;
+      snapshotPresetPrice = Number(req.body.presetPrice);
     }
-    snapshotPresetName = preset.packageName;
-    snapshotPresetPrice = preset.price;
   }
 
   // ── Build extra charges array ─────────────────────────────
@@ -158,13 +163,13 @@ const createComplaint = async (req, res) => {
     reopenNotes: isReopened ? reopenNotes : '',
     reopenPhotos: isReopened && Array.isArray(reopenPhotos) ? reopenPhotos : [],
     status: 'new',
-    createdBy: req.user._id,
+    createdBy: req.user.id,
   });
 
   // ── Log initial status update ─────────────────────────────
   await ComplaintUpdate.create({
     complaintId: complaint._id,
-    updatedBy: req.user._id,
+    updatedBy: req.user.id,
     role: 'admin',
     oldStatus: '',
     newStatus: 'new',
@@ -217,7 +222,7 @@ const assignComplaint = async (req, res) => {
   // Log the assignment
   await ComplaintUpdate.create({
     complaintId: complaint._id,
-    updatedBy: req.user._id,
+    updatedBy: req.user.id,
     role: 'admin',
     oldStatus,
     newStatus: 'assigned',

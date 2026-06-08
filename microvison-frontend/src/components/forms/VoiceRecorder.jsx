@@ -15,11 +15,11 @@ export default function VoiceRecorder({ onUpload, uploadedUrl = '' }) {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (mediaRecorderRef.current && isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
     };
-  }, [isRecording]);
+  }, []);
 
   const startRecording = async () => {
     try {

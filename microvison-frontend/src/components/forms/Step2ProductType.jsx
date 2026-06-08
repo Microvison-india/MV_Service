@@ -1,14 +1,12 @@
 // GRD Section 6.2 — Step 2: Product & Type
-// Product: LED / Cooler / Both
+// Product: LED / Cooler
 // LED → type: Installation or Complaint
 // Cooler → type is ALWAYS auto-set to 'complaint' (no installation for coolers)
-// Both → admin selects LED type; Cooler is auto-set to complaint
 // Warranty: in_warranty | out_of_warranty (single flag for whole complaint)
 
 const PRODUCTS = [
   { value: 'led', label: 'LED', icon: '💡' },
   { value: 'cooler', label: 'Cooler', icon: '❄️' },
-  { value: 'both', label: 'LED + Cooler', icon: '💡❄️' },
 ];
 
 const WARRANTY_OPTIONS = [
@@ -63,7 +61,7 @@ export default function Step2ProductType({ formData, setFormData }) {
         </div>
       </div>
 
-      {/* Complaint Type — shown for LED and Both; hidden/locked for Cooler */}
+      {/* Complaint Type — shown for LED; hidden/locked for Cooler */}
       {formData.product && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
