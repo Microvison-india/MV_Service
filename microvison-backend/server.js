@@ -15,7 +15,8 @@ const app = express();
 app.use(cors({ origin: process.env.FRONTEND_URL }));
 app.use(express.json());
 
-// Routes (stubs)
+// Routes
+app.use('/api/auth', require('./routes/auth.routes'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 // Error handler
