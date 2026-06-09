@@ -11,6 +11,12 @@ const {
   rejectComplaint,
   markGoing,
   updateStatus,
+  confirmDone,
+  disputeDone,
+  approveExtra,
+  rejectExtra,
+  getActionItems,
+  getComplaintById,
 } = require('../controllers/complaint.controller');
 
 // ── Admin Routes (all require auth + isAdmin) ───────────────────
@@ -22,6 +28,28 @@ router.post('/', auth, isAdmin, createComplaint);
 
 // PATCH /api/complaints/:id/assign — Assign to an SC
 router.patch('/:id/assign', auth, isAdmin, assignComplaint);
+
+// ── Admin Action Centre Routes (Phase 9) ───────────────────
+// GET /api/complaints/action-items — Dashboard lists and counts
+router.get('/action-items', auth, isAdmin, getActionItems);
+
+// PATCH /api/complaints/:id/confirm-done — Confirm SC job
+router.patch('/:id/confirm-done', auth, isAdmin, confirmDone);
+
+// PATCH /api/complaints/:id/dispute-done — Dispute SC job
+router.patch('/:id/dispute-done', auth, isAdmin, disputeDone);
+
+// PATCH /api/complaints/:id/dispute-done — Dispute SC job
+router.patch('/:id/dispute-done', auth, isAdmin, disputeDone);
+
+// PATCH /api/complaints/:id/extras/:extraId/approve — Approve extra charge
+router.patch('/:id/extras/:extraId/approve', auth, isAdmin, approveExtra);
+
+// PATCH /api/complaints/:id/extras/:extraId/reject — Reject extra charge
+router.patch('/:id/extras/:extraId/reject', auth, isAdmin, rejectExtra);
+
+// GET /api/complaints/:id — Get full complaint with timeline updates
+router.get('/:id', auth, isAdmin, getComplaintById);
 
 // ── SC Routes (all require auth + isSC) ────────────────────────
 // GET  /api/complaints/my — SC's own complaints (filtered)

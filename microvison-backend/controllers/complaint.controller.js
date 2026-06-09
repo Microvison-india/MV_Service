@@ -488,6 +488,190 @@ const updateStatus = async (req, res) => {
   res.status(200).json({ message: `Complaint status updated to ${newStatus}.`, complaint });
 };
 
+// ─────────────────────────────────────────────────────────────
+// @desc    Admin confirms the completed job, marking it closed.
+// @route   PATCH /api/complaints/:id/confirm-done
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const confirmDone = async (req, res) => {
+  const { id } = req.params;
+  const complaint = await Complaint.findById(id);
+
+  if (!complaint) {
+    return res.status(404).json({ message: 'Complaint not found.' });
+  }
+
+  if (!['done', 'not_done', 'part_pending', 'replacement'].includes(complaint.status)) {
+    return res.status(400).json({ message: 'Complaint is not in a completed status from SC.' });
+  }
+
+  // Determine if bill should be generated. Only for in_warranty.
+  const billGenerated = complaint.warrantyStatus === 'in_warranty';
+  
+  const oldStatus = complaint.status;
+  
+  complaint.status = 'closed';
+  complaint.billGenerated = billGenerated;
+  complaint.billLockedAt = new Date();
+  
+  // Admin final petrol lock (edit 3)
+  if (req.body.petrolFinal !== undefined && req.body.petrolFinal !== '') {
+    complaint.petrolFinal = Number(req.body.petrolFinal);
+    complaint.petrolEditCount = 3;
+    complaint.petrolLocked = true;
+  } else {
+    // If they just confirm, it gets locked anyway
+    complaint.petrolLocked = true;
+    if (complaint.petrolEditCount < 3) {
+      complaint.petrolEditCount = 3; // admin skipped their turn, locked it
+    }
+  }
+
+  await complaint.save();
+
+  await ComplaintUpdate.create({
+    complaintId: complaint._id,
+    updatedBy: req.user.id,
+    role: 'admin',
+    oldStatus,
+    newStatus: 'closed',
+    note: req.body.note ? req.body.note.trim() : 'Admin confirmed and closed the job.',
+  });
+
+  res.status(200).json({ message: 'Complaint confirmed and closed.', complaint });
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Admin disputes the job, sending it back to SC.
+// @route   PATCH /api/complaints/:id/dispute-done
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const disputeDone = async (req, res) => {
+  const { id } = req.params;
+  const { note } = req.body;
+
+  if (!note || note.trim() === '') {
+    return res.status(400).json({ message: 'Dispute note is required.' });
+  }
+
+  const complaint = await Complaint.findById(id);
+  if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+  const oldStatus = complaint.status;
+  
+  // Bounce back to accepted
+  complaint.status = 'accepted';
+  
+  await complaint.save();
+
+  await ComplaintUpdate.create({
+    complaintId: complaint._id,
+    updatedBy: req.user.id,
+    role: 'admin',
+    oldStatus,
+    newStatus: 'accepted',
+    note: `Disputed: ${note.trim()}`,
+  });
+
+  res.status(200).json({ message: 'Job disputed and returned to SC.', complaint });
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Approve or Reject an extra charge
+// @route   PATCH /api/complaints/:id/extras/:extraId/approve
+// @route   PATCH /api/complaints/:id/extras/:extraId/reject
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const handleExtraCharge = async (req, res, status) => {
+  const { id, extraId } = req.params;
+  const complaint = await Complaint.findById(id);
+
+  if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+  const extra = complaint.extraCharges.id(extraId);
+  if (!extra) return res.status(404).json({ message: 'Extra charge not found.' });
+
+  if (extra.status !== 'pending') {
+    return res.status(400).json({ message: `Extra charge is already ${extra.status}.` });
+  }
+
+  extra.status = status;
+  await complaint.save();
+
+  await ComplaintUpdate.create({
+    complaintId: complaint._id,
+    updatedBy: req.user.id,
+    role: 'admin',
+    oldStatus: complaint.status,
+    newStatus: complaint.status,
+    note: `Admin ${status} extra charge: ${extra.label} (₹${extra.amount})`,
+  });
+
+  res.status(200).json({ message: `Extra charge ${status}.`, complaint });
+};
+
+const approveExtra = (req, res) => handleExtraCharge(req, res, 'approved');
+const rejectExtra = (req, res) => handleExtraCharge(req, res, 'rejected');
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Get a single complaint by ID (with timeline updates)
+// @route   GET /api/complaints/:id
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const getComplaintById = async (req, res) => {
+  const { id } = req.params;
+  const complaint = await Complaint.findById(id).populate('assignedTo', 'ownerName businessName phone1 email1');
+  if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+  const updates = await ComplaintUpdate.find({ complaintId: id }).sort({ createdAt: -1 });
+
+  res.status(200).json({ complaint, updates });
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Get counts and lists for Admin Action Centre
+// @route   GET /api/complaints/action-items
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const getActionItems = async (req, res) => {
+  const User = require('../models/User'); // lazy import to avoid circular if any
+
+  // 1. Pending SC Registrations
+  const pendingSCRegistrations = await User.find({ role: 'service_centre', status: 'pending' }).select('-passwordHash');
+
+  // 2. Pending Confirmations (Jobs done by SC, waiting for admin to close)
+  const pendingConfirmations = await Complaint.find({
+    status: { $in: ['done', 'not_done', 'part_pending', 'replacement'] }
+  })
+    .populate('assignedTo', 'ownerName businessName phone1')
+    .sort({ updatedAt: -1 });
+
+  // 3. Rejected by SC
+  const rejectedBySC = await Complaint.find({ status: 'rejected_by_sc' })
+    .populate('assignedTo', 'ownerName businessName phone1')
+    .sort({ updatedAt: -1 });
+
+  // 4. Pending Extra Approvals (Any complaint containing an extra charge with status='pending')
+  const pendingExtraApprovals = await Complaint.find({
+    'extraCharges.status': 'pending'
+  })
+    .populate('assignedTo', 'ownerName businessName phone1')
+    .sort({ updatedAt: -1 });
+
+  res.status(200).json({
+    pendingSCRegistrations,
+    pendingConfirmations,
+    rejectedBySC,
+    pendingExtraApprovals,
+    counts: {
+      pendingSCRegistrations: pendingSCRegistrations.length,
+      pendingConfirmations: pendingConfirmations.length,
+      rejectedBySC: rejectedBySC.length,
+      pendingExtraApprovals: pendingExtraApprovals.length,
+    }
+  });
+};
+
 module.exports = {
   reopenCheck,
   createComplaint,
@@ -497,4 +681,10 @@ module.exports = {
   rejectComplaint,
   markGoing,
   updateStatus,
+  confirmDone,
+  disputeDone,
+  approveExtra,
+  rejectExtra,
+  getActionItems,
+  getComplaintById,
 };

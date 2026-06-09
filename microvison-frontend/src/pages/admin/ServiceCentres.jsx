@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import SCFilters from '../../components/filters/SCFilters';
@@ -31,25 +31,27 @@ export default function ServiceCentres() {
     page: 1,
   });
 
-  const fetchSCs = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
-      const { data } = await api.get(`/api/service-centres?${params.toString()}`);
-      setServiceCentres(data.serviceCentres);
-      setPagination({ total: data.total, page: data.page, totalPages: data.totalPages });
-    } catch (err) {
-      setError('Failed to load service centres. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
   useEffect(() => {
+    let active = true;
+    const fetchSCs = async () => {
+      setError('');
+      try {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+        const { data } = await api.get(`/api/service-centres?${params.toString()}`);
+        if (active) {
+          setServiceCentres(data.serviceCentres);
+          setPagination({ total: data.total, page: data.page, totalPages: data.totalPages });
+        }
+      } catch {
+        if (active) setError('Failed to load service centres. Please try again.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
     fetchSCs();
-  }, [fetchSCs]);
+    return () => { active = false; };
+  }, [filters]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);

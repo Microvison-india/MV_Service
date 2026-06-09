@@ -10,8 +10,6 @@ const CAPABILITY_OPTIONS = [
 ];
 
 export default function Register() {
-  const navigate = useNavigate();
-
   const [cities, setCities] = useState([]);
   const [formData, setFormData] = useState({
     ownerName: '',

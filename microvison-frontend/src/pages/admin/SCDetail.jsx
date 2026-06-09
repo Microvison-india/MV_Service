@@ -25,39 +25,42 @@ export default function SCDetail() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState('info');
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
 
-  const fetchSC = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.get(`/api/service-centres/${id}`);
-      setSc(data);
-      setEditData({
-        ownerName: data.ownerName,
-        businessName: data.businessName,
-        phone1: data.phone1,
-        phone2: data.phone2,
-        email2: data.email2,
-        fullAddress: data.fullAddress,
-        city: data.city,
-        district: data.district,
-        state: data.state,
-        productCapability: data.productCapability,
-      });
-    } catch (err) {
-      setError('Failed to load service centre details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let active = true;
+    const fetchSC = async () => {
+      setError('');
+      try {
+        const { data } = await api.get(`/api/service-centres/${id}`);
+        if (active) {
+          setSc(data);
+          setEditData({
+            ownerName: data.ownerName,
+            businessName: data.businessName,
+            phone1: data.phone1,
+            phone2: data.phone2,
+            email2: data.email2,
+            fullAddress: data.fullAddress,
+            city: data.city,
+            district: data.district,
+            state: data.state,
+            productCapability: data.productCapability,
+          });
+        }
+      } catch {
+        if (active) setError('Failed to load service centre details.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
     fetchSC();
-  }, [id]);
+    return () => { active = false; };
+  }, [id, refreshTick]);
 
   const performAction = async (action) => {
     setActionLoading(true);

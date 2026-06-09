@@ -84,16 +84,18 @@
   - [x] `components/complaint/PetrolEditField.jsx` (3-round petrol history + correct-turn editing)
   - [x] `App.jsx` — SC nested routes wired (/sc, /sc/new-requests, /sc/my-complaints, /sc/billing)
 
-- [ ] **Phase 8.5 — SC Portal Polish (Deferred)**
-  - [ ] Create distinct UI flows/fields for `not_done`, `part_pending`, and `replacement` final statuses.
+- [ ] **Phase 8.5 — App Polish & Logic Tweaks (Deferred)**
+  - [ ] Create distinct UI flows/fields for `not_done`, `part_pending`, and `replacement` final statuses on the SC portal.
+  - [ ] Refine SC Assignment Logic (Filter/limit "To whom we can assign" during complaint creation Step 4).
 
-- [ ] **Phase 9 — Admin Action Centre (Day 12-13)**
-  - [ ] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
-  - [ ] Action item counts controller (`getActionItems`)
-  - [ ] Admin action routes
-  - [ ] ActionCentre page UI (`pages/admin/ActionCentre.jsx`)
-  - [ ] `ExtraChargesList` UI component
-  - [ ] `StatusTimeline` UI component
+- [x] **Phase 9 — Admin Action Centre (Day 12-13)**
+  - [x] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
+  - [x] Action item lists controller (`getActionItems`)
+  - [x] Admin action routes
+  - [x] ActionCentre page UI (`pages/admin/ActionCentre.jsx`)
+  - [x] `ExtraChargesList` UI component
+  - [x] `StatusTimeline` UI component
+  - [x] `AdminComplaintDetail` UI slide panel
 
 - [ ] **Phase 10 — Admin Complaints Tab (Day 14-15)**
   - [ ] Complaint getAll controller (with 12+ filters, pagination, sorting)

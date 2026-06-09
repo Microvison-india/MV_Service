@@ -20,6 +20,7 @@ const formatType = (type) => {
 export default function Presets() {
   const [presets, setPresets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,21 +32,21 @@ export default function Presets() {
     price: '',
   });
 
-  const fetchPresets = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get('/api/presets');
-      setPresets(data);
-    } catch (error) {
-      console.error('Error fetching presets:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let active = true;
+    const fetchPresets = async () => {
+      try {
+        const { data } = await api.get('/api/presets');
+        if (active) setPresets(data);
+      } catch (error) {
+        console.error('Error fetching presets:', error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
     fetchPresets();
-  }, []);
+    return () => { active = false; };
+  }, [refreshTick]);
 
   const handleOpenModal = (preset = null) => {
     if (preset) {
@@ -91,7 +92,7 @@ export default function Presets() {
         });
       }
       setIsModalOpen(false);
-      fetchPresets();
+      setRefreshTick(t => t + 1);
     } catch (error) {
       console.error('Error saving preset:', error);
       alert('Failed to save preset.');

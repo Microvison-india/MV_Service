@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import api from '../../api/axios';
 import SCComplaintCard from '../../components/complaint/SCComplaintCard';
