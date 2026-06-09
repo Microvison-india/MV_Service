@@ -129,8 +129,16 @@
   - [ ] Cloudinary and Brevo setup verification
   - [ ] Vercel Frontend Deploy
 
-- [ ] **Phase 14 — WhatsApp Integrations (Deferred to End)**
-  - [ ] WATI/AiSensy wrapper (`utils/sendWhatsApp.js`)
-  - [ ] Trigger 1: New Complaint Assigned (Add to Phase 7 controller)
-  - [ ] Trigger 2: Complaint Reopened (Add to Phase 12 controller)
-  - [ ] Meta template approvals & Production Testing
+- [ ] **Phase 14 — Messaging Integrations (Deferred to End)**
+  - [ ] Text/SMS and WhatsApp wrapper utility (`utils/sendMsg.js`)
+  - [ ] Trigger 1: Send "Complaint Received" msg to Customer
+  - [ ] Trigger 2: Send SC details to Customer
+  - [ ] Trigger 3: Send basic complaint details to Assigned SC
+  - [ ] Trigger 4: Complaint Reopened
+  - [ ] Provider/Meta template approvals & Production Testing
+
+- [ ] **Phase 15 — UI/UX Polish & Final Testing**
+  - [ ] Improve overall UI flow and UX consistency
+  - [ ] Comprehensive end-to-end testing
+  - [ ] Visual UI improvements and final layout adjustments
+  - [ ] Handle any new minor additions or edge-case features

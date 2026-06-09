@@ -39,21 +39,21 @@ router.patch('/:id/confirm-done', auth, isAdmin, confirmDone);
 // PATCH /api/complaints/:id/dispute-done — Dispute SC job
 router.patch('/:id/dispute-done', auth, isAdmin, disputeDone);
 
-// PATCH /api/complaints/:id/dispute-done — Dispute SC job
-router.patch('/:id/dispute-done', auth, isAdmin, disputeDone);
-
 // PATCH /api/complaints/:id/extras/:extraId/approve — Approve extra charge
 router.patch('/:id/extras/:extraId/approve', auth, isAdmin, approveExtra);
 
 // PATCH /api/complaints/:id/extras/:extraId/reject — Reject extra charge
 router.patch('/:id/extras/:extraId/reject', auth, isAdmin, rejectExtra);
 
-// GET /api/complaints/:id — Get full complaint with timeline updates
-router.get('/:id', auth, isAdmin, getComplaintById);
+
 
 // ── SC Routes (all require auth + isSC) ────────────────────────
 // GET  /api/complaints/my — SC's own complaints (filtered)
 router.get('/my', auth, isSC, getMyComplaints);
+
+// GET /api/complaints/:id — Get full complaint with timeline updates
+// IMPORTANT: MUST BE PLACED AFTER ALL OTHER GET ROUTES TO PREVENT COLLISION
+router.get('/:id', auth, isAdmin, getComplaintById);
 
 // PATCH /api/complaints/:id/accept — SC accepts assignment
 router.patch('/:id/accept', auth, isSC, acceptComplaint);

@@ -447,11 +447,11 @@ const updateStatus = async (req, res) => {
   complaint.proofPhotos = photos;
   if (scNotes) complaint.scNotes = scNotes.trim();
 
-  // Petrol Edit 2 — SC's turn only if editCount === 1 and in-warranty (GRD 6.3)
+  // Petrol Edit 2 — SC's turn only if editCount is 0 or 1 and in-warranty (GRD 6.3)
   if (
     complaint.warrantyStatus === 'in_warranty' &&
     petrolSC != null &&
-    complaint.petrolEditCount === 1 &&
+    (complaint.petrolEditCount === 1 || complaint.petrolEditCount === 0) &&
     !complaint.petrolLocked
   ) {
     complaint.petrolSC = Number(petrolSC);
@@ -620,7 +620,7 @@ const rejectExtra = (req, res) => handleExtraCharge(req, res, 'rejected');
 // ─────────────────────────────────────────────────────────────
 const getComplaintById = async (req, res) => {
   const { id } = req.params;
-  const complaint = await Complaint.findById(id).populate('assignedTo', 'ownerName businessName phone1 email1');
+  const complaint = await Complaint.findById(id).populate('assignedCentreId', 'ownerName businessName phone1 email1');
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
   const updates = await ComplaintUpdate.find({ complaintId: id }).sort({ createdAt: -1 });
@@ -634,28 +634,28 @@ const getComplaintById = async (req, res) => {
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
 const getActionItems = async (req, res) => {
-  const User = require('../models/User'); // lazy import to avoid circular if any
+  const ServiceCentre = require('../models/ServiceCentre'); // lazy import to avoid circular if any
 
   // 1. Pending SC Registrations
-  const pendingSCRegistrations = await User.find({ role: 'service_centre', status: 'pending' }).select('-passwordHash');
+  const pendingSCRegistrations = await ServiceCentre.find({ status: 'pending' }).sort({ createdAt: -1 });
 
   // 2. Pending Confirmations (Jobs done by SC, waiting for admin to close)
   const pendingConfirmations = await Complaint.find({
     status: { $in: ['done', 'not_done', 'part_pending', 'replacement'] }
   })
-    .populate('assignedTo', 'ownerName businessName phone1')
+    .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
 
   // 3. Rejected by SC
   const rejectedBySC = await Complaint.find({ status: 'rejected_by_sc' })
-    .populate('assignedTo', 'ownerName businessName phone1')
+    .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
 
   // 4. Pending Extra Approvals (Any complaint containing an extra charge with status='pending')
   const pendingExtraApprovals = await Complaint.find({
     'extraCharges.status': 'pending'
   })
-    .populate('assignedTo', 'ownerName businessName phone1')
+    .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
 
   res.status(200).json({

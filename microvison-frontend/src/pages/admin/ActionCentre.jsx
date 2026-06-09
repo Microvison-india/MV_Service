@@ -88,7 +88,7 @@ export default function ActionCentre() {
         </div>
         <p className="font-semibold text-foreground text-sm">{c.customerName} · {c.city}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          SC: <span className="font-medium text-foreground">{c.assignedTo?.businessName || 'Unassigned'}</span>
+          SC: <span className="font-medium text-foreground">{c.assignedCentreId?.businessName || 'Unassigned'}</span>
         </p>
       </div>
       <div className="text-right shrink-0">

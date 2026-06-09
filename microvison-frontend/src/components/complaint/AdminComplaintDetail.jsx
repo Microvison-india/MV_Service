@@ -137,11 +137,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
           </div>
 
           {/* Assigned SC Info */}
-          {c.assignedTo && (
+          {c.assignedCentreId && (
             <div className="rounded-xl border border-border p-4 bg-muted/20">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Service Centre</p>
-              <p className="font-semibold">{c.assignedTo.businessName}</p>
-              <p className="text-sm text-muted-foreground">{c.assignedTo.ownerName} · {c.assignedTo.phone1}</p>
+              <p className="font-semibold">{c.assignedCentreId.businessName}</p>
+              <p className="text-sm text-muted-foreground">{c.assignedCentreId.ownerName} · {c.assignedCentreId.phone1}</p>
             </div>
           )}
 

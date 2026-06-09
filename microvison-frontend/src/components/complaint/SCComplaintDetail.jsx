@@ -74,7 +74,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       };
 
       // Petrol SC edit (only if in-warranty and it's SC's turn)
-      if (isInWarranty && c.petrolEditCount === 1 && petrolSC) {
+      if (isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && petrolSC !== '') {
         body.petrolSC = Number(petrolSC);
       }
 
@@ -288,7 +288,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                   )}
 
                   {/* Petrol SC input (if it's SC's turn and in-warranty) */}
-                  {isInWarranty && c.petrolEditCount === 1 && (
+                  {isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && (
                     <div>
                       <label className={labelCls}>Actual Petrol / Diesel (₹) — Your Turn</label>
                       <p className="text-xs text-muted-foreground mb-2">
