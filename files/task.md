@@ -1,34 +1,34 @@
-- [ ] **Phase 1 — Project Setup & Config (Day 1)**
-  - [ ] Initialize backend repo (`express, mongoose, cors, dotenv, bcryptjs, jsonwebtoken, multer, cloudinary, multer-storage-cloudinary, axios`)
-  - [ ] Set up `.env` and `.env.example`
-  - [ ] Database config (`config/db.js`)
-  - [ ] Cloudinary config (`config/cloudinary.js`)
-  - [ ] Brevo email config (`config/brevo.js` HTTP API wrapper)
-  - [ ] Express server setup (`server.js`)
-  - [ ] Initialize frontend Vite React app
-  - [ ] Tailwind & Shadcn initialization (`npx shadcn@latest init`)
-  - [ ] Add all Shadcn components (`button input textarea select table dialog tabs badge card form toast toaster sheet dropdown-menu skeleton alert avatar separator label`)
-  - [ ] Axios interceptor setup (`src/api/axios.js`)
-  - [ ] Vite PWA plugin config
+- [x] **Phase 1 — Project Setup & Config (Day 1)**
+  - [x] Initialize backend repo (`express, mongoose, cors, dotenv, bcryptjs, jsonwebtoken, multer, cloudinary, multer-storage-cloudinary, axios`)
+  - [x] Set up `.env` and `.env.example`
+  - [x] Database config (`config/db.js`)
+  - [x] Cloudinary config (`config/cloudinary.js`)
+  - [x] Brevo email config (`config/brevo.js` HTTP API wrapper)
+  - [x] Express server setup (`server.js`)
+  - [x] Initialize frontend Vite React app
+  - [x] Tailwind & Shadcn initialization (`npx shadcn@latest init`)
+  - [x] Add all Shadcn components (`button input textarea select table dialog tabs badge card form toast toaster sheet dropdown-menu skeleton alert avatar separator label`)
+  - [x] Axios interceptor setup (`src/api/axios.js`)
+  - [x] Vite PWA plugin config
 
-- [ ] **Phase 2 — Database Models (Day 1-2)**
-  - [ ] `City` model & Seed Script (`utils/seedCities.js`)
-  - [ ] `User` model
-  - [ ] `ServiceCentre` model
-  - [ ] `Preset` model
-  - [ ] `OtpToken` model (with TTL index)
-  - [ ] `Complaint` model
-  - [ ] `ComplaintUpdate` model
-  - [ ] `Invoice` model
+- [x] **Phase 2 — Database Models (Day 1-2)**
+  - [x] `City` model & Seed Script (`utils/seedCities.js`)
+  - [x] `User` model
+  - [x] `ServiceCentre` model
+  - [x] `Preset` model
+  - [x] `OtpToken` model (with TTL index)
+  - [x] `Complaint` model
+  - [x] `ComplaintUpdate` model
+  - [x] `Invoice` model
 
-- [ ] **Phase 3 — Auth System (Day 2-3)**
-  - [ ] Brevo HTTP wrapper function (`utils/sendEmail.js`)
-  - [ ] Auth controllers (Login, Register SC, Forgot Password, Verify OTP, Reset Password)
-  - [ ] JWT and RBAC Middlewares (`middleware/auth.js`, `middleware/rbac.js`)
-  - [ ] Auth routes (`routes/auth.routes.js`)
-  - [ ] React AuthContext (`context/AuthContext.jsx`)
-  - [ ] React ProtectedRoute in `App.jsx`
-  - [ ] Auth UI Pages (`Login.jsx`, `Register.jsx`, `ForgotPassword.jsx`, `VerifyOtp.jsx`, `ResetPassword.jsx`)
+- [x] **Phase 3 — Auth System (Day 2-3)**
+  - [x] Brevo HTTP wrapper function (`utils/sendEmail.js`)
+  - [x] Auth controllers (Login, Register SC, Forgot Password, Verify OTP, Reset Password)
+  - [x] JWT and RBAC Middlewares (`middleware/auth.js`, `middleware/rbac.js`)
+  - [x] Auth routes (`routes/auth.routes.js`)
+  - [x] React AuthContext (`context/AuthContext.jsx`)
+  - [x] React ProtectedRoute in `App.jsx`
+  - [x] Auth UI Pages (`Login.jsx`, `Register.jsx`, `ForgotPassword.jsx`, `VerifyOtp.jsx`, `ResetPassword.jsx`)
 
 - [x] **Phase 4 — Presets & Cities API (Day 3)**
   - [x] City controller & routes (`/cities`, `/cities/district/:district`)
@@ -37,35 +37,55 @@
   - [x] Admin Presets page (`pages/admin/Presets.jsx`)
   - [x] 3-way Cascading State/District/City dropdown UI in Register form
 
-- [ ] **Phase 5 — Service Centre Management (Day 4-5)**
-  - [ ] Service Centre controllers (getAll with filters/pagination, getById, approve, reject, update, deactivate, getStats)
-  - [ ] Service Centre routes
-  - [ ] `SCFilters` UI component
-  - [ ] Admin ServiceCentres List page (`pages/admin/ServiceCentres.jsx`)
-  - [ ] Admin SCDetail page (`pages/admin/SCDetail.jsx`)
+- [x] **Phase 5 — Service Centre Management (Day 4-5)**
+  - [x] `controllers/serviceCentre.controller.js` (getAll, getPending, getById, approve, reject, update, deactivate, getStats)
+  - [x] `routes/serviceCentre.routes.js`
+  - [x] `components/filters/SCFilters.jsx`
+  - [x] `pages/admin/ServiceCentres.jsx`
+  - [x] `pages/admin/SCDetail.jsx`
+  - [x] `pages/admin/ActionCentre.jsx` (GRD 11.1 — added, not in TBP)
+  - [x] `App.jsx` — routes for `/admin`, `/admin/service-centres`, `/admin/service-centres/:id`
+  - [x] `server.js` — mounted `/api/service-centres`
 
-- [ ] **Phase 6 — File Uploads (Day 5)**
-  - [ ] Multer & Cloudinary upload middleware (`middleware/upload.js`)
-  - [ ] Upload controllers & routes (`/upload/images`, `/upload/audio`)
-  - [ ] `ImageUploader` UI component
-  - [ ] `VoiceRecorder` UI component (with iOS Safari fallback)
+- [x] **Phase 6 — File Uploads (Day 5)**
+  - [x] Multer & Cloudinary upload middleware (`middleware/upload.js`)
+  - [x] Upload controllers & routes (`/upload/images`, `/upload/audio`)
+  - [x] `ImageUploader` UI component
+  - [x] `VoiceRecorder` UI component (with iOS Safari fallback)
 
-- [ ] **Phase 7 — Complaint Registration (Day 6-8)**
-  - [ ] ID generator utility (`MV-YYYY-XXXXX`)
-  - [ ] Reopen checker utility (`utils/reopenChecker.js`)
-  - [ ] Complaint creation & assignment controllers
-  - [ ] Complaint routes (`create`, `assign`, `reopen-check`)
-  - [ ] NewComplaint Step Wizard UI (`Step1CustomerInfo`, `Step2ProductType`, `Step3Charges`, `Step4AssignSC`)
-  - [ ] `ReopenBanner` UI component
+- [x] **Phase 7A — Complaint Backend (Day 6)**
+  - [x] `utils/generateComplaintId.js` (MV-YYYY-XXXXX, year-reset)
+  - [x] `utils/reopenChecker.js` (all 5 GRD Section 8 conditions)
+  - [x] `controllers/complaint.controller.js` (reopenCheck, create, assign)
+  - [x] `routes/complaint.routes.js` (GET reopen-check, POST /, PATCH /:id/assign)
+  - [x] `server.js` — mounted `/api/complaints`
+  - [x] Fixed duplicate index warning in `models/Complaint.js`
 
-- [ ] **Phase 8 — Service Centre Portal (Day 9-11)**
-  - [ ] SC Complaint controllers (getMyComplaints, accept, reject, markGoing, updateStatus)
-  - [ ] SC routes
-  - [ ] SCLayout & Sidebar (`pages/sc/SCLayout.jsx`, `layout/SCSidebar.jsx`)
-  - [ ] NewRequests page (`pages/sc/NewRequests.jsx`)
-  - [ ] MyComplaints page (`pages/sc/MyComplaints.jsx`)
-  - [ ] ComplaintDetail — SC mode (`components/complaint/ComplaintDetail.jsx`)
-  - [ ] `PetrolEditField` UI component
+- [x] **Phase 7B — Complaint Frontend Wizard (Day 7-8)**
+  - [x] `pages/admin/NewComplaint.jsx` (step wizard wrapper with full validation)
+  - [x] `components/forms/Step1CustomerInfo.jsx` (cascading city/district/state)
+  - [x] `components/forms/Step2ProductType.jsx` (card selection, cooler lock)
+  - [x] `components/forms/Step3Charges.jsx` (preset fetch, petrol, extras, media)
+  - [x] `components/forms/Step4AssignSC.jsx` (filtered SC cards, submit)
+  - [x] `components/complaint/ReopenBanner.jsx` (2-step reopen flow)
+  - [x] `App.jsx` — `/admin/new-complaint` route added
+  - [x] `ActionCentre.jsx` — "+ New Complaint" button + success message banner
+  - [x] Fixed all import paths (Phase 6 + 7B components)
+
+- [x] **Phase 8 — Service Centre Portal (Day 9-11)**
+  - [x] SC Complaint controllers (getMyComplaints, accept, reject, markGoing, updateStatus)
+  - [x] SC routes (`GET /my`, `PATCH /:id/accept`, `PATCH /:id/reject`, `PATCH /:id/going`, `PATCH /:id/status`)
+  - [x] `pages/sc/SCLayout.jsx` (sticky top nav, badge on New Requests, mobile hamburger drawer)
+  - [x] `pages/sc/NewRequests.jsx` (assigned complaints, Accept/Reject with confirm modals)
+  - [x] `pages/sc/MyComplaints.jsx` (all complaints with status/product/warranty filters)
+  - [x] `pages/sc/SCBilling.jsx` (placeholder — full in Phase 11)
+  - [x] `components/complaint/SCComplaintCard.jsx` (shared card for both pages)
+  - [x] `components/complaint/SCComplaintDetail.jsx` (slide panel: mark going, proof upload, final status, petrol, extras, OOW payment)
+  - [x] `components/complaint/PetrolEditField.jsx` (3-round petrol history + correct-turn editing)
+  - [x] `App.jsx` — SC nested routes wired (/sc, /sc/new-requests, /sc/my-complaints, /sc/billing)
+
+- [ ] **Phase 8.5 — SC Portal Polish (Deferred)**
+  - [ ] Create distinct UI flows/fields for `not_done`, `part_pending`, and `replacement` final statuses.
 
 - [ ] **Phase 9 — Admin Action Centre (Day 12-13)**
   - [ ] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)

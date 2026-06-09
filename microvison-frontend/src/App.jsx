@@ -15,6 +15,12 @@ import ServiceCentres from './pages/admin/ServiceCentres';
 import SCDetail from './pages/admin/SCDetail';
 import NewComplaint from './pages/admin/NewComplaint';
 
+// SC Pages
+import SCLayout from './pages/sc/SCLayout';
+import NewRequests from './pages/sc/NewRequests';
+import MyComplaints from './pages/sc/MyComplaints';
+import SCBilling from './pages/sc/SCBilling';
+
 // ProtectedRoute: blocks access if no token
 function ProtectedRoute({ children, allowedRole }) {
   const { token, user } = useAuth();
@@ -97,15 +103,24 @@ function AppRoutes() {
         }
       />
 
-      {/* SC routes — placeholder, built in Phase 8+ */}
+      {/* SC routes — GRD Section 10 */}
       <Route
-        path="/sc/*"
+        path="/sc"
         element={
           <ProtectedRoute allowedRole="service_centre">
-            <div>SC Dashboard — Phase 8+</div>
+            <SCLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        {/* Default redirect to new requests */}
+        <Route index element={<Navigate to="/sc/new-requests" replace />} />
+        {/* Tab 1 — New Requests (GRD 10.1) */}
+        <Route path="new-requests" element={<NewRequests />} />
+        {/* Tab 2 — My Complaints (GRD 10.2) */}
+        <Route path="my-complaints" element={<MyComplaints />} />
+        {/* Tab 3 — Billing (GRD 10.3, built Phase 11) */}
+        <Route path="billing" element={<SCBilling />} />
+      </Route>
 
       {/* Default redirect */}
       <Route path="/" element={<RoleRedirect />} />

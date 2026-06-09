@@ -155,6 +155,14 @@ Each entry follows this structure:
 - **Type:** DEFERRED
 - **Summary:** TBP lists `sendWhatsApp.js` as part of Phase 7. As explicitly agreed by the user, all WhatsApp integration is deferred to Phase 13. The utility file will NOT be created until then.
 
+## Phase 8 — Service Centre Portal
+
+### DEV-TBP-017
+- **Phase:** 8
+- **TBP Section:** Phase 8, File 4 — `components/complaint/ComplaintDetail.jsx`
+- **Type:** CHANGED
+- **Summary:** TBP specified that `proofPhotos` and `customerPaymentAmount` should block the final submission until provided. This strict validation was updated to only trigger if the SC selects **Done** as the final status. If they select **Not Done**, **Part Pending**, or **Replacement**, the required validations are bypassed since those states naturally do not require completion proof or customer payment. A completely distinct UI flow for these edge-case statuses will be built in a later polish phase.
+
 ---
 
 ## Future Phases

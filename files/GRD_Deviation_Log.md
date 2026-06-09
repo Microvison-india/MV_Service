@@ -119,6 +119,18 @@ Each entry follows this structure:
 - **Type:** ADDED
 - **Summary:** GRD states the preset price must be pulled from the database for in-warranty complaints. Per user request, an explicit "**Custom / Manual Entry**" option was added to the Preset dropdown. This allows the admin to manually input a Custom Preset Title and Price directly during registration without needing to pre-configure it in the Preset Management screen.
 
+### DEV-GRD-013
+- **Phase:** 8
+- **GRD Section:** 10.2 (Tab 2 — My Complaints)
+- **Type:** CHANGED
+- **Summary:** GRD lists filters for the SC "My Complaints" tab. As a UX enhancement, the default view when loading this tab applies a `status: accepted,going` filter (labeled "Active Jobs"). This ensures the SC immediately sees the work they need to do today, rather than a mixed list of closed/rejected complaints. The SC can change the dropdown to "All Statuses" to see their full history.
+
+### DEV-GRD-014
+- **Phase:** 8
+- **GRD Section:** 10.2 (Complaint Detail actions)
+- **Type:** CHANGED
+- **Summary:** GRD states proof photos and out-of-warranty customer payments are "mandatory before marking final status". This validation has been relaxed to only apply when the SC marks the final status specifically as **Done**. For statuses like *Not Done*, *Part Pending*, or *Replacement*, these fields are treated as optional to avoid blocking the workflow (e.g. an SC cannot take a completion photo if the customer wasn't home). UI flow tweaks for these edge-case statuses are deferred to a later polish phase.
+
 ---
 
 ## Future Phases
