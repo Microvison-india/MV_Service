@@ -17,9 +17,13 @@ const {
   rejectExtra,
   getActionItems,
   getComplaintById,
+  getAllComplaints,
 } = require('../controllers/complaint.controller');
 
 // ── Admin Routes (all require auth + isAdmin) ───────────────────
+// GET  /api/complaints — Get all complaints (with filters)
+router.get('/', auth, isAdmin, getAllComplaints);
+
 // GET  /api/complaints/reopen-check?phone1=&product=&complaintType=
 router.get('/reopen-check', auth, isAdmin, reopenCheck);
 

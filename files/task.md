@@ -87,6 +87,7 @@
 - [ ] **Phase 8.5 — App Polish & Logic Tweaks (Deferred)**
   - [ ] Create distinct UI flows/fields for `not_done`, `part_pending`, and `replacement` final statuses on the SC portal.
   - [ ] Refine SC Assignment Logic (Filter/limit "To whom we can assign" during complaint creation Step 4).
+  - [ ] Changes in flow and state of complaint (will change later and update deviation logs if needed).
 
 - [x] **Phase 9 — Admin Action Centre (Day 12-13)**
   - [x] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
@@ -97,13 +98,14 @@
   - [x] `StatusTimeline` UI component
   - [x] `AdminComplaintDetail` UI slide panel
 
-- [ ] **Phase 10 — Admin Complaints Tab (Day 14-15)**
-  - [ ] Complaint getAll controller (with 12+ filters, pagination, sorting)
-  - [ ] Admin complaint routes
-  - [ ] `ComplaintFilters` UI component
-  - [ ] AllComplaints page UI (`pages/admin/AllComplaints.jsx`)
-  - [ ] ComplaintDetail — Admin mode
-  - [ ] `useComplaints` hook
+- [x] **Phase 10 — Admin Complaints Tab (Day 14-15)**
+  - [x] Complaint getAll controller (with 12+ filters, pagination, sorting)
+  - [x] Admin complaint routes
+  - [x] `ComplaintFilters` UI component
+  - [x] AllComplaints page UI (`pages/admin/AllComplaints.jsx`)
+  - [x] ComplaintDetail — Admin mode
+  - [x] `useComplaints` hook
+  - [x] Integrated `AdminLayout` navigation wrapper
 
 - [ ] **Phase 11 — Billing (Day 16-17)**
   - [ ] Billing calculator logic (`utils/billingCalculator.js`)

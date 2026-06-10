@@ -133,5 +133,37 @@ Each entry follows this structure:
 
 ---
 
+## Phase 10 — Admin Complaints Tab
+
+### DEV-GRD-015
+- **Phase:** 10
+- **GRD Section:** 7.2 (Status Flow) / 7.3 (Status Transition Rules)
+- **Type:** DECISION
+- **Summary:** Clarified and mapped the exact status transition rules, definitions, and flowchart for the complaint lifecycle (including how the `new` status represents `Unassigned` complaints, and how SC updates transition to `done`, `not_done`, `part_pending`, and `replacement` states). Added a Mermaid diagram documenting this flow.
+
+#### Complaint Status Lifecycle Flowchart:
+```mermaid
+graph TD
+    classDef admin fill:#bfdbfe,stroke:#2563eb,stroke-width:2px,color:#000000;
+    classDef sc fill:#fbcfe8,stroke:#db2777,stroke-width:2px,color:#000000;
+    classDef system fill:#e2e8f0,stroke:#475569,stroke-width:2px,color:#000000;
+
+    New("new (Unassigned)"):::system -->|Admin assigns SC| Assigned(assigned):::admin
+    Assigned -->|SC accepts| Accepted(accepted):::sc
+    Assigned -->|SC rejects| Rejected(rejected_by_sc):::sc
+    Rejected -->|Admin reassigns| Assigned
+    Accepted -->|SC starts travel| Going(going):::sc
+    Accepted & Going -->|SC submits work| Done(done):::sc
+    Accepted & Going -->|SC submits block| NotDone(not_done):::sc
+    Accepted & Going -->|SC awaits parts| PartPending(part_pending):::sc
+    Accepted & Going -->|SC escalates| Replacement(replacement):::sc
+    
+    Done & NotDone & PartPending & Replacement -->|Admin disputes work| Accepted
+    Done & NotDone & PartPending & Replacement -->|Admin approves & locks| Closed(closed):::admin
+    Closed -->|Admin triggers Reopen| Reopened(reopened):::admin
+```
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

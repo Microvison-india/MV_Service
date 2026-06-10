@@ -9,11 +9,13 @@ import VerifyOtp from './pages/auth/VerifyOtp';
 import ResetPassword from './pages/auth/ResetPassword';
 
 // Admin Pages
+import AdminLayout from './pages/admin/AdminLayout';
 import Presets from './pages/admin/Presets';
 import ActionCentre from './pages/admin/ActionCentre';
 import ServiceCentres from './pages/admin/ServiceCentres';
 import SCDetail from './pages/admin/SCDetail';
 import NewComplaint from './pages/admin/NewComplaint';
+import AllComplaints from './pages/admin/AllComplaints';
 
 // SC Pages
 import SCLayout from './pages/sc/SCLayout';
@@ -55,53 +57,30 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Admin routes */}
-      {/* Tab 1 — Action Centre (GRD 11.1) */}
       <Route
         path="/admin"
         element={
           <ProtectedRoute allowedRole="admin">
-            <ActionCentre />
+            <AdminLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        {/* Index: Action Centre (GRD 11.1) */}
+        <Route index element={<ActionCentre />} />
 
-      {/* Presets management (GRD 4.2) */}
-      <Route
-        path="/admin/presets"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <Presets />
-          </ProtectedRoute>
-        }
-      />
+        {/* Tab 3 — All Complaints (GRD 11.3 / Phase 10) */}
+        <Route path="complaints" element={<AllComplaints />} />
 
-      {/* Tab 2 — Service Centres (GRD 11.2) */}
-      <Route
-        path="/admin/service-centres"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <ServiceCentres />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/service-centres/:id"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <SCDetail />
-          </ProtectedRoute>
-        }
-      />
+        {/* Presets management (GRD 4.2) */}
+        <Route path="presets" element={<Presets />} />
 
-      {/* New Complaint Wizard (GRD Section 6) */}
-      <Route
-        path="/admin/new-complaint"
-        element={
-          <ProtectedRoute allowedRole="admin">
-            <NewComplaint />
-          </ProtectedRoute>
-        }
-      />
+        {/* Tab 2 — Service Centres (GRD 11.2) */}
+        <Route path="service-centres" element={<ServiceCentres />} />
+        <Route path="service-centres/:id" element={<SCDetail />} />
+
+        {/* New Complaint Wizard (GRD Section 6) */}
+        <Route path="new-complaint" element={<NewComplaint />} />
+      </Route>
 
       {/* SC routes — GRD Section 10 */}
       <Route

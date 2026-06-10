@@ -672,6 +672,119 @@ const getActionItems = async (req, res) => {
   });
 };
 
+// ─────────────────────────────────────────────────────────────
+// @desc    Get all complaints with 12+ filters, search, pagination
+// @route   GET /api/complaints
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const getAllComplaints = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      city,
+      district,
+      state,
+      product,
+      complaintType,
+      warrantyStatus,
+      status,
+      assignedCentreId,
+      scCapability,
+      dateFrom,
+      dateTo,
+      isReopened,
+    } = req.query;
+
+    const query = {};
+
+    // 1. Text Search (customerName, phone1, phone2, complaintId)
+    if (search) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { customerName: searchRegex },
+        { phone1: searchRegex },
+        { phone2: searchRegex },
+        { complaintId: searchRegex },
+      ];
+    }
+
+    // 2. Direct filters
+    if (city) query.city = city;
+    if (district) query.district = district;
+    if (state) query.state = state;
+    if (product) query.product = product;
+    if (complaintType) query.complaintType = complaintType;
+    if (warrantyStatus) query.warrantyStatus = warrantyStatus;
+
+    // 3. Status filter (can be single or multiple comma-separated)
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim());
+      query.status = { $in: statuses };
+    }
+
+    // 4. Assigned SC filter
+    if (assignedCentreId) {
+      query.assignedCentreId = assignedCentreId;
+    }
+
+    // 5. SC Product Capability filter (subquery on ServiceCentre)
+    if (scCapability) {
+      const scs = await ServiceCentre.find({ productCapability: scCapability }).select('_id').lean();
+      const scIds = scs.map((s) => s._id);
+      query.assignedCentreId = { $in: scIds };
+    }
+
+    // 6. Date Range filter (createdAt)
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) {
+        query.createdAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = endOfDay;
+      }
+    }
+
+    // 7. Reopened flag filter
+    if (isReopened === 'true') {
+      query.isReopened = true;
+    } else if (isReopened === 'false') {
+      query.isReopened = false;
+    }
+
+    // Pagination
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.max(1, parseInt(limit, 10));
+    const skipNum = (pageNum - 1) * limitNum;
+
+    // Execute query
+    const complaints = await Complaint.find(query)
+      .populate('assignedCentreId', 'businessName ownerName phone1')
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skipNum)
+      .limit(limitNum)
+      .lean();
+
+    const total = await Complaint.countDocuments(query);
+
+    res.status(200).json({
+      complaints,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
+  } catch (error) {
+    console.error('Error in getAllComplaints:', error);
+    res.status(500).json({ message: 'Server error while fetching complaints.' });
+  }
+};
+
 module.exports = {
   reopenCheck,
   createComplaint,
@@ -687,4 +800,5 @@ module.exports = {
   rejectExtra,
   getActionItems,
   getComplaintById,
+  getAllComplaints,
 };

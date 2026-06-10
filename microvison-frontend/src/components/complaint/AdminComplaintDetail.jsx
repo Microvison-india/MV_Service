@@ -25,6 +25,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
+
+  // Reassignment states
+  const [candidates, setCandidates] = useState([]);
+  const [selectedSCId, setSelectedSCId] = useState('');
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
   
   useEffect(() => {
     let active = true;
@@ -54,6 +59,46 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       active = false;
     };
   }, [complaintId, refreshTick]);
+
+  // Fetch candidate Service Centres for reassignment
+  useEffect(() => {
+    let active = true;
+    if (c && ['new', 'assigned', 'rejected_by_sc'].includes(c.status)) {
+      setLoadingCandidates(true);
+      api.get('/api/service-centres', { params: { status: 'active', limit: 100 } })
+        .then(({ data }) => {
+          if (!active) return;
+          const allSCs = data.serviceCentres || [];
+          const getRequiredCapabilities = (product) => {
+            if (product === 'led') return ['led_only', 'both'];
+            if (product === 'cooler') return ['cooler_only', 'both'];
+            if (product === 'both') return ['both'];
+            return [];
+          };
+          const required = getRequiredCapabilities(c.product);
+          
+          let matches = allSCs.filter(
+            (sc) =>
+              sc.city?.toLowerCase() === c.city?.toLowerCase() &&
+              required.includes(sc.productCapability)
+          );
+          
+          if (matches.length === 0) {
+            matches = allSCs.filter(
+              (sc) =>
+                sc.district?.toLowerCase() === c.district?.toLowerCase() &&
+                required.includes(sc.productCapability)
+            );
+          }
+          setCandidates(matches);
+        })
+        .catch((err) => console.error('Failed to fetch SC candidates:', err))
+        .finally(() => {
+          if (active) setLoadingCandidates(false);
+        });
+    }
+    return () => { active = false; };
+  }, [c]);
 
   if (loading) {
     return (
@@ -103,6 +148,24 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       setTimeout(onUpdated, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to dispute job.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReassign = async () => {
+    if (!selectedSCId) {
+      setError('Please select a service centre.');
+      return;
+    }
+    setActionLoading('reassign');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/assign`, { serviceCentreId: selectedSCId });
+      setSuccess('Complaint reassigned successfully!');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reassign complaint.');
     } finally {
       setActionLoading(false);
     }
@@ -211,7 +274,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             <StatusTimeline updates={updates} />
           </div>
 
-          {/* Admin Confirm / Dispute Actions */}
+          {/* Admin Confirm / Dispute / Reassign Actions */}
           {canConfirmOrDispute ? (
             <div className="pt-6 border-t border-border space-y-6">
               <h3 className="font-bold text-lg text-foreground">Admin Decision</h3>
@@ -254,6 +317,45 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   {actionLoading === 'dispute' ? 'Disputing...' : '✕ Dispute Job'}
                 </button>
               </div>
+            </div>
+          ) : ['new', 'assigned', 'rejected_by_sc'].includes(c.status) ? (
+            <div className="pt-6 border-t border-border space-y-4">
+              <h3 className="font-bold text-lg text-foreground">Reassign Service Centre</h3>
+              
+              {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">{error}</p>}
+              {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">{success}</p>}
+
+              {loadingCandidates ? (
+                <p className="text-sm text-muted-foreground animate-pulse">Loading matching service centres...</p>
+              ) : candidates.length === 0 ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+                  No active service centres found for <strong>{c.city}</strong> or <strong>{c.district}</strong> matching capability.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <label className={labelCls}>Select Service Centre</label>
+                  <select
+                    value={selectedSCId}
+                    onChange={(e) => setSelectedSCId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">-- Choose Service Centre --</option>
+                    {candidates.map((sc) => (
+                      <option key={sc._id} value={sc._id}>
+                        {sc.businessName} ({sc.city} - {sc.ownerName})
+                      </option>
+                    ))}
+                  </select>
+                  
+                  <button
+                    onClick={handleReassign}
+                    disabled={!!actionLoading || !selectedSCId}
+                    className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition"
+                  >
+                    {actionLoading === 'reassign' ? 'Reassigning...' : 'Reassign Service Centre'}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="pt-6 border-t border-border">
