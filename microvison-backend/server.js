@@ -22,6 +22,7 @@ app.use('/api/presets', require('./routes/preset.routes'));
 app.use('/api/service-centres', require('./routes/serviceCentre.routes'));
 app.use('/api/upload', require('./routes/upload.routes'));
 app.use('/api/complaints', require('./routes/complaint.routes'));
+app.use('/api/billing', require('./routes/billing.routes'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 // Error handler

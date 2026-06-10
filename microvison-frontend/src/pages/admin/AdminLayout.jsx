@@ -17,6 +17,7 @@ export default function AdminLayout() {
     { path: '/admin/complaints', label: 'All Complaints', icon: '📋' },
     { path: '/admin/service-centres', label: 'Service Centres', icon: '🏢' },
     { path: '/admin/presets', label: 'Presets', icon: '🏷️' },
+    { path: '/admin/billing', label: 'Billing', icon: '💰' },
   ];
 
   return (

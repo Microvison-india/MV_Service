@@ -16,6 +16,7 @@ import ServiceCentres from './pages/admin/ServiceCentres';
 import SCDetail from './pages/admin/SCDetail';
 import NewComplaint from './pages/admin/NewComplaint';
 import AllComplaints from './pages/admin/AllComplaints';
+import Billing from './pages/admin/Billing';
 
 // SC Pages
 import SCLayout from './pages/sc/SCLayout';
@@ -77,6 +78,9 @@ function AppRoutes() {
         {/* Tab 2 — Service Centres (GRD 11.2) */}
         <Route path="service-centres" element={<ServiceCentres />} />
         <Route path="service-centres/:id" element={<SCDetail />} />
+
+        {/* Tab 4 — Billing (Phase 11) */}
+        <Route path="billing" element={<Billing />} />
 
         {/* New Complaint Wizard (GRD Section 6) */}
         <Route path="new-complaint" element={<NewComplaint />} />

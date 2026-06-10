@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../../api/axios';
 import ImageUploader from '../forms/ImageUploader';
 import PetrolEditField from './PetrolEditField';
+import BillSummary from './BillSummary';
 
 // GRD Section 10.2 — SC Complaint Detail slide panel
 // Opened from MyComplaints when SC clicks "Open Details"
@@ -212,12 +213,21 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
             />
           )}
 
+          {/* Bill Summary (Only if Closed) */}
+          {c.status === 'closed' && (
+            <BillSummary complaint={c} />
+          )}
+
           {/* ── Action Section ── */}
           {alreadyFinished ? (
             <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-4 text-center">
-              <p className="text-green-800 font-semibold">Job submitted!</p>
+              <p className="text-green-800 font-semibold">
+                {c.status === 'closed' ? 'Job Closed & Locked!' : 'Job submitted!'}
+              </p>
               <p className="text-sm text-green-700 mt-1">
-                Status: <strong>{c.status.replace(/_/g, ' ')}</strong>. Waiting for admin to confirm.
+                {c.status === 'closed'
+                  ? 'This complaint has been verified and closed by admin.'
+                  : `Status: ${c.status.replace(/_/g, ' ')}. Waiting for admin to confirm.`}
               </p>
             </div>
           ) : (

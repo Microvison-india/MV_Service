@@ -4,6 +4,7 @@ const auth = require('../middleware/auth');
 const { isAdmin, isSC } = require('../middleware/rbac');
 const {
   reopenCheck,
+  reopenComplaint,
   createComplaint,
   assignComplaint,
   getMyComplaints,
@@ -32,6 +33,9 @@ router.post('/', auth, isAdmin, createComplaint);
 
 // PATCH /api/complaints/:id/assign — Assign to an SC
 router.patch('/:id/assign', auth, isAdmin, assignComplaint);
+
+// POST /api/complaints/:id/reopen — Reopen a closed complaint
+router.post('/:id/reopen', auth, isAdmin, reopenComplaint);
 
 // ── Admin Action Centre Routes (Phase 9) ───────────────────
 // GET /api/complaints/action-items — Dashboard lists and counts

@@ -107,20 +107,24 @@
   - [x] `useComplaints` hook
   - [x] Integrated `AdminLayout` navigation wrapper
 
-- [ ] **Phase 11 — Billing (Day 16-17)**
-  - [ ] Billing calculator logic (`utils/billingCalculator.js`)
-  - [ ] Billing controllers (`getComplaintBills`, `getMonthlyInvoice`)
-  - [ ] Billing routes
-  - [ ] `BillingTable` & `MonthlyInvoice` UI components
-  - [ ] `BillSummary` UI component
-  - [ ] Admin Billing page (`pages/admin/Billing.jsx`)
-  - [ ] SC Billing page (`pages/sc/SCBilling.jsx`)
-  - [ ] `useBilling` hook
+- [x] **Phase 11 — Billing (Day 16-17)**
+  - [x] Billing calculator logic (`utils/billingCalculator.js`)
+  - [x] Billing controllers (`getComplaintBills`, `getMonthlyInvoice`)
+  - [x] Billing routes
+  - [x] `BillingTable` & `MonthlyInvoice` UI components
+  - [x] `BillSummary` UI component
+  - [x] Admin Billing page (`pages/admin/Billing.jsx`)
+  - [x] SC Billing page (`pages/sc/SCBilling.jsx`)
+  - [x] `useBilling` hook
 
-- [ ] **Phase 12 — Reopen Flow (Day 18)**
-  - [ ] Reopen controller logic
-  - [ ] Reopen routes
-  - [ ] Reopen forms in UI (ReopenBanner wiring)
+- [x] **Phase 12 — Reopen Flow (Day 18)**
+  - [x] Backend reopen helper logic in `reopenChecker.js`
+  - [x] Backend controller implementation in `complaint.controller.js`
+  - [x] Backend route mounting in `complaint.routes.js`
+  - [x] Frontend `ReopenBanner.jsx` integration
+  - [x] Frontend `NewComplaint.jsx` workflow wiring
+  - [x] Frontend `AdminComplaintDetail.jsx` inline reopen action panel
+  - [ ] Reopen condition change and from where we can reopen it, we will deal with it later
 
 - [ ] **Phase 13 — PWA + Polish + Deploy (Day 19-20)**
   - [ ] Finalize Vite PWA config & Icons

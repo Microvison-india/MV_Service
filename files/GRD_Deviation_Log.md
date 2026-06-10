@@ -165,5 +165,22 @@ graph TD
 
 ---
 
+## Phase 12 — Reopen Flow
+
+### DEV-GRD-016
+- **Phase:** 12
+- **GRD Section:** 8 (Complaint Reopen Logic)
+- **Type:** CHANGED
+- **Summary:** GRD stated that the original complaint status must be `done` or `not_done` for a reopen. Clarified with the user that **only fully closed complaints** (`status === 'closed'`) can be reopened. Active, rejected, or unconfirmed complaints cannot be reopened.
+- **Resolution Check:** To verify that the closed complaint was originally resolved as `done` or `not_done` before closing (and not escalations like `replacement` or `part_pending`), we query the `ComplaintUpdate` logs.
+
+### DEV-GRD-017
+- **Phase:** 12
+- **GRD Section:** 8 (Complaint Reopen Logic) / WhatsApp Integration
+- **Type:** DEFERRED
+- **Summary:** The WhatsApp trigger for reopens (`complaint_reopened` template) is deferred to Phase 14 per agreement `DEV-TBP-008` (WhatsApp integration is deferred to the end of the project). Added a `// TODO (Phase 14)` placeholder comment in the reopen controller.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

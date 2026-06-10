@@ -19,17 +19,37 @@ const findReopenEligible = async (phone1, product, complaintType) => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+  // Find the most recent closed complaint for this customer/product within 30 days
   const existing = await Complaint.findOne({
     phone1,
     product,
     complaintType,
-    status: { $in: ['done', 'not_done'] },
+    status: 'closed',
     createdAt: { $gte: thirtyDaysAgo },
   })
+    .sort({ createdAt: -1 })
     .select('complaintId customerName city status createdAt')
     .lean();
 
-  return existing || null;
+  if (existing) {
+    // Dynamically require ComplaintUpdate to prevent circular imports if any
+    const ComplaintUpdate = require('../models/ComplaintUpdate');
+    
+    // Find the update log when it was closed
+    const updateLog = await ComplaintUpdate.findOne({
+      complaintId: existing._id,
+      newStatus: 'closed',
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Only eligible if the status before closing was 'done' or 'not_done'
+    if (updateLog && ['done', 'not_done'].includes(updateLog.oldStatus)) {
+      return existing;
+    }
+  }
+
+  return null;
 };
 
 module.exports = { findReopenEligible };

@@ -3,6 +3,7 @@ import api from '../../api/axios';
 import ExtraChargesList from './ExtraChargesList';
 import StatusTimeline from './StatusTimeline';
 import PetrolEditField from './PetrolEditField';
+import BillSummary from './BillSummary';
 
 // GRD Section 11.1 / TBP Phase 9
 // Admin slide-out review panel for a complaint.
@@ -30,6 +31,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [candidates, setCandidates] = useState([]);
   const [selectedSCId, setSelectedSCId] = useState('');
   const [loadingCandidates, setLoadingCandidates] = useState(false);
+
+  // Reopen states
+  const [reopenNotes, setReopenNotes] = useState('');
+  const [reopenPhotos, setReopenPhotos] = useState([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   
   useEffect(() => {
     let active = true;
@@ -116,6 +122,16 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
   const canConfirmOrDispute = ['done', 'not_done', 'part_pending', 'replacement'].includes(c.status);
 
+  const getPreCloseStatus = () => {
+    if (!updates || updates.length === 0) return null;
+    const closedUpdate = updates.find(u => u.newStatus === 'closed');
+    return closedUpdate ? closedUpdate.oldStatus : null;
+  };
+  const preCloseStatus = getPreCloseStatus();
+  const isReopenEligible = c.status === 'closed' && 
+    (new Date() - new Date(c.createdAt)) / (1000 * 60 * 60 * 24) <= 30 &&
+    ['done', 'not_done'].includes(preCloseStatus);
+
   const handleConfirm = async () => {
     setActionLoading('confirm');
     setError('');
@@ -166,6 +182,55 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       setTimeout(onUpdated, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reassign complaint.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReopenPhotoUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    if (reopenPhotos.length + files.length > 2) {
+      alert('Maximum 2 reopen photos allowed.');
+      e.target.value = null;
+      return;
+    }
+
+    setUploadingPhotos(true);
+    const formData = new FormData();
+    files.forEach((f) => formData.append('images', f));
+    try {
+      const { data } = await api.post('/api/upload/images', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setReopenPhotos((prev) => [...prev, ...data.images.map((img) => img.url)]);
+    } catch {
+      setError('Photo upload failed. Please try again.');
+    } finally {
+      setUploadingPhotos(false);
+      e.target.value = null;
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!reopenNotes.trim()) {
+      setError('Reopen notes are required.');
+      return;
+    }
+    setActionLoading('reopen');
+    setError('');
+    try {
+      const { data } = await api.post(`/api/complaints/${c._id}/reopen`, {
+        reopenNotes: reopenNotes.trim(),
+        reopenPhotos,
+      });
+      setSuccess(`Complaint reopened successfully as ${data.complaint.complaintId}!`);
+      setTimeout(() => {
+        onUpdated();
+      }, 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reopen complaint.');
     } finally {
       setActionLoading(false);
     }
@@ -268,6 +333,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             />
           </div>
 
+          {/* Bill Summary (Only if Closed) */}
+          {c.status === 'closed' && (
+            <BillSummary complaint={c} />
+          )}
+
           {/* Status Timeline */}
           <div className="space-y-4">
             <h3 className="font-semibold text-foreground border-b border-border pb-2">Activity Timeline</h3>
@@ -356,6 +426,56 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   </button>
                 </div>
               )}
+            </div>
+          ) : isReopenEligible ? (
+            <div className="pt-6 border-t border-border space-y-6">
+              <h3 className="font-bold text-lg text-foreground">Reopen Complaint</h3>
+              
+              {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">{error}</p>}
+              {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">{success}</p>}
+
+              <div className="space-y-3 p-4 bg-yellow-50/50 rounded-xl border border-yellow-200">
+                <label className="block text-xs font-semibold text-yellow-800 uppercase tracking-wide mb-1">
+                  Describe Reopen Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  placeholder="Describe why this complaint is being reopened (Required)..."
+                  value={reopenNotes}
+                  onChange={(e) => setReopenNotes(e.target.value)}
+                  className={`${inputCls} border-yellow-300 focus:ring-yellow-400`}
+                  rows={3}
+                />
+                
+                <div>
+                  <label className="block text-xs font-semibold text-yellow-800 uppercase tracking-wide mb-1">
+                    Reopen Photos (Optional, max 2)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleReopenPhotoUpload}
+                    disabled={uploadingPhotos || reopenPhotos.length >= 2}
+                    className="text-sm text-yellow-800 mt-1"
+                  />
+                  {uploadingPhotos && <p className="text-xs text-yellow-700 mt-1">Uploading...</p>}
+                  {reopenPhotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {reopenPhotos.map((url, i) => (
+                        <img key={i} src={url} alt={`reopen-${i}`} className="w-12 h-12 rounded object-cover border border-yellow-300" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleReopen}
+                  disabled={!!actionLoading || uploadingPhotos}
+                  className="w-full py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-bold disabled:opacity-50 transition"
+                >
+                  {actionLoading === 'reopen' ? 'Reopening...' : '⚠️ Confirm & Reopen'}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="pt-6 border-t border-border">

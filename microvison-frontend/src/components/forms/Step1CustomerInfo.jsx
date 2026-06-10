@@ -6,7 +6,7 @@ import ReopenBanner from '../complaint/ReopenBanner';
 // Fields: customerName, phone1, phone2, localAddress, city (dropdown), district (auto), state (auto)
 // On phone1 blur: check for reopen eligibility (requires product + complaintType from Step 2 — we check again in Step 2)
 
-export default function Step1CustomerInfo({ formData, setFormData, reopenData, setReopenData }) {
+export default function Step1CustomerInfo({ formData, setFormData, reopenData, setReopenData, onReopenSuccess }) {
   const [cities, setCities] = useState([]);
   const [loadingCities, setLoadingCities] = useState(true);
   const [checkingReopen, setCheckingReopen] = useState(false);
@@ -92,14 +92,11 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
     }
   };
 
-  const handleReopenConfirm = ({ reopenNotes, reopenPhotos }) => {
-    setReopenData({
-      isReopened: true,
-      reopenParentId: reopenResult.existingComplaint._id,
-      reopenNotes,
-      reopenPhotos,
-    });
+  const handleReopenConfirm = (newComplaint) => {
     setShowBanner(false);
+    if (onReopenSuccess) {
+      onReopenSuccess(newComplaint);
+    }
   };
 
   const handleReopenDismiss = () => {

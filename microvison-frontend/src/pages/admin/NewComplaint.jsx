@@ -228,6 +228,9 @@ export default function NewComplaint() {
               setFormData={setFormData}
               reopenData={reopenData}
               setReopenData={setReopenData}
+              onReopenSuccess={(newC) => {
+                navigate('/admin', { state: { successMessage: `Complaint ${newC.complaintId} reopened successfully! Please assign it below.` } });
+              }}
             />
           )}
           {currentStep === 2 && (

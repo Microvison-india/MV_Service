@@ -165,5 +165,22 @@ Each entry follows this structure:
 
 ---
 
+## Phase 12 — Reopen Flow
+
+### DEV-TBP-018
+- **Phase:** 12
+- **TBP Section / File:** Phase 12, File 1 — `reopen` / `reopenChecker.js`
+- **Type:** CHANGED
+- **Summary:** Only complaints with `status === 'closed'` are eligible for reopening. To verify their pre-close status was `done` or `not_done`, the helper queries the `ComplaintUpdate` collection.
+- **WhatsApp Integration:** WhatsApp trigger was deferred as a `// TODO` placeholder comment in the controller per DEV-TBP-008.
+
+### DEV-TBP-019
+- **Phase:** 12
+- **TBP Section / File:** `AdminComplaintDetail.jsx`
+- **Type:** ADDED
+- **Summary:** Added an inline **Reopen Complaint** action panel inside the detail slide-out review panel for eligible closed complaints, matching the inline aesthetics of Confirm/Dispute actions. It features a required notes textarea and a Cloudinary-powered image uploader (optional, max 2 images).
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

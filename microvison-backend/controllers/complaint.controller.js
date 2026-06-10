@@ -33,6 +33,116 @@ const reopenCheck = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// @desc    Reopen a closed complaint (creates a new complaint referencing the old one)
+// @route   POST /api/complaints/:id/reopen
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const reopenComplaint = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reopenNotes, reopenPhotos } = req.body;
+
+    if (!reopenNotes || !reopenNotes.trim()) {
+      return res.status(400).json({ message: 'Reopen notes are required.' });
+    }
+
+    const parent = await Complaint.findById(id);
+    if (!parent) {
+      return res.status(404).json({ message: 'Original complaint not found.' });
+    }
+
+    // Strict eligibility checks:
+    // 1. Current status must be 'closed'
+    if (parent.status !== 'closed') {
+      return res.status(400).json({ message: 'Only closed complaints can be reopened.' });
+    }
+
+    // 2. Created within the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    if (parent.createdAt < thirtyDaysAgo) {
+      return res.status(400).json({ message: 'Complaint cannot be reopened after 30 days.' });
+    }
+
+    // 3. Pre-closed resolution must be done or not_done
+    const updateLog = await ComplaintUpdate.findOne({
+      complaintId: parent._id,
+      newStatus: 'closed',
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!updateLog || !['done', 'not_done'].includes(updateLog.oldStatus)) {
+      return res.status(400).json({
+        message: 'Only complaints resolved as Done or Not Done can be reopened.',
+      });
+    }
+
+    // 4. Generate new complaint ID
+    const newComplaintId = await generateComplaintId();
+
+    // 5. Create the reopened complaint record
+    const reopened = await Complaint.create({
+      complaintId: newComplaintId,
+      customerName: parent.customerName,
+      phone1: parent.phone1,
+      phone2: parent.phone2,
+      localAddress: parent.localAddress,
+      city: parent.city,
+      district: parent.district,
+      state: parent.state,
+      product: parent.product,
+      complaintType: parent.complaintType,
+      warrantyStatus: parent.warrantyStatus,
+      presetId: parent.presetId,
+      presetName: parent.presetName,
+      presetPrice: parent.presetPrice,
+      petrolAdmin: parent.petrolAdmin,
+      petrolSC: null,
+      petrolFinal: null,
+      petrolEditCount: 0,
+      petrolLocked: false,
+      extraCharges: [],
+      customerPaymentAmount: null,
+      notes: parent.notes,
+      adminPhotos: parent.adminPhotos,
+      voiceNoteUrl: parent.voiceNoteUrl,
+      
+      // Reopen flags
+      isReopened: true,
+      reopenedAt: new Date(),
+      reopenParentId: parent._id,
+      reopenNotes: reopenNotes.trim(),
+      reopenPhotos: reopenPhotos || [],
+      
+      status: 'new',
+      createdBy: req.user.id,
+    });
+
+    // Create ComplaintUpdate log for the new reopened complaint
+    await ComplaintUpdate.create({
+      complaintId: reopened._id,
+      updatedBy: req.user.id,
+      role: 'admin',
+      oldStatus: '',
+      newStatus: 'new',
+      note: `Complaint reopened from ${parent.complaintId}. Reopen notes: ${reopenNotes.trim()}`,
+    });
+
+    // TODO (Phase 14): Send WhatsApp template 'complaint_reopened' to SC on assignment
+
+    res.status(201).json({
+      message: 'Complaint reopened successfully.',
+      complaint: reopened,
+    });
+  } catch (error) {
+    console.error('Error in reopenComplaint:', error);
+    res.status(500).json({ message: 'Server error while reopening complaint.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Create a new complaint (status = 'new', no SC assigned yet)
 // @desc    Create a new complaint (status = 'new', no SC assigned yet)
 // @route   POST /api/complaints
 // @access  Private (Admin only)
@@ -787,6 +897,7 @@ const getAllComplaints = async (req, res) => {
 
 module.exports = {
   reopenCheck,
+  reopenComplaint,
   createComplaint,
   assignComplaint,
   getMyComplaints,
