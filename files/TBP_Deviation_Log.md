@@ -182,5 +182,77 @@ Each entry follows this structure:
 
 ---
 
+## Addendum v1.2 — Phase 7C: Product Tracking & Warranty System
+
+> **Note:** Addendum v1.2 introduces a new **Phase 7C** inserted immediately after Phase 7B in the build sequence. It supersedes TBP v1.1 Phases 7A/7B for complaint creation controller logic, Step 1 frontend, and the warranty/reopen sections. All other TBP phases remain unchanged.
+
+### DEV-TBP-020
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `models/Product.js` — NEW FILE
+- **Type:** ADDED
+- **Summary:** A new `Product` model is required as the permanent record for every physical LED/Cooler unit. Fields: `trackingId` (auto-generated, e.g. PT-000142, unique), `serialNumber` (optional, unique sparse), `hasSerial` (boolean), `product` (enum: led/cooler, locked once set), `customerName`, `phone1`, `phone2`, `localAddress`, `city`, `district`, `state`, `billPhoto` (Cloudinary URL), `billDate`, `warrantyStatus` (in_warranty/out_of_warranty), `warrantyExpiryDate`, `warrantySource` (auto_calculated/manual), `complaintHistory[]` ({complaintId, date, status, type}), `lastComplaintId` (ref Complaint), `lastComplaintDate`.
+
+### DEV-TBP-021
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `models/Complaint.js` — MODIFIED (new fields added)
+- **Type:** CHANGED
+- **Summary:** New fields added to the `Complaint` model to store the product link and warranty snapshot: `trackingId` (ref Product — always present once Phase 7C is live), `serialNumber` (String — optional snapshot copy), `billPhoto` (String — Cloudinary URL snapshot), `billDate` (Date snapshot), `warrantyStatus` (snapshot, enum: in_warranty/out_of_warranty), `warrantyExpiryDate` (Date snapshot), `warrantySource` (snapshot, enum: auto_calculated/manual). These are permanent snapshots at complaint creation time and never change retroactively.
+
+### DEV-TBP-022
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `utils/warrantyCalculator.js` — NEW FILE
+- **Type:** ADDED
+- **Summary:** New utility implementing the warranty determination logic from Addendum v1.2 Section 4. Given `billDate`, `complaintType`, and an optional admin `manualSelection`, returns `{ warrantyStatus, warrantyExpiryDate, warrantySource }`. Called both when saving a Product record and when snapshotting onto a Complaint. Logic: if `billDate` → auto-calculate; if manual selection → use it; if neither → `in_warranty` for LED installation, `out_of_warranty` for all else.
+
+### DEV-TBP-023
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `controllers/product.controller.js` — NEW FILE
+- **Type:** ADDED
+- **Summary:** New controller with 5 handlers: `searchProducts` (GET /products/search?phone=&serial=&name=&address=&trackingId=), `getProduct` (GET /products/:trackingId — full detail + complaintHistory), `createProduct` (POST /products — called internally on complaint submit), `updateProduct` (PUT /products/:trackingId — called internally on complaint submit to update address/bill/warranty), `getReopenCheck` (GET /products/:trackingId/reopen-check — returns lastComplaint status+date for ReopenBanner).
+
+### DEV-TBP-024
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `routes/product.routes.js` — NEW FILE
+- **Type:** ADDED
+- **Summary:** New route file mounting all 5 product endpoints defined in DEV-TBP-023. All routes are admin-only (`auth + rbac('admin')`) except `getReopenCheck` which is accessible to both admin and SC. Mounted in `server.js` at `/api/products`.
+
+### DEV-TBP-025
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `components/forms/Step1CustomerInfo.jsx` — REBUILT
+- **Type:** CHANGED
+- **Summary:** Step 1 is fully rebuilt to implement Addendum v1.2 Section 6 flow. Key changes: (1) Phone blur triggers `GET /products/search?phone=` — shows 0/1/multiple match UI; (2) 'Search Product Tracking' modal added — search by any identifier; (3) Serial number field added — overrides phone match if existing product found, hard-blocks if serial belongs to different product; (4) Auto-fill behavior: all product fields populated when product linked, all remain editable; (5) 'Last complaint' summary shown in linked banner. Old plain phone-only + reopenChecker.js approach is replaced.
+
+### DEV-TBP-026
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `components/forms/Step2ProductType.jsx` — MODIFIED (warranty section rebuilt)
+- **Type:** CHANGED
+- **Summary:** The simple In/Out warranty toggle in Step 2 is replaced with context-sensitive warranty rendering per Addendum v1.2 Section 7: if product linked with existing billDate → read-only display of warranty info with optional update; if product linked with no billDate OR no product linked → bill photo/date fields shown (optional) with manual selector as fallback; LED Installation → defaults to in_warranty if blank. On any billDate change, `warrantyCalculator.js` is called client-side to update the preview immediately.
+
+### DEV-TBP-027
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `components/complaint/ReopenBanner.jsx` — MODIFIED
+- **Type:** CHANGED
+- **Summary:** ReopenBanner is updated to pull data from the linked Product record (via `GET /products/:trackingId/reopen-check`) instead of the old `GET /complaints/reopen-check?phone=&product=&complaintType=` endpoint. Banner now shows: Tracking ID, Serial Number (if any), last complaint ID/date/status, current warrantyStatus + expiryDate. New two-action design: 'Reopen this complaint' OR 'New complaint for this product' (both allowed; second option creates a fresh linked complaint but skips the reopen flag).
+
+### DEV-TBP-028
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `controllers/complaint.controller.js` — MODIFIED (create + getById updated)
+- **Type:** CHANGED
+- **Summary:** `createComplaint` is updated to: (1) link/create Product record on every submit — if no trackingId provided, create new Product; if trackingId provided, update existing Product with latest address/bill/warranty; (2) append new complaint to `complaintHistory[]` and update `lastComplaintId/lastComplaintDate`; (3) snapshot all 7 new warranty fields onto the Complaint document. `getComplaintById` is updated to include `productTimeline` array in response (sourced from `Product.complaintHistory[]`).
+
+### DEV-TBP-029
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `components/complaint/AdminComplaintDetail.jsx` + `SCComplaintDetail.jsx` — MODIFIED
+- **Type:** ADDED
+- **Summary:** Both complaint detail slide-out panels receive a new **Product Timeline** section at the bottom. Displays a plain list of all complaints/installations linked to the same product. Current item not clickable. Siblings are clickable for Admin (navigate to that complaint's detail view). For SC: siblings assigned to OTHER centres shown as plain text only (not clickable). Data sourced from `productTimeline` array already in the complaint detail API response.
+
+### DEV-TBP-030
+- **Phase:** 7C (New — Product Tracking)
+- **TBP Section / File:** `components/filters/ComplaintFilters.jsx` — MODIFIED
+- **Type:** ADDED
+- **Summary:** Two new search/filter fields added to the existing `ComplaintFilters` component on the All Complaints tab: **Search by Serial Number** and **Search by Tracking ID**. These pass `serialNumber=` and `trackingId=` query params to `GET /complaints`. The `getAll` controller is updated to filter by these params. No other changes to the All Complaints list UI.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

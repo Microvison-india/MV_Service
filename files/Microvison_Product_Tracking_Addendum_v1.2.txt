@@ -1,0 +1,362 @@
+﻿
+MICROVISON
+Product Tracking & Warranty System
+Addendum v1.2 - Supersedes warranty/reopen sections of GRD v1.1 and TBP v1.1
+
+Serial Number Tracking · Auto Warranty Calculation · Inline Product Timeline · Smart Reopen
+
+
+
+1. Why This Addendum Exists
+The original GRD v1.1 and TBP v1.1 treated every complaint as an isolated record - warranty status was a manual flag, and reopen detection relied only on phone number + product + 30-day window. This addendum introduces a permanent Product Tracking layer that sits underneath every LED and Cooler complaint, enabling automatic warranty calculation, full product history, and much smarter reopen detection - regardless of whether the customer calls from the same phone number or even knows their product's serial number.
+
+This addendum REPLACES the following GRD v1.1 sections:
+• Section 5.1 - Product Types (warranty selection logic changes)
+• Section 6.1 - Step 1 Customer Information (now starts with phone/serial lookup)
+• Section 6.2 - Step 2 Product & Type (warranty is no longer a simple in/out toggle)
+• Section 8 - Complaint Reopen Logic (now driven by Product Tracking, not phone+30day alone)
+
+Everything else in GRD v1.1 and TBP v1.1 (billing split, SC portal, admin tabs, presets, PWA, WhatsApp) remains unchanged and still applies.
+
+
+
+2. Core Concept - Every Product Is Trackable
+
+A new collection, products, becomes the permanent record of every physical LED or Cooler unit Microvison has ever serviced or installed. Every complaint links to exactly one Product record. This link is established through one of two methods:
+
+Method
+When Used
+Identifier
+Serial Number
+Whenever the admin has/enters a serial number - at installation or any complaint
+serialNumber (globally unique, hard constraint)
+Phone Number + Manual Search
+When no serial number exists or is known
+phone1 / phone2 auto-suggest, OR admin manually searches Product Tracking by name/address/trackingId and links manually
+• Every product gets a system-generated trackingId (e.g. PT-000142) regardless of whether a serial number exists.
+• Serial number is always OPTIONAL - but if present, it is globally unique and permanently locked to one customer (no resale/transfer scenarios).
+• If no serial number, the product is still fully trackable via phone number matching + manual linking.
+• This applies to BOTH LED and Cooler - coolers were previously excluded from any tracking; now they are fully included (minus the 'installation' complaint type, which remains LED-only).
+
+
+
+3. New Data Model - products Collection
+
+Field
+Type
+Notes
+trackingId
+String, unique
+Auto-generated, e.g. PT-000142. Exists for every product, always.
+serialNumber
+String, unique, sparse
+Optional. If present, globally unique and permanently locked to this record.
+hasSerial
+Boolean
+true if serialNumber is set
+product
+Enum: led / cooler
+Locked once set - a serial cannot switch product type
+customerName
+String
+Latest known name - can be updated over time
+phone1, phone2
+String
+Can be appended/updated as customer calls from new numbers
+localAddress, city, district, state
+String
+Latest known address - editable each complaint
+billPhoto
+String (Cloudinary URL)
+Latest bill photo on file
+billDate
+Date
+Latest bill date on file - used for warranty calculation
+warrantyStatus
+Enum: in_warranty / out_of_warranty
+Current calculated/manual status
+warrantyExpiryDate
+Date
+= billDate + 3 years, if billDate present. Else null.
+warrantySource
+Enum: auto_calculated / manual
+Tracks how warrantyStatus was determined
+complaintHistory
+Array of {complaintId, date, status, type}
+Full timeline - every complaint ever linked
+lastComplaintId
+ref Complaint
+Most recent complaint linked to this product
+lastComplaintDate
+Date
+Date of lastComplaintId - used for reopen 30-day check
+createdAt / updatedAt
+Date
+
+
+
+4. Warranty Determination Logic
+Applies identically to LED and Cooler. Evaluated and stored on the Product record every time new bill information is entered. Snapshotted onto the Complaint record at the time of that complaint (so historical bills remain accurate even if warranty info is updated later).
+
+IF billDate is provided (new or updated):
+    warrantyExpiryDate = billDate + 3 years
+    warrantyStatus = (today <= warrantyExpiryDate) ? in_warranty : out_of_warranty
+    warrantySource = 'auto_calculated'
+
+ELSE IF manual selection provided by admin:
+    warrantyStatus = admin's manual choice
+    warrantyExpiryDate = null
+    warrantySource = 'manual'
+
+ELSE (neither provided):
+    IF this is a NEW LED INSTALLATION:
+        warrantyStatus = 'in_warranty'   (brand new install - obvious default)
+        warrantyExpiryDate = null
+    ELSE (any complaint - LED or Cooler, no bill info at all):
+        warrantyStatus = 'out_of_warranty'   (safe default)
+    warrantySource = 'manual'
+
+Re-evaluation: every time admin enters/updates billDate for a product (at any future complaint), the Product record's warrantyStatus, warrantyExpiryDate, and warrantySource are recalculated and overwritten. The Complaint record keeps its own snapshot of these 3 fields as they were AT THE TIME of that specific complaint - this snapshot never changes retroactively.
+
+
+
+5. Complaint Types - Final Rules
+
+Product
+Complaint Types Allowed
+Installation Flow?
+Serial Number
+LED
+Installation OR Complaint
+Yes - installation creates the first Product record for a new unit
+Optional at installation and at complaint
+Cooler
+Complaint only - no installation type ever exists
+No - every cooler complaint is registered the same way as an LED complaint with no installation history
+Optional, same rules as LED
+'Both' (LED + Cooler in one complaint) remains REMOVED as per DEV-GRD-011 - unchanged from the existing deviation log. Each complaint is for exactly one product. 'Both' is only an SC capability tag.
+
+
+
+6. Complaint Registration - Full New Flow
+
+6.1 Step 1 - Phone Number + Product Lookup (NEW - replaces old Step 1 opener)
+1. Admin enters customer phone number (first field, as before)
+2. System auto-searches products where phone1 OR phone2 matches entered number
+
+   0 matches found:
+     -> Proceed fresh. 'Search Product Tracking manually' button still available
+
+   1 match found:
+     -> Show banner: 'Found 1 product under this number
+        [LED/Cooler] - Tracking ID PT-XXXX
+        Last complaint: MV-XXXX-XXXXX on [date], status: [status]'
+        Buttons: [Link this complaint to it]  [No, different product]
+
+   2+ matches found:
+     -> Show list of all matching products (trackingId, product type,
+        last complaint date/status). Admin picks one OR selects
+        'None of these - new product'
+
+6.2 Manual Search (always available alongside Step 1)
+• A 'Search Product Tracking' button/modal is available at all times during Step 1.
+• Admin can search by: serial number, trackingId, customer name, phone (any historical number), address.
+• Use case: customer calls from a NEW/different phone number, but admin recognizes it's the same product from name/address - admin manually finds and links the correct trackingId.
+• If admin manually links via a phone number not currently on the Product record, system prompts: 'Add [new phone] as an additional contact for this product? Yes/No' - and appends to phone1/phone2 if confirmed.
+
+6.3 Serial Number Entry (anywhere in the form, optional)
+• A Serial Number field is available in the form regardless of whether a product was linked via phone.
+• If admin types a serial number that matches an EXISTING product → that takes priority, auto-fills everything from that record (overrides any phone-based link).
+• If admin types a serial number that does NOT exist → it will be saved as the serial for this product record (new or linked) on submit.
+• HARD BLOCK: if the entered serial number already belongs to a DIFFERENT trackingId (different customer/phone/address on record) → error shown: 'This serial number belongs to [customer], [address]. Please verify the serial number.' Admin cannot proceed until resolved.
+
+6.4 Auto-fill Behaviour (whenever a product is linked - via phone or serial)
+• All known fields auto-populate: customerName, phone1, phone2, localAddress, city, district, state, product type, billPhoto, billDate, warrantyStatus, warrantyExpiryDate.
+• ALL auto-filled fields remain fully editable - admin can correct address, add a second phone, update bill info, etc.
+• A 'Last complaint' summary is shown: complaint ID, date, status - informs admin if reopen banner should appear (see Section 8).
+• On final submit, the Product record is UPDATED with whatever values are in the form (latest address, latest bill info, etc.) - self-correcting over time.
+• The new complaint is appended to complaintHistory[] on the Product record, and lastComplaintId/lastComplaintDate are updated.
+
+6.5 If No Product Linked At All (brand new)
+• Admin fills the form fresh - all fields manual.
+• On submit, a new Product record is created - trackingId auto-generated.
+• hasSerial = true/false depending on whether admin entered a serial number.
+• complaintHistory[] starts with this one complaint.
+
+
+
+7. Warranty Section - Form Behaviour by Scenario
+
+Scenario
+What's Shown / What Happens
+LED Installation - brand new product, no bill info
+Bill photo + bill date fields shown (optional but recommended). If left blank: warrantyStatus defaults to in_warranty, warrantyExpiryDate = null, warrantySource = manual. Admin CAN still manually flag out_of_warranty in rare edge cases.
+LED Installation - bill info provided
+warrantyExpiryDate = billDate + 3yr, warrantyStatus auto-calculated, warrantySource = auto_calculated.
+LED/Cooler Complaint - product linked, already has billDate on record
+Existing bill photo + date + calculated warranty shown (read-only display by default). Admin CAN update bill photo/date if they have better/newer info - triggers recalculation.
+LED/Cooler Complaint - product linked, NO billDate on record yet
+Bill photo + bill date fields shown (optional). If admin fills now -> auto-calculates and updates the Product record going forward. If admin doesn't have it -> manual In Warranty / Out of Warranty selector shown as fallback.
+LED/Cooler Complaint - no product linked (brand new, untracked)
+Same as above - bill photo/date optional, manual selector as fallback. Defaults to out_of_warranty if nothing provided.
+In every scenario, whatever billPhoto/billDate/warrantyStatus/warrantyExpiryDate/warrantySource values are finalized for THIS complaint get snapshotted onto the Complaint document - and also written back to update the Product record for future complaints.
+
+
+
+8. Reopen Logic - Final Version
+
+Reopen check now runs against the LINKED Product record (via phone match,
+manual link, or serial match) - not a standalone complaint query.
+
+Reopen eligible IF:
+    product.lastComplaint.status == 'closed'
+    AND product.lastComplaintDate is within last 30 days
+
+NOTE: warranty status does NOT gate reopen eligibility.
+Out-of-warranty products can still be reopened for tracking/history
+purposes -- billing logic is unaffected either way (customer still
+pays for out-of-warranty regardless of reopen vs new complaint).
+
+8.1 Reopen Banner - Shown When Eligible
+• Tracking ID + Serial Number (if any)
+• Last complaint ID, date, status
+• Current warrantyStatus + warrantyExpiryDate
+• Two buttons: 'Reopen this complaint' (pre-fills everything from Product record + creates new complaint with reopenParentId + isReopened=true) OR 'New complaint for this product' (still links to same trackingId, adds to history, but is NOT a reopen - e.g. genuinely new/different issue)
+
+
+
+9. Product Timeline - Simple Inline List in Complaint Detail
+No new page, no new tab, no new route, no filters. Clicking any complaint row in All Complaints (or My Complaints) opens that complaint's normal full detail view exactly as before - Customer, Product, Warranty, Charges, Media, Status Timeline, SC actions. One small additional section is added to this existing view: Product Timeline.
+
+9.1 What It Looks Like
+Complaint Detail - Comp-5 (full detail, as normal)
+├─ Customer / Product / Warranty / Charges / Media
+├─ Status Timeline (SC actions, audit log - as before)
+└─ Product Timeline (NEW - simple list, no page, no filters)
+     Install-1 - 12 Mar 2024 - Closed
+     Comp-2    - 20 Apr 2025 - Closed
+     Comp-5    - 10 Jun 2026 - New   (current - not clickable)
+
+9.2 Behaviour
+• Product Timeline is just a plain list - complaint/installation label, date, status. No table, no search, no filters, no pagination.
+• Each item EXCEPT the one currently being viewed is a small clickable link.
+• Clicking a sibling item navigates DIRECTLY to that complaint's own full detail view (same structure as any complaint detail - Customer, Product, Warranty, Charges, Media, Status Timeline, SC actions, and its own Product Timeline list with that item now marked current).
+• This lets admin/SC hop between every complaint/installation linked to the same product, one full detail view at a time - no separate page ever exists.
+• Role-based access: SC viewing a complaint assigned to them sees the Product Timeline list, but sibling items belonging to OTHER service centres are shown as plain text (date + status, not clickable) - SC cannot open another centre's complaint detail. Admin can click any item.
+
+9.3 Search & Filters - Unchanged Existing List Only
+• Add two new search fields to the EXISTING ComplaintFilters component (All Complaints tab): Search by Serial Number, Search by Tracking ID.
+• Both simply filter the existing flat complaint table - e.g. searching a serial number returns every complaint/installation linked to that product as normal rows in the table, sorted by date as usual.
+• No other UI changes to All Complaints - it remains the single flat list it always was.
+
+9.4 Backend Support
+• Complaint Detail API response includes a small productTimeline array: [{complaintId, mvId, type, date, status, isCurrent, assignedCentreId}] - sourced from the linked Product record's complaintHistory[].
+• No separate endpoint, no separate page route needed - this array is just part of the existing GET /complaints/:id response.
+
+
+
+10. Data Model Changes - Summary
+
+10.1 New Collection
+• products - as defined in Section 3
+
+10.2 Complaint Model - New Fields (snapshots)
+Field
+Type
+Notes
+trackingId
+ref Product
+Always present - every complaint links to a product
+serialNumber
+String
+Optional copy of the product's serial at time of this complaint
+billPhoto
+String (Cloudinary URL)
+Snapshot at time of THIS complaint
+billDate
+Date
+Snapshot at time of THIS complaint
+warrantyStatus
+Enum: in_warranty / out_of_warranty
+Snapshot - used for billing logic, same as before
+warrantyExpiryDate
+Date
+Snapshot
+warrantySource
+Enum: auto_calculated / manual
+Snapshot
+All other Complaint fields, billing logic (in-warranty vs out-of-warranty), SC portal flows, admin Action Centre, presets, and PWA/WhatsApp remain exactly as defined in GRD v1.1 / TBP v1.1 and the existing deviation logs (DEV-GRD-* / DEV-TBP-*).
+
+
+
+11. New & Changed Backend Routes
+
+Method & Path
+Purpose
+GET /products/search?phone=&serial=&name=&address=&trackingId=
+Search products by any identifier - used in Step 1 auto-search and manual search modal
+GET /products/:trackingId
+Full product detail + timeline - used in Product Tracking tab
+PUT /products/:trackingId
+Update product record - called internally on complaint submit (address/bill/warranty changes)
+POST /products
+Create new product record - called internally when complaint submit has no linked product
+GET /products/:trackingId/reopen-check
+Returns lastComplaint status/date for reopen banner logic
+
+
+12. Edge Cases - Final List
+
+Scenario
+Behaviour
+Serial number entered belongs to a different customer/product
+HARD BLOCK - error shown, admin must verify/correct the serial number. No override possible (no resale scenario supported).
+No serial, phone matches exactly one existing product
+Auto-suggest banner shown - admin confirms link or declines (different product)
+No serial, phone matches multiple products
+List shown - admin picks correct one, or 'none of these'
+No serial, phone doesn't match anything, but it IS the same product (admin knows from name/address)
+Admin uses manual 'Search Product Tracking' to find and link by trackingId - system optionally adds new phone to record
+LED installation, no bill info given
+warrantyStatus = in_warranty (default for new install), expiryDate = null, source = manual
+Cooler complaint, never had bill info, none given now
+warrantyStatus = out_of_warranty (safe default), manual override always available
+Admin updates bill date on a later complaint for a product that already had warranty calculated
+Product record's warrantyStatus/expiryDate/source recalculated and overwritten. Past complaints' snapshots remain unchanged.
+Reopen requested on out-of-warranty product
+Allowed - for tracking/history only. Billing remains out-of-warranty rules (customer pays, optional admin extras).
+Same trackingId, 2nd different product at same address (e.g. customer has 1 LED + 1 Cooler)
+These are TWO SEPARATE Product records (different product type = different trackingId), even if phone/address are identical. Phone-match auto-suggest will show both as separate options in the '2+ matches' list.
+
+
+13. Where This Fits in the Build Sequence
+This module should be built as a new phase inserted into the existing TBP sequence - recommended as Phase 7C, immediately after the existing Phase 7B (Complaint Frontend Wizard) is functionally complete with the OLD flow, OR integrated directly into Phase 7A/7B if not yet started.
+
+Step
+What to Build
+1
+Create models/Product.js - schema as per Section 3
+2
+Add new fields to models/Complaint.js - as per Section 10.2
+3
+Build utils/warrantyCalculator.js - implements logic from Section 4
+4
+Build controllers/product.controller.js - search, get, create, update, reopen-check (Section 11 routes)
+5
+Build routes/product.routes.js
+6
+Rebuild Step1CustomerInfo.jsx - phone-based auto-search, manual search modal, serial number field, auto-fill + edit behaviour (Section 6)
+7
+Update Step2ProductType.jsx / warranty section - conditional rendering per Section 7 scenarios
+8
+Update ReopenBanner.jsx - pulls from Product record per Section 8
+9
+Build new pages/admin/ProductTracking.jsx - search + detail + timeline view (Section 9)
+10
+Wire AdminSidebar to add Product Tracking as a new tab
+11
+Update complaint creation controller - link/create Product record, update complaintHistory, lastComplaintId/Date on every submit
+
+End of Document  ·  Microvison Product Tracking & Warranty Addendum v1.0
+Microvison - Product Tracking & Warranty Addendum v1.2  |  Page 1 of 2
+

@@ -72,6 +72,29 @@
   - [x] `ActionCentre.jsx` — "+ New Complaint" button + success message banner
   - [x] Fixed all import paths (Phase 6 + 7B components)
 
+- [ ] **Phase 7C — Product Tracking & Warranty System (Addendum v1.2)**
+  > ⚠ This phase supersedes parts of Phase 7A/7B (complaint controller, Step1, warranty toggle, ReopenBanner). Must be built before Phase 8 is considered fully production-ready.
+
+  **Backend — New Files**
+  - [ ] `models/Product.js` — new Product schema (trackingId, serialNumber, hasSerial, product, customerName, phone1/2, address, billPhoto, billDate, warrantyStatus, warrantyExpiryDate, warrantySource, complaintHistory[], lastComplaintId, lastComplaintDate)
+  - [ ] `utils/warrantyCalculator.js` — warranty determination logic (billDate+3yr auto / manual fallback / installation default)
+  - [ ] `utils/generateTrackingId.js` — auto-generates PT-XXXXXX style trackingId
+  - [ ] `controllers/product.controller.js` — searchProducts, getProduct, createProduct, updateProduct, getReopenCheck
+  - [ ] `routes/product.routes.js` — all 5 product routes; mount in server.js at `/api/products`
+
+  **Backend — Modified Files**
+  - [ ] `models/Complaint.js` — add 7 new snapshot fields: trackingId (ref Product), serialNumber, billPhoto, billDate, warrantyStatus, warrantyExpiryDate, warrantySource
+  - [ ] `controllers/complaint.controller.js` — update `createComplaint` to link/create Product record, snapshot warranty fields, update complaintHistory; update `getComplaintById` to include productTimeline array in response
+  - [ ] `controllers/complaint.controller.js` — update `getAll` to support `serialNumber=` and `trackingId=` query filter params
+
+  **Frontend — Rebuilt / Modified Files**
+  - [ ] `components/forms/Step1CustomerInfo.jsx` — REBUILD: phone blur triggers product search, show 0/1/multiple match UI, manual search modal, serial number field with hard-block logic, auto-fill all fields, editable after fill
+  - [ ] `components/forms/Step2ProductType.jsx` — update warranty section: context-sensitive (product linked with billDate = read-only display; no billDate = optional bill fields + manual toggle fallback; LED install default = in_warranty)
+  - [ ] `components/complaint/ReopenBanner.jsx` — update to pull from Product record via reopen-check endpoint; show trackingId, serial, last complaint, warranty status; add 'New complaint for this product' second action
+  - [ ] `components/complaint/AdminComplaintDetail.jsx` — add Product Timeline inline section at bottom
+  - [ ] `components/complaint/SCComplaintDetail.jsx` — add Product Timeline inline section at bottom (SC: siblings from other centres = plain text, not clickable)
+  - [ ] `components/filters/ComplaintFilters.jsx` — add Serial Number + Tracking ID search fields
+
 - [x] **Phase 8 — Service Centre Portal (Day 9-11)**
   - [x] SC Complaint controllers (getMyComplaints, accept, reject, markGoing, updateStatus)
   - [x] SC routes (`GET /my`, `PATCH /:id/accept`, `PATCH /:id/reject`, `PATCH /:id/going`, `PATCH /:id/status`)

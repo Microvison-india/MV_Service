@@ -182,5 +182,68 @@ graph TD
 
 ---
 
+## Addendum v1.2 — Product Tracking & Warranty System
+
+> **Note:** Addendum v1.2 formally supersedes GRD v1.1 Sections 5.1, 6.1, 6.2, and 8. All other GRD v1.1 sections remain unchanged. A new **Phase 7C** is inserted into the build sequence immediately after Phase 7B.
+
+### DEV-GRD-018
+- **Phase:** 7C (New — Product Tracking)
+- **GRD Section:** 5.1 (Product Types — warranty selection logic)
+- **Type:** CHANGED (Superseded by Addendum v1.2 Section 4)
+- **Summary:** GRD v1.1 Section 5.1 treated warranty as a simple manual In/Out toggle. **Addendum v1.2** replaces this with auto-calculated warranty:
+  - `warrantyExpiryDate = billDate + 3 years` (if billDate provided)
+  - `warrantyStatus = auto_calculated` if derived from billDate; `manual` if admin-selected
+  - Safe defaults: LED installation → `in_warranty`; any other complaint with no bill info → `out_of_warranty`
+  - Warranty is evaluated on the `Product` record and **snapshotted** onto the `Complaint` record at time of creation — historical complaints never change retroactively
+
+### DEV-GRD-019
+- **Phase:** 7C (New — Product Tracking)
+- **GRD Section:** 6.1 (Step 1 — Customer Information)
+- **Type:** CHANGED (Superseded by Addendum v1.2 Section 6.1–6.4)
+- **Summary:** GRD v1.1 Section 6.1 started Step 1 with a plain phone number field with a reopen check on blur. **Addendum v1.2** replaces the opener:
+  1. Admin enters phone number → system auto-searches `products` collection (phone1 OR phone2)
+  2. **0 matches** → fresh form, 'Search Product Tracking manually' button available
+  3. **1 match** → banner shown with Tracking ID, product type, last complaint; admin confirms link or declines
+  4. **2+ matches** → list of all matching products; admin picks one or selects 'None of these'
+  5. **Serial Number field** is always available — overrides phone match if it resolves to an existing product; hard-blocks if serial belongs to a different product/customer
+  6. **Manual Search modal** always available — search by serial, trackingId, name, phone, address
+  7. All auto-filled fields remain fully editable
+  8. On submit: Product record is updated with latest info; new complaint appended to `complaintHistory[]`
+
+### DEV-GRD-020
+- **Phase:** 7C (New — Product Tracking)
+- **GRD Section:** 6.2 (Step 2 — Product & Type)
+- **Type:** CHANGED (Superseded by Addendum v1.2 Section 7)
+- **Summary:** GRD v1.1 Section 6.2 had a simple In Warranty / Out of Warranty toggle. **Addendum v1.2** replaces this with context-sensitive rendering:
+  - If product linked with existing `billDate` → display read-only warranty info; admin can update bill info to trigger recalculation
+  - If product linked with no `billDate` → show bill photo/date fields (optional), with manual selector as fallback
+  - If no product linked (brand new) → same as above, defaults to `out_of_warranty` if nothing provided
+  - LED Installation always defaults to `in_warranty` if no bill info given
+
+### DEV-GRD-021
+- **Phase:** 7C (New — Product Tracking)
+- **GRD Section:** 8 (Complaint Reopen Logic)
+- **Type:** CHANGED (Superseded by Addendum v1.2 Section 8)
+- **Summary:** GRD v1.1 Section 8 drove reopen detection from a standalone query (phone + product + 30-day window). **Addendum v1.2** drives it from the linked `Product` record:
+  - `product.lastComplaint.status === 'closed'` AND `product.lastComplaintDate` within last 30 days
+  - Warranty status does NOT gate reopen — out-of-warranty products can be reopened for tracking purposes
+  - Reopen banner shows: Tracking ID, Serial Number (if any), last complaint ID/date/status, current warrantyStatus + expiryDate
+  - Two banner actions: 'Reopen this complaint' (creates new complaint with `reopenParentId + isReopened=true`) OR 'New complaint for this product' (links to same trackingId, not a reopen)
+
+### DEV-GRD-022
+- **Phase:** 7C (New — Product Tracking)
+- **GRD Section:** N/A (New Feature — not in GRD v1.1)
+- **Type:** ADDED
+- **Summary:** **Product Timeline** is a new inline section added to the existing complaint detail view (both Admin and SC). No new page, route, or tab is created.
+  - Shows a plain list: each complaint/installation linked to the same product (label, date, status)
+  - Current complaint is shown but not clickable
+  - Siblings are clickable links → navigate to that complaint's own full detail view
+  - **SC Role restriction:** sibling complaints assigned to OTHER service centres shown as plain text only (date + status, not clickable)
+  - Admin can click any sibling item regardless of assigned SC
+  - Backend: `productTimeline` array included in existing `GET /complaints/:id` response — no new endpoint needed
+  - Filter addition: Two new search fields added to `ComplaintFilters` component (All Complaints tab): **Search by Serial Number** and **Search by Tracking ID**
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
