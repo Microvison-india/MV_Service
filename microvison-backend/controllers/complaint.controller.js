@@ -2,8 +2,40 @@ const Complaint = require('../models/Complaint');
 const ComplaintUpdate = require('../models/ComplaintUpdate');
 const Preset = require('../models/Preset');
 const ServiceCentre = require('../models/ServiceCentre');
+const Product = require('../models/Product');
 const generateComplaintId = require('../utils/generateComplaintId');
+const generateTrackingId = require('../utils/generateTrackingId');
+const { calculateWarranty } = require('../utils/warrantyCalculator');
 const { findReopenEligible } = require('../utils/reopenChecker');
+
+// Helper to generate flexible regex pattern string for matching complaint IDs (e.g. MV-2026-00005, MV005, 00005)
+const makeComplaintIdPattern = (term) => {
+  if (!term) return '';
+  const clean = term.trim().toLowerCase();
+  const digits = clean.replace(/[^0-9]/g, '');
+  
+  if (clean.startsWith('mv')) {
+    if (digits.startsWith('20') && digits.length >= 9) {
+      const year = digits.slice(0, 4);
+      const serial = digits.slice(4);
+      return 'mv.*' + year + '.*' + serial;
+    } else if (digits) {
+      return 'mv.*' + digits;
+    } else {
+      return 'mv';
+    }
+  } else if (digits) {
+    if (digits.startsWith('20') && digits.length >= 9) {
+      const year = digits.slice(0, 4);
+      const serial = digits.slice(4);
+      return year + '.*' + serial;
+    } else {
+      return digits;
+    }
+  }
+  return clean.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
+
 
 // ─────────────────────────────────────────────────────────────
 // @desc    Check if a customer's phone number is reopen-eligible
@@ -159,9 +191,13 @@ const createComplaint = async (req, res) => {
     state,
 
     // Step 2
+    trackingId,      // Optional from frontend if an existing product is selected
+    serialNumber,    // Optional from frontend
     product,
     complaintType,
-    warrantyStatus,
+    warrantyStatus,  // Manual fallback from frontend if no billDate
+    billPhoto,       // New from frontend
+    billDate,        // New from frontend
 
     // Step 3
     presetId,
@@ -182,8 +218,8 @@ const createComplaint = async (req, res) => {
   if (!customerName || !phone1 || !localAddress || !city || !district || !state) {
     return res.status(400).json({ message: 'Customer info fields are required.' });
   }
-  if (!product || !complaintType || !warrantyStatus) {
-    return res.status(400).json({ message: 'Product, complaint type, and warranty status are required.' });
+  if (!product || !complaintType) {
+    return res.status(400).json({ message: 'Product and complaint type are required.' });
   }
 
   // ── Business rules ────────────────────────────────────────
@@ -241,14 +277,94 @@ const createComplaint = async (req, res) => {
   const complaintId = await generateComplaintId();
 
   // ── Petrol tracking ───────────────────────────────────────
-  const petrolValue = warrantyStatus === 'in_warranty' && petrolAdmin != null
-    ? Number(petrolAdmin)
-    : null;
+  const petrolValue = (petrolAdmin != null) ? Number(petrolAdmin) : null;
   const petrolEditCount = petrolValue != null ? 1 : 0;
+
+  // ── Product Tracking (Addendum v1.2) ──────────────────────
+  let productRecord;
+  let finalWarrantyStatus = warrantyStatus;
+  let finalWarrantyExpiryDate = null;
+  let finalWarrantySource = 'manual';
+
+  // Calculate final warranty based on provided bill info and manual fallbacks
+  const calculated = calculateWarranty(billDate, complaintType, warrantyStatus);
+  finalWarrantyStatus = calculated.warrantyStatus;
+  finalWarrantyExpiryDate = calculated.warrantyExpiryDate;
+  finalWarrantySource = calculated.warrantySource;
+
+  if (trackingId) {
+    // Existing product linked
+    productRecord = await Product.findOne({ trackingId });
+    if (!productRecord) {
+      return res.status(404).json({ message: 'Linked product tracking ID not found.' });
+    }
+    // Update product with latest info
+    productRecord.customerName = customerName;
+    productRecord.phone1 = phone1;
+    if (phone2) productRecord.phone2 = phone2;
+    productRecord.localAddress = localAddress;
+    productRecord.city = city;
+    productRecord.district = district;
+    productRecord.state = state;
+    if (serialNumber && serialNumber !== productRecord.serialNumber) {
+      const existing = await Product.findOne({ serialNumber });
+      if (existing && existing.trackingId !== trackingId) {
+         return res.status(400).json({ message: 'Serial number already exists on another product.' });
+      }
+      productRecord.serialNumber = serialNumber;
+      productRecord.hasSerial = true;
+    }
+    // Only update bill info if provided newly, else keep existing
+    if (billDate !== undefined) {
+      productRecord.billDate = billDate;
+      productRecord.billPhoto = billPhoto || productRecord.billPhoto;
+      productRecord.warrantyStatus = finalWarrantyStatus;
+      productRecord.warrantyExpiryDate = finalWarrantyExpiryDate;
+      productRecord.warrantySource = finalWarrantySource;
+    } else {
+      // If no new billDate provided, use the product's existing warranty for the complaint snapshot
+      finalWarrantyStatus = productRecord.warrantyStatus;
+      finalWarrantyExpiryDate = productRecord.warrantyExpiryDate;
+      finalWarrantySource = productRecord.warrantySource;
+    }
+  } else {
+    // Brand new product
+    if (serialNumber) {
+      const existing = await Product.findOne({ serialNumber });
+      if (existing) return res.status(400).json({ message: 'Serial number already exists.' });
+    }
+    const newTrackingId = await generateTrackingId();
+    productRecord = new Product({
+      trackingId: newTrackingId,
+      serialNumber: serialNumber || undefined,
+      hasSerial: !!serialNumber,
+      product,
+      customerName,
+      phone1: String(phone1),
+      phone2: phone2 ? String(phone2) : '',
+      localAddress,
+      city,
+      district,
+      state,
+      billPhoto: billPhoto || '',
+      billDate: billDate || null,
+      warrantyStatus: finalWarrantyStatus,
+      warrantyExpiryDate: finalWarrantyExpiryDate,
+      warrantySource: finalWarrantySource,
+      complaintHistory: []
+    });
+  }
 
   // ── Create the complaint document ─────────────────────────
   const complaint = await Complaint.create({
     complaintId,
+    trackingId: productRecord._id,
+    serialNumber: serialNumber || productRecord.serialNumber || null,
+    billPhoto: billPhoto || productRecord.billPhoto || '',
+    billDate: billDate || productRecord.billDate || null,
+    warrantyStatus: finalWarrantyStatus,
+    warrantyExpiryDate: finalWarrantyExpiryDate,
+    warrantySource: finalWarrantySource,
     customerName,
     phone1: String(phone1),
     phone2: phone2 ? String(phone2) : '',
@@ -258,12 +374,11 @@ const createComplaint = async (req, res) => {
     state,
     product,
     complaintType,
-    warrantyStatus,
-    presetId: warrantyStatus === 'in_warranty' ? presetId : null,
+    presetId: finalWarrantyStatus === 'in_warranty' ? presetId : null,
     presetName: snapshotPresetName,
     presetPrice: snapshotPresetPrice,
-    petrolAdmin: petrolValue,
-    petrolEditCount,
+    petrolAdmin: finalWarrantyStatus === 'in_warranty' ? petrolValue : null,
+    petrolEditCount: finalWarrantyStatus === 'in_warranty' ? petrolEditCount : 0,
     extraCharges: formattedExtras,
     notes: notes || '',
     voiceNoteUrl: voiceNoteUrl || '',
@@ -275,6 +390,19 @@ const createComplaint = async (req, res) => {
     status: 'new',
     createdBy: req.user.id,
   });
+
+  // ── Update Product History ──────────────────────────────
+  productRecord.complaintHistory.push({
+    complaintId: complaint._id,
+    mvId: complaint.complaintId,
+    type: complaintType,
+    status: complaint.status,
+    date: complaint.createdAt,
+    assignedCentreId: null
+  });
+  productRecord.lastComplaintId = complaint._id;
+  productRecord.lastComplaintDate = complaint.createdAt;
+  await productRecord.save();
 
   // ── Log initial status update ─────────────────────────────
   await ComplaintUpdate.create({
@@ -730,12 +858,45 @@ const rejectExtra = (req, res) => handleExtraCharge(req, res, 'rejected');
 // ─────────────────────────────────────────────────────────────
 const getComplaintById = async (req, res) => {
   const { id } = req.params;
-  const complaint = await Complaint.findById(id).populate('assignedCentreId', 'ownerName businessName phone1 email1');
+  const complaint = await Complaint.findById(id)
+    .populate('assignedCentreId', 'ownerName businessName phone1 email1')
+    .populate({
+      path: 'trackingId',
+      populate: {
+        path: 'complaintHistory.complaintId',
+        select: 'status'
+      }
+    });
+    
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+  // Security: If user is SC, they can only view their own assigned complaints
+  if (req.user.role === 'service_centre') {
+    const sc = await ServiceCentre.findOne({ userId: req.user.id });
+    if (!sc || String(complaint.assignedCentreId?._id || complaint.assignedCentreId) !== String(sc._id)) {
+      return res.status(403).json({ message: 'Access denied: You are not assigned to this complaint.' });
+    }
+  }
 
   const updates = await ComplaintUpdate.find({ complaintId: id }).sort({ createdAt: -1 });
 
-  res.status(200).json({ complaint, updates });
+  // Extract Product Timeline
+  let productTimeline = [];
+  if (complaint.trackingId && complaint.trackingId.complaintHistory) {
+    productTimeline = complaint.trackingId.complaintHistory.map(item => {
+      const plain = item.toObject ? item.toObject() : item;
+      const liveStatus = (plain.complaintId && plain.complaintId.status) ? plain.complaintId.status : plain.status;
+      const compId = (plain.complaintId && plain.complaintId._id) ? plain.complaintId._id : plain.complaintId;
+      return {
+        ...plain,
+        complaintId: compId,
+        status: liveStatus,
+        isCurrent: String(compId) === String(complaint._id)
+      };
+    });
+  }
+
+  res.status(200).json({ complaint, updates, productTimeline });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -805,6 +966,8 @@ const getAllComplaints = async (req, res) => {
       dateFrom,
       dateTo,
       isReopened,
+      serialNumber,
+      trackingId
     } = req.query;
 
     const query = {};
@@ -812,11 +975,12 @@ const getAllComplaints = async (req, res) => {
     // 1. Text Search (customerName, phone1, phone2, complaintId)
     if (search) {
       const searchRegex = new RegExp(search.trim(), 'i');
+      const complaintPattern = makeComplaintIdPattern(search);
       query.$or = [
         { customerName: searchRegex },
         { phone1: searchRegex },
         { phone2: searchRegex },
-        { complaintId: searchRegex },
+        { complaintId: { $regex: complaintPattern, $options: 'i' } },
       ];
     }
 
@@ -827,6 +991,7 @@ const getAllComplaints = async (req, res) => {
     if (product) query.product = product;
     if (complaintType) query.complaintType = complaintType;
     if (warrantyStatus) query.warrantyStatus = warrantyStatus;
+    if (serialNumber) query.serialNumber = { $regex: serialNumber.trim(), $options: 'i' };
 
     // 3. Status filter (can be single or multiple comma-separated)
     if (status) {
@@ -860,10 +1025,21 @@ const getAllComplaints = async (req, res) => {
     }
 
     // 7. Reopened flag filter
-    if (isReopened === 'true') {
-      query.isReopened = true;
-    } else if (isReopened === 'false') {
-      query.isReopened = false;
+    if (isReopened !== undefined) {
+      query.isReopened = isReopened === 'true';
+    }
+
+    // 8. Tracking ID filter
+    // If trackingId is provided, we need to find the Product first, then filter complaints by its _id
+    if (trackingId) {
+      const Product = require('../models/Product'); // lazy load
+      const trackingRecord = await Product.findOne({ trackingId: { $regex: trackingId.trim(), $options: 'i' } }).lean();
+      if (trackingRecord) {
+        query.trackingId = trackingRecord._id;
+      } else {
+        // If the tracking ID doesn't exist, we should return an empty result set safely
+        query.trackingId = null; // Forces 0 matches since we know it doesn't match
+      }
     }
 
     // Pagination

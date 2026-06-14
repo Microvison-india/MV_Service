@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import Step1CustomerInfo from '../../components/forms/Step1CustomerInfo';
 import Step2ProductType from '../../components/forms/Step2ProductType';
@@ -53,6 +53,9 @@ const validateStep = (step, formData, reopenData) => {
 
 export default function NewComplaint() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefill = location.state?.prefill || {};
+
   const [currentStep, setCurrentStep] = useState(1);
   const [stepError, setStepError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -61,17 +64,22 @@ export default function NewComplaint() {
   // Master form state — all 4 steps share this
   const [formData, setFormData] = useState({
     // Step 1
-    customerName: '',
-    phone1: '',
-    phone2: '',
-    localAddress: '',
-    city: '',
-    district: '',
-    state: '',
+    customerName: prefill.customerName || '',
+    phone1: prefill.phone1 || '',
+    phone2: prefill.phone2 || '',
+    localAddress: prefill.localAddress || '',
+    city: prefill.city || '',
+    district: prefill.district || '',
+    state: prefill.state || '',
+    trackingId: prefill.trackingId || '',
+    serialNumber: prefill.serialNumber || '',
+    linkedProductType: prefill.product || '',
     // Step 2
-    product: '',
+    product: prefill.product || '',
     complaintType: '',
-    warrantyStatus: '',
+    warrantyStatus: prefill.warrantyStatus || '',
+    billPhoto: prefill.billPhoto || '',
+    billDate: prefill.billDate || '',
     // Step 3
     presetId: '',
     customPresetName: '',

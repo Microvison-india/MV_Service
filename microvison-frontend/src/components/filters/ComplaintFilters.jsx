@@ -131,6 +131,8 @@ export default function ComplaintFilters({ filters, onChange }) {
       dateFrom: '',
       dateTo: '',
       isReopened: '',
+      trackingId: '',
+      serialNumber: '',
       page: 1,
     });
   };
@@ -235,6 +237,32 @@ export default function ComplaintFilters({ filters, onChange }) {
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
+          </div>
+
+          {/* Tracking ID */}
+          <div className="space-y-1.5">
+            <label className={labelCls}>Tracking ID</label>
+            <input
+              type="text"
+              name="trackingId"
+              placeholder="e.g. PT-000001"
+              value={filters.trackingId || ''}
+              onChange={handleSelect}
+              className={inputCls}
+            />
+          </div>
+
+          {/* Serial Number */}
+          <div className="space-y-1.5">
+            <label className={labelCls}>Serial Number</label>
+            <input
+              type="text"
+              name="serialNumber"
+              placeholder="e.g. SN-12345"
+              value={filters.serialNumber || ''}
+              onChange={handleSelect}
+              className={inputCls}
+            />
           </div>
 
           {/* City */}

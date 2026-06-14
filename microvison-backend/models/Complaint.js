@@ -24,9 +24,15 @@ const complaintSchema = new mongoose.Schema(
     state: { type: String, required: true },
 
     // ── Product ───────────────────────────────────────────────
+    trackingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null }, // Required going forward, null for legacy
+    serialNumber: { type: String, default: null },
     product: { type: String, enum: ['led', 'cooler', 'both'], required: true },
     complaintType: { type: String, enum: ['installation', 'complaint'], required: true },
     warrantyStatus: { type: String, enum: ['in_warranty', 'out_of_warranty'], required: true },
+    warrantyExpiryDate: { type: Date, default: null },
+    warrantySource: { type: String, enum: ['auto_calculated', 'manual'], default: 'manual' },
+    billPhoto: { type: String, default: '' },
+    billDate: { type: Date, default: null },
 
     // ── Preset & Base Charges (in-warranty only) ──────────────
     presetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Preset', default: null },

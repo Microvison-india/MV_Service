@@ -61,7 +61,7 @@ router.get('/my', auth, isSC, getMyComplaints);
 
 // GET /api/complaints/:id — Get full complaint with timeline updates
 // IMPORTANT: MUST BE PLACED AFTER ALL OTHER GET ROUTES TO PREVENT COLLISION
-router.get('/:id', auth, isAdmin, getComplaintById);
+router.get('/:id', auth, getComplaintById);
 
 // PATCH /api/complaints/:id/accept — SC accepts assignment
 router.patch('/:id/accept', auth, isSC, acceptComplaint);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../api/axios';
 import ImageUploader from '../forms/ImageUploader';
 import PetrolEditField from './PetrolEditField';
@@ -32,6 +32,27 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [markingGoing, setMarkingGoing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [productTimeline, setProductTimeline] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const fetchDetail = async () => {
+      try {
+        const { data } = await api.get(`/api/complaints/${initial._id}`);
+        if (active) {
+          setC(data.complaint);
+          setProductTimeline(data.productTimeline || []);
+        }
+      } catch (err) {
+        console.error('Failed to load full complaint details', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchDetail();
+    return () => { active = false; };
+  }, [initial._id]);
 
   const isInWarranty = c.warrantyStatus === 'in_warranty';
   const canMarkGoing = c.status === 'accepted';
@@ -39,6 +60,35 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const alreadyFinished = ['done', 'not_done', 'part_pending', 'replacement', 'closed'].includes(c.status);
 
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
+
+  // Sourced from Product tracking if populated to always show the latest info
+  const productInfo = c.trackingId || {};
+  const latestCustomerName = productInfo.customerName || c.customerName;
+  const latestPhone1 = productInfo.phone1 || c.phone1;
+  const latestPhone2 = productInfo.phone2 || c.phone2;
+  const latestAddress = productInfo.localAddress || c.localAddress;
+  const latestCity = productInfo.city || c.city;
+  const latestDistrict = productInfo.district || c.district;
+  const latestState = productInfo.state || c.state;
+  const latestTrackingId = productInfo.trackingId || c.trackingId;
+  const latestSerialNumber = productInfo.serialNumber || c.serialNumber;
+  const latestProduct = productInfo.product || c.product;
+  const latestWarrantyStatus = productInfo.warrantyStatus || c.warrantyStatus;
+  const latestWarrantySource = productInfo.warrantySource || c.warrantySource;
+  const latestBillDate = productInfo.billDate || c.billDate;
+  const latestWarrantyExpiryDate = productInfo.warrantyExpiryDate || c.warrantyExpiryDate;
+  const displayTrackingId = typeof latestTrackingId === 'object'
+    ? (latestTrackingId?.trackingId || latestTrackingId?._id || '')
+    : (latestTrackingId || '');
+
+  const formatDate = (dateVal) => {
+    if (!dateVal) return '';
+    try {
+      return new Date(dateVal).toLocaleDateString();
+    } catch {
+      return '';
+    }
+  };
 
   const handleMarkGoing = async () => {
     setMarkingGoing(true);
@@ -108,8 +158,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
         {/* Header */}
         <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <p className="text-xs text-muted-foreground font-mono">{c.complaintId}</p>
-            <h2 className="text-lg font-bold text-foreground">{c.customerName}</h2>
+            <p className="text-xs text-muted-foreground font-mono">
+              {displayTrackingId ? `Product: ${displayTrackingId} · Job ID: ${c.complaintId}` : `Job ID: ${c.complaintId}`}
+            </p>
+            <h2 className="text-lg font-bold text-foreground">{latestCustomerName}</h2>
           </div>
           <button
             onClick={onClose}
@@ -136,24 +188,95 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
             </span>
           </div>
 
-          {/* ── Customer info ── */}
-          <div className="rounded-xl border border-border p-4 space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Customer</p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Phone 1</p>
-                <p className="font-medium">{c.phone1}</p>
+          {/* Customer & Product Profile */}
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4 shadow-sm">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-bold text-sm text-foreground uppercase tracking-wider">Customer Profile</h3>
+              {displayTrackingId ? (
+                <span className="text-xs font-mono bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold uppercase">
+                  Product ID: {displayTrackingId}
+                </span>
+              ) : (
+                <span className="text-xs font-mono bg-muted text-muted-foreground px-2.5 py-1 rounded-full font-bold uppercase">
+                  No Product Link
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {/* Customer Name */}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Customer Name</span>
+                <p className="font-semibold text-sm text-foreground">{latestCustomerName || '—'}</p>
               </div>
-              {c.phone2 && (
+
+              {/* Phone No */}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Phone No</span>
+                <p className="font-semibold text-sm text-foreground">
+                  {latestPhone1 || '—'}{latestPhone2 ? ` / ${latestPhone2}` : ''}
+                </p>
+              </div>
+
+              {/* Address */}
+              <div className="sm:col-span-2 space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Address</span>
+                <p className="font-medium text-foreground">
+                  {latestAddress || '—'}
+                  {(latestCity || latestDistrict || latestState) ? `, ${[latestCity, latestDistrict, latestState].filter(Boolean).join(', ')}` : ''}
+                </p>
+              </div>
+
+              {/* Product Type */}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Product Type</span>
+                <p className="font-semibold text-foreground capitalize font-mono">
+                  {PRODUCT_LABELS[latestProduct] || latestProduct || '—'}
+                </p>
+              </div>
+
+              {/* Warranty Status */}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Warranty Status</span>
                 <div>
-                  <p className="text-muted-foreground text-xs">Phone 2</p>
-                  <p className="font-medium">{c.phone2}</p>
+                  <span className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] uppercase ${
+                    latestWarrantyStatus === 'in_warranty' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-orange-100 text-orange-800'
+                  }`}>
+                    {latestWarrantyStatus === 'in_warranty' ? '✅ In Warranty' : '⚠️ Out of Warranty'}
+                  </span>
+                  {latestWarrantySource === 'manual' && (
+                    <span className="ml-2 inline-block bg-blue-100 text-blue-800 font-semibold px-1.5 py-0.5 rounded text-[9px] uppercase">
+                      Manual
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Bill Date */}
+              {latestBillDate && (
+                <div className="space-y-1">
+                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Bill Date</span>
+                  <p className="font-medium text-foreground">{formatDate(latestBillDate)}</p>
                 </div>
               )}
-              <div className="col-span-2">
-                <p className="text-muted-foreground text-xs">Address</p>
-                <p className="font-medium">{c.localAddress}, {c.city}, {c.district}, {c.state}</p>
-              </div>
+
+              {/* Expiry Date */}
+              {latestWarrantyExpiryDate && (
+                <div className="space-y-1">
+                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Warranty Expiry Date</span>
+                  <p className="font-medium text-foreground">{formatDate(latestWarrantyExpiryDate)}</p>
+                </div>
+              )}
+
+              {/* Serial Number */}
+              {latestSerialNumber && (
+                <div className="space-y-1">
+                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-[10px]">Serial Number</span>
+                  <p className="font-mono text-foreground font-semibold">{latestSerialNumber}</p>
+                </div>
+              )}
             </div>
           </div>
 
