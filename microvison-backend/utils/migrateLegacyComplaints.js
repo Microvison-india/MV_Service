@@ -64,7 +64,7 @@ const migrateLegacyComplaints = async () => {
       if (!productRecord) {
         // Create a new product tracking record using the latest complaint's data
         const latestComplaint = complaints[complaints.length - 1];
-        const trackingId = await generateTrackingId();
+        const trackingId = await generateTrackingId(productType);
 
         productRecord = new Product({
           trackingId,

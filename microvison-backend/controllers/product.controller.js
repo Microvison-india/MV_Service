@@ -7,19 +7,14 @@ const { calculateWarranty } = require('../utils/warrantyCalculator');
 const makeComplaintIdPattern = (term) => {
   if (!term) return '';
   const clean = term.trim().toLowerCase();
-  const digits = clean.replace(/[^0-9]/g, '');
   
-  if (clean.startsWith('mv')) {
-    if (digits.startsWith('20') && digits.length >= 9) {
-      const year = digits.slice(0, 4);
-      const serial = digits.slice(4);
-      return 'mv.*' + year + '.*' + serial;
-    } else if (digits) {
-      return 'mv.*' + digits;
-    } else {
-      return 'mv';
-    }
-  } else if (digits) {
+  if (clean.startsWith('m')) {
+    const pattern = clean.replace(/[^a-z0-9]/g, '.*');
+    return pattern;
+  }
+  
+  const digits = clean.replace(/[^0-9]/g, '');
+  if (digits) {
     if (digits.startsWith('20') && digits.length >= 9) {
       const year = digits.slice(0, 4);
       const serial = digits.slice(4);
@@ -141,7 +136,7 @@ const createProduct = async (req, res) => {
       }
     }
 
-    const trackingId = await generateTrackingId();
+    const trackingId = await generateTrackingId(productType);
     
     // Calculate warranty using new utility
     const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty(

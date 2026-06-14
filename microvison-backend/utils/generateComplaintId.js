@@ -1,33 +1,52 @@
 const Complaint = require('../models/Complaint');
 
 /**
- * Generates a unique complaint ID in the format MV-YYYY-XXXXX.
- * Resets the 5-digit counter each calendar year.
- * Example: MV-2026-00001, MV-2026-00002, ..., MV-2027-00001
+ * Generates a unique Complaint ID in the format M + I/C + DDMMYY + 4-digit daily counter + W/O.
+ * The daily counter resets to 0001 each new day.
+ * Legacy IDs are preserved and ignored by the daily regex scanner.
+ * @param {string} complaintType - 'installation' or 'complaint'
+ * @param {string} warrantyStatus - 'in_warranty' or 'out_of_warranty'
  */
-const generateComplaintId = async () => {
-  const currentYear = new Date().getFullYear();
+const generateComplaintId = async (complaintType, warrantyStatus) => {
+  const typeCode = complaintType === 'installation' ? 'I' : 'C';
+  const warrantyCode = warrantyStatus === 'in_warranty' ? 'W' : 'O';
 
-  // Find the most recently created complaint for this year
-  const lastComplaint = await Complaint.findOne({
-    complaintId: new RegExp(`^MV-${currentYear}-`),
+  // Format today's date as DDMMYY
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = new Date();
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const yearStr = String(d.getFullYear()).slice(-2);
+  const dateStr = `${day}${month}${yearStr}`; // e.g. "150626"
+
+  // Regex to find today's complaints in the new format: M + [IC] + DDMMYY + 4 digits + [WO]
+  const regex = new RegExp(`^M[IC]${dateStr}\\d{4}[WO]$`);
+
+  // We scan the last 10 complaints matching today's pattern to find the highest daily sequence number
+  const todayComplaints = await Complaint.find({
+    complaintId: { $regex: regex }
   })
-    .sort({ createdAt: -1 })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(10)
     .select('complaintId')
     .lean();
 
-  let nextNumber = 1;
-
-  if (lastComplaint) {
-    // Extract the 5-digit number from the last ID and increment
-    const parts = lastComplaint.complaintId.split('-');
-    const lastNumber = parseInt(parts[2], 10);
-    nextNumber = lastNumber + 1;
+  let maxNum = 0;
+  for (const c of todayComplaints) {
+    if (c.complaintId) {
+      // e.g. MC1506260003O -> substring(8, 12) is "0003"
+      const numStr = c.complaintId.substring(8, 12);
+      const num = parseInt(numStr, 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
   }
 
-  // Pad to 5 digits: 1 → '00001'
-  const paddedNumber = String(nextNumber).padStart(5, '0');
-  return `MV-${currentYear}-${paddedNumber}`;
+  const nextNumber = maxNum + 1;
+  const paddedNumber = String(nextNumber).padStart(4, '0');
+
+  return `M${typeCode}${dateStr}${paddedNumber}${warrantyCode}`;
 };
 
 module.exports = generateComplaintId;

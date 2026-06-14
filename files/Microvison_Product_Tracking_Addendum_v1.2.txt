@@ -1,4 +1,4 @@
-﻿
+
 MICROVISON
 Product Tracking & Warranty System
 Addendum v1.2 - Supersedes warranty/reopen sections of GRD v1.1 and TBP v1.1
@@ -238,11 +238,10 @@ Complaint Detail - Comp-5 (full detail, as normal)
      Comp-5    - 10 Jun 2026 - New   (current - not clickable)
 
 9.2 Behaviour
-• Product Timeline is just a plain list - complaint/installation label, date, status. No table, no search, no filters, no pagination.
-• Each item EXCEPT the one currently being viewed is a small clickable link.
-• Clicking a sibling item navigates DIRECTLY to that complaint's own full detail view (same structure as any complaint detail - Customer, Product, Warranty, Charges, Media, Status Timeline, SC actions, and its own Product Timeline list with that item now marked current).
-• This lets admin/SC hop between every complaint/installation linked to the same product, one full detail view at a time - no separate page ever exists.
-• Role-based access: SC viewing a complaint assigned to them sees the Product Timeline list, but sibling items belonging to OTHER service centres are shown as plain text (date + status, not clickable) - SC cannot open another centre's complaint detail. Admin can click any item.
+• Product Timeline is a vertical sequence of collapsible accordion cards (each card representing one Complaint ID linked to that product).
+• The currently viewed active complaint card is highlighted and expanded by default.
+• All other historical complaints on the timeline are collapsed. Clicking a historical card dynamically fetches its details (SC notes, proof photos, petrol, invoice) via GET /api/complaints/:id and expands them inline inside the same panel, avoiding page navigation.
+• Role-based access: SC viewing a complaint assigned to them sees the timeline, but sibling items belonging to OTHER service centres are shown as plain text only (date + status, not clickable) to enforce data privacy. Admin can click and expand any item.
 
 9.3 Search & Filters - Unchanged Existing List Only
 • Add two new search fields to the EXISTING ComplaintFilters component (All Complaints tab): Search by Serial Number, Search by Tracking ID.
@@ -357,6 +356,26 @@ Wire AdminSidebar to add Product Tracking as a new tab
 11
 Update complaint creation controller - link/create Product record, update complaintHistory, lastComplaintId/Date on every submit
 
-End of Document  ·  Microvison Product Tracking & Warranty Addendum v1.0
-Microvison - Product Tracking & Warranty Addendum v1.2  |  Page 1 of 2
+14. Product & Complaint ID Formatting Rules (Updated June 2026)
+
+14.1 Product ID (Tracking ID)
+• Format: P + L/C + 6-digit number (e.g., PL000001, PC000023)
+• P = Product prefix
+• L = LED product type
+• C = Cooler product type
+• 6-digit sequence: Global incremental counter (not category-specific) that never resets. Stored without dashes.
+
+14.2 Complaint ID
+• Format: M + I/C + DDMMYY + 4-digit daily counter + W/O (e.g., MI1406250001W, MC1406250003O)
+• M = Microvison prefix
+• I = Installation complaint type
+• C = Service/Complaint type
+• DDMMYY = Current creation date digits
+• 4-digit counter: Sequence starts at 0001 and resets every day.
+• W/O = Dynamic warranty code (W for In-warranty, O for Out-of-warranty) determined at complaint creation.
+• Stored as-is without dashes.
+
+
+End of Document  ·  Microvison Product Tracking & Warranty Addendum v1.2 (Updated)
+Microvison - Product Tracking & Warranty Addendum v1.2  |  Page 2 of 2
 

@@ -54,7 +54,7 @@
   - [x] `VoiceRecorder` UI component (with iOS Safari fallback)
 
 - [x] **Phase 7A — Complaint Backend (Day 6)**
-  - [x] `utils/generateComplaintId.js` (MV-YYYY-XXXXX, year-reset)
+  - [x] `utils/generateComplaintId.js` (Custom daily format: M + I/C + DDMMYY + XXXX + W/O, resets daily)
   - [x] `utils/reopenChecker.js` (all 5 GRD Section 8 conditions)
   - [x] `controllers/complaint.controller.js` (reopenCheck, create, assign)
   - [x] `routes/complaint.routes.js` (GET reopen-check, POST /, PATCH /:id/assign)
@@ -78,7 +78,7 @@
   **Backend — New Files**
   - [x] `models/Product.js` — new Product schema (trackingId, serialNumber, hasSerial, product, customerName, phone1/2, address, billPhoto, billDate, warrantyStatus, warrantyExpiryDate, warrantySource, complaintHistory[], lastComplaintId, lastComplaintDate)
   - [x] `utils/warrantyCalculator.js` — warranty determination logic (billDate+3yr auto / manual fallback / installation default)
-  - [x] `utils/generateTrackingId.js` — auto-generates PT-XXXXXX style trackingId
+  - [x] `utils/generateTrackingId.js` — auto-generates custom Product ID: P + L/C + XXXXXX global counter
   - [x] `controllers/product.controller.js` — searchProducts, getProduct, createProduct, updateProduct, getReopenCheck
   - [x] `routes/product.routes.js` — all 5 product routes; mount in server.js at `/api/products`
 
@@ -158,7 +158,7 @@
   - [ ] Cloudinary and Brevo setup verification
   - [ ] Vercel Frontend Deploy
 
-- [ ] **Phase 14 — Messaging Integrations (Deferred to End)**
+- [x] **Phase 14 — Messaging Integrations (Deferred to End)**
   - [ ] Text/SMS and WhatsApp wrapper utility (`utils/sendMsg.js`)
   - [ ] Trigger 1: Send "Complaint Received" msg to Customer
   - [ ] Trigger 2: Send SC details to Customer
@@ -171,3 +171,9 @@
   - [ ] Comprehensive end-to-end testing
   - [ ] Visual UI improvements and final layout adjustments
   - [ ] Handle any new minor additions or edge-case features
+
+- [x] **Phase 16 — Custom ID Formatting Rules (Day 21)**
+  - [x] Refactored Product ID format to `P + L/C + 6-digit global sequence` (stored without dashes, global counter)
+  - [x] Refactored Complaint ID format to `M + I/C + DDMMYY + 4-digit daily sequence + W/O` (stored without dashes, resets daily)
+  - [x] Loose alphanumeric search matching in backend for legacy and new formats
+  - [x] Update documentation (Deviation logs and Addendum) to match new system specifications

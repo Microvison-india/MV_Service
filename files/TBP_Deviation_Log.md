@@ -244,13 +244,31 @@ Each entry follows this structure:
 - **Phase:** 7C (New — Product Tracking)
 - **TBP Section / File:** `components/complaint/AdminComplaintDetail.jsx` + `SCComplaintDetail.jsx` — MODIFIED
 - **Type:** ADDED
-- **Summary:** Both complaint detail slide-out panels receive a new **Product Timeline** section at the bottom. Displays a plain list of all complaints/installations linked to the same product. Current item not clickable. Siblings are clickable for Admin (navigate to that complaint's detail view). For SC: siblings assigned to OTHER centres shown as plain text only (not clickable). Data sourced from `productTimeline` array already in the complaint detail API response.
+- **Summary:** Both complaint detail slide-out panels receive a new **Product Timeline** history section at the bottom. It aggregates all complaints under their parent product tracking record into collapsible cards. The active complaint is highlighted and auto-expanded on load. Historical complaints remain collapsed, and when clicked, act as an accordion to dynamically fetch their specific job details (notes, proof photos, petrol, invoice) via `GET /api/complaints/:id` and expand them inline. For SC: historical complaints assigned to other centres are shown as plain text only (not clickable). Sourced from `productTimeline` returned in the existing complaint detail API response.
 
 ### DEV-TBP-030
 - **Phase:** 7C (New — Product Tracking)
 - **TBP Section / File:** `components/filters/ComplaintFilters.jsx` — MODIFIED
 - **Type:** ADDED
 - **Summary:** Two new search/filter fields added to the existing `ComplaintFilters` component on the All Complaints tab: **Search by Serial Number** and **Search by Tracking ID**. These pass `serialNumber=` and `trackingId=` query params to `GET /complaints`. The `getAll` controller is updated to filter by these params. No other changes to the All Complaints list UI.
+
+### DEV-TBP-031
+- **Phase:** Future / Custom ID Format (New)
+- **TBP Section / File:** `utils/generateTrackingId.js`
+- **Type:** CHANGED
+- **Summary:** Redesigned Product ID (Tracking ID) format to `P` + `L/C` + `6-digit sequence number` (e.g. `PL000001` or `PC000002`). The utility function now accepts `productType` to append the correct category code (`L` or `C`). The global counter queries the last 10 products, parses their legacy or new ID formats to extract the numeric suffix, and determines the maximum value to increment globally.
+
+### DEV-TBP-032
+- **Phase:** Future / Custom ID Format (New)
+- **TBP Section / File:** `utils/generateComplaintId.js` / `complaint.controller.js`
+- **Type:** CHANGED
+- **Summary:** Redesigned Complaint ID format to `M` + `I/C` + `DDMMYY` (creation date) + `4-digit sequence` + `W/O` (warranty code). The daily counter resets to `0001` each day, scanning today's date formatted as `DDMMYY` to find the highest sequence number. In the creation controller, ID generation executes *after* warranty calculation to get the resolved status. Search pattern matcher updated in both product and complaint controllers to flexibly query all ID styles.
+
+### DEV-TBP-033
+- **Phase:** Future / Customer Card Layout Refinement
+- **TBP Section / File:** `AdminComplaintDetail.jsx` / `SCComplaintDetail.jsx`
+- **Type:** CHANGED
+- **Summary:** Modified JSX rendering in both detail views to output a styled Customer Profile card. Added a grid container to output Name, Phone (standardized `phone1 / phone2` format), Address (concatenated localAddress, city, district, state), Warranty Status, Bill Date, Warranty Expiry Date, Serial Number, and Tracking ID with clear labels. Checked if variables exist (such as `latestBillDate` and `latestWarrantyExpiryDate`) and formatted them using a localized `formatDate` helper. Included a manual selection check on warranty status. Adjusted fields to align with timeline visibility differences.
 
 ---
 

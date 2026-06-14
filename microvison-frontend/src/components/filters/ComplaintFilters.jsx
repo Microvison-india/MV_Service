@@ -245,7 +245,7 @@ export default function ComplaintFilters({ filters, onChange }) {
             <input
               type="text"
               name="trackingId"
-              placeholder="e.g. PT-000001"
+              placeholder="e.g. PL000001 / PT-000001"
               value={filters.trackingId || ''}
               onChange={handleSelect}
               className={inputCls}

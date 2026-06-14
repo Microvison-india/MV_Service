@@ -234,14 +234,31 @@ graph TD
 - **Phase:** 7C (New — Product Tracking)
 - **GRD Section:** N/A (New Feature — not in GRD v1.1)
 - **Type:** ADDED
-- **Summary:** **Product Timeline** is a new inline section added to the existing complaint detail view (both Admin and SC). No new page, route, or tab is created.
-  - Shows a plain list: each complaint/installation linked to the same product (label, date, status)
-  - Current complaint is shown but not clickable
-  - Siblings are clickable links → navigate to that complaint's own full detail view
-  - **SC Role restriction:** sibling complaints assigned to OTHER service centres shown as plain text only (date + status, not clickable)
-  - Admin can click any sibling item regardless of assigned SC
-  - Backend: `productTimeline` array included in existing `GET /complaints/:id` response — no new endpoint needed
-  - Filter addition: Two new search fields added to `ComplaintFilters` component (All Complaints tab): **Search by Serial Number** and **Search by Tracking ID**
+- **Summary:** **Product Timeline** is a new inline history timeline section integrated directly into the Admin complaint detail panel, grouping all complaints (by their individual Complaint IDs) under their parent Product Tracking ID:
+  - Displays a vertical timeline of all complaints/installations associated with that specific product.
+  - The current active complaint card is visually highlighted and expanded by default.
+  - All other historical complaints on the timeline are collapsible. Clicking a historical card acts as an accordion, dynamically loading its specific details (SC notes, proof photos, petrol logs, invoice details) via `GET /api/complaints/:id` and expanding them inline on the same slide-out panel.
+  - **SC Role restriction:** On the SC portal complaint detail panel, the timeline details for other jobs are hidden or shown as plain text only (not clickable) to enforce data privacy between different service centres.
+  - Backend: `productTimeline` list is returned as part of the standard `GET /complaints/:id` payload.
+  - Filters: Added Serial Number and Tracking ID search filters on the All Complaints tab.
+
+### DEV-GRD-023
+- **Phase:** Future / Custom ID Format (New)
+- **GRD Section:** 7A (generateComplaintId) & 7C (generateTrackingId)
+- **Type:** CHANGED
+- **Summary:** Redesigned Product ID (Tracking ID) and Complaint ID format rules:
+  - **Product ID:** Changed from legacy `PT-XXXXXX` format to `PLXXXXXX` (LED) / `PCXXXXXX` (Cooler) where `XXXXXX` is a global 6-digit incrementing counter. Counter is global across all categories (increments continuously) and stored as-is without hyphens.
+  - **Complaint ID:** Changed from legacy `MV-YYYY-XXXXX` format to `M` + `I/C` (type code: Installation or Complaint) + `DDMMYY` (creation date) + `XXXX` (daily sequence starting at `0001` and resetting each new day) + `W/O` (resolved warranty status snapshot code: In-warranty or Out-of-warranty). Stored without dashes.
+  - Alphanumeric loose regex search matching is integrated to ensure all tabs and search inputs match both new and legacy formats seamlessly.
+
+### DEV-GRD-024
+- **Phase:** Future / Customer Card Layout Refinement
+- **GRD Section:** 6.1 (Step 1 Customer Info) & 10.2 / 11.1 (Complaint details panels)
+- **Type:** CHANGED
+- **Summary:** Standardized the Customer Profile Card rendered at the top of the detail panels. Added clear, uppercase bold labels for Name, Phone, Address, Product, Warranty Status, Serial Number, and Product ID. Standardized phone format to `Phone No: phone1 / phone2`.
+- **Field Visibilities:**
+  - **Admin Panel:** Shows the overall **Current Warranty Status** of the product tracking profile, along with the **Bill Date** and **Warranty Expiry Date** if they exist. It hides the **Product Type** (LED/Cooler) on the top card because the type can vary from complaint to complaint in the multi-job timeline below it.
+  - **SC Panel:** Shows all of the above, but retains the **Product Type** and **Warranty Status** directly on the card since the SC view is focused solely on the single, individual assigned complaint context.
 
 ---
 

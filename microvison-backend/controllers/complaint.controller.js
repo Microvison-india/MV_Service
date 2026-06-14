@@ -12,19 +12,14 @@ const { findReopenEligible } = require('../utils/reopenChecker');
 const makeComplaintIdPattern = (term) => {
   if (!term) return '';
   const clean = term.trim().toLowerCase();
-  const digits = clean.replace(/[^0-9]/g, '');
   
-  if (clean.startsWith('mv')) {
-    if (digits.startsWith('20') && digits.length >= 9) {
-      const year = digits.slice(0, 4);
-      const serial = digits.slice(4);
-      return 'mv.*' + year + '.*' + serial;
-    } else if (digits) {
-      return 'mv.*' + digits;
-    } else {
-      return 'mv';
-    }
-  } else if (digits) {
+  if (clean.startsWith('m')) {
+    const pattern = clean.replace(/[^a-z0-9]/g, '.*');
+    return pattern;
+  }
+  
+  const digits = clean.replace(/[^0-9]/g, '');
+  if (digits) {
     if (digits.startsWith('20') && digits.length >= 9) {
       const year = digits.slice(0, 4);
       const serial = digits.slice(4);
@@ -111,7 +106,7 @@ const reopenComplaint = async (req, res) => {
     }
 
     // 4. Generate new complaint ID
-    const newComplaintId = await generateComplaintId();
+    const newComplaintId = await generateComplaintId(parent.complaintType, parent.warrantyStatus);
 
     // 5. Create the reopened complaint record
     const reopened = await Complaint.create({
@@ -273,9 +268,6 @@ const createComplaint = async (req, res) => {
       }))
     : [];
 
-  // ── Generate unique complaint ID ──────────────────────────
-  const complaintId = await generateComplaintId();
-
   // ── Petrol tracking ───────────────────────────────────────
   const petrolValue = (petrolAdmin != null) ? Number(petrolAdmin) : null;
   const petrolEditCount = petrolValue != null ? 1 : 0;
@@ -291,6 +283,9 @@ const createComplaint = async (req, res) => {
   finalWarrantyStatus = calculated.warrantyStatus;
   finalWarrantyExpiryDate = calculated.warrantyExpiryDate;
   finalWarrantySource = calculated.warrantySource;
+
+  // ── Generate unique complaint ID ──────────────────────────
+  const complaintId = await generateComplaintId(complaintType, finalWarrantyStatus);
 
   if (trackingId) {
     // Existing product linked
@@ -333,7 +328,7 @@ const createComplaint = async (req, res) => {
       const existing = await Product.findOne({ serialNumber });
       if (existing) return res.status(400).json({ message: 'Serial number already exists.' });
     }
-    const newTrackingId = await generateTrackingId();
+    const newTrackingId = await generateTrackingId(product);
     productRecord = new Product({
       trackingId: newTrackingId,
       serialNumber: serialNumber || undefined,
