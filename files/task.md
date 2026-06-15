@@ -158,13 +158,13 @@
   - [ ] Cloudinary and Brevo setup verification
   - [ ] Vercel Frontend Deploy
 
-- [x] **Phase 14 — Messaging Integrations (Deferred to End)**
-  - [ ] Text/SMS and WhatsApp wrapper utility (`utils/sendMsg.js`)
-  - [ ] Trigger 1: Send "Complaint Received" msg to Customer
-  - [ ] Trigger 2: Send SC details to Customer
-  - [ ] Trigger 3: Send basic complaint details to Assigned SC
-  - [ ] Trigger 4: Complaint Reopened
-  - [ ] Provider/Meta template approvals & Production Testing
+- [/] **Phase 14 — Messaging Integrations (Deferred to End)**
+  - [x] Direct Meta WhatsApp Cloud API wrapper utility (`utils/sendWhatsApp.js`) (Sandbox Mode implemented)
+  - [ ] Trigger 1: Send "Complaint Received" msg to Customer (Pending approved template)
+  - [ ] Trigger 2: Send SC details to Customer (Pending approved template)
+  - [ ] Trigger 3: Send basic complaint details to Assigned SC (Pending approved template)
+  - [ ] Trigger 4: Complaint Reopened (Pending approved template)
+  - [ ] Configure environment variables for permanent credentials and production templates (.env / .env.example)
 
 - [ ] **Phase 15 — UI/UX Polish & Final Testing**
   - [ ] Improve overall UI flow and UX consistency
@@ -177,3 +177,11 @@
   - [x] Refactored Complaint ID format to `M + I/C + DDMMYY + 4-digit daily sequence + W/O` (stored without dashes, resets daily)
   - [x] Loose alphanumeric search matching in backend for legacy and new formats
   - [x] Update documentation (Deviation logs and Addendum) to match new system specifications
+
+- [x] **Phase 17 — Auth Checks & Forgot Password OTP Fix**
+  - [x] Validate password length and confirm password match in backend `registerSC`
+  - [x] Trim and lowercase email inputs in all backend auth routes
+  - [x] Return explicit 404/400 error on forgot password if user is not found
+  - [x] Log OTP to console and implement fallback sandbox mode if Brevo key is missing/placeholder
+  - [x] Display actual API error messages on frontend `ForgotPassword` page
+  - [x] Run ESLint and verify build

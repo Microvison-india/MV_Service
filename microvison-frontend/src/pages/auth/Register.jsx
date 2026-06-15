@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 
 // All SC registration fields per GRD Section 3.2
@@ -99,6 +99,10 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -114,7 +118,8 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const { confirmPassword, ...payload } = formData;
+      const payload = { ...formData };
+      delete payload.confirmPassword;
       await api.post('/api/auth/register', payload);
       setSuccess(true);
     } catch (err) {

@@ -42,12 +42,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
   // Historical details caching & expanded state
   const [loadedDetails, setLoadedDetails] = useState({});
+  const [prevComplaintId, setPrevComplaintId] = useState(complaintId);
   const [expandedComplaintId, setExpandedComplaintId] = useState(complaintId);
   const [loadingHistoryDetails, setLoadingHistoryDetails] = useState(null);
 
-  useEffect(() => {
+  if (complaintId !== prevComplaintId) {
+    setPrevComplaintId(complaintId);
     setExpandedComplaintId(complaintId);
-  }, [complaintId]);
+  }
 
   const handleToggleExpand = async (compId) => {
     if (expandedComplaintId === compId) {
@@ -110,7 +112,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   useEffect(() => {
     let active = true;
     if (c && ['new', 'assigned', 'rejected_by_sc'].includes(c.status)) {
-      setLoadingCandidates(true);
+      Promise.resolve().then(() => {
+        if (active) setLoadingCandidates(true);
+      });
       api.get('/api/service-centres', { params: { status: 'active', limit: 100 } })
         .then(({ data }) => {
           if (!active) return;
@@ -420,7 +424,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const latestState = productInfo.state || c?.state;
   const latestTrackingId = productInfo.trackingId || c?.trackingId;
   const latestSerialNumber = productInfo.serialNumber || c?.serialNumber;
-  const latestProduct = productInfo.product || c?.product;
+  // const latestProduct = productInfo.product || c?.product;
   const latestWarrantyStatus = productInfo.warrantyStatus || c?.warrantyStatus;
   const latestWarrantySource = productInfo.warrantySource || c?.warrantySource;
   const latestBillDate = productInfo.billDate || c?.billDate;
@@ -582,8 +586,8 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 const isCurrent = String(item.complaintId) === String(c?._id);
                 const isExpanded = expandedComplaintId === String(item.complaintId);
                 
-                let nodeDetails = null;
-                let nodeUpdates = [];
+                let nodeDetails;
+                let nodeUpdates;
                 let isNodeLoading = false;
                 
                 if (isCurrent) {

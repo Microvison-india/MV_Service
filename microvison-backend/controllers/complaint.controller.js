@@ -7,6 +7,7 @@ const generateComplaintId = require('../utils/generateComplaintId');
 const generateTrackingId = require('../utils/generateTrackingId');
 const { calculateWarranty } = require('../utils/warrantyCalculator');
 const { findReopenEligible } = require('../utils/reopenChecker');
+const sendWhatsApp = require('../utils/sendWhatsApp');
 
 // Helper to generate flexible regex pattern string for matching complaint IDs (e.g. MV-2026-00005, MV005, 00005)
 const makeComplaintIdPattern = (term) => {
@@ -162,6 +163,15 @@ const reopenComplaint = async (req, res) => {
       message: 'Complaint reopened successfully.',
       complaint: reopened,
     });
+
+    // Trigger 4: Send "Complaint Reopened" msg to Customer
+    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED || 'complaint_reopened';
+    sendWhatsApp(reopened.phone1, templateReopened, [
+      reopened.customerName,
+      reopened.complaintId,
+      reopenNotes.trim(),
+      new Date(reopened.createdAt).toLocaleDateString('en-IN')
+    ]);
   } catch (error) {
     console.error('Error in reopenComplaint:', error);
     res.status(500).json({ message: 'Server error while reopening complaint.' });
@@ -413,6 +423,27 @@ const createComplaint = async (req, res) => {
     message: 'Complaint created successfully.',
     complaint,
   });
+
+  // Asynchronous WhatsApp notification
+  if (isReopened) {
+    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED || 'complaint_reopened';
+    sendWhatsApp(complaint.phone1, templateReopened, [
+      complaint.customerName,
+      complaint.complaintId,
+      reopenNotes || '',
+      new Date(complaint.createdAt).toLocaleDateString('en-IN')
+    ]);
+  } else {
+    const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED || 'complaint_received';
+    const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
+    sendWhatsApp(complaint.phone1, templateName, [
+      complaint.customerName,
+      complaint.complaintId,
+      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+      complaint.complaintType,
+      complaintDate
+    ]);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -462,13 +493,34 @@ const assignComplaint = async (req, res) => {
     note: `Assigned to ${sc.businessName}.`,
   });
 
-  // TODO (Phase 13): Send WhatsApp message to Service Centre here
-  // sendWhatsApp({ to: sc.phone1, template_name: 'new_complaint', complaint })
-
   res.status(200).json({
     message: `Complaint assigned to ${sc.businessName} successfully.`,
     complaint,
   });
+
+  // Trigger 2: Send SC details to Customer
+  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'sc_details_to_customer';
+  sendWhatsApp(complaint.phone1, templateCustomer, [
+    complaint.customerName,
+    complaint.complaintId,
+    sc.businessName,
+    sc.ownerName,
+    sc.phone1
+  ]);
+
+  // Trigger 3: Send basic complaint details to Assigned SC
+  const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'complaint_details_to_sc';
+  const customerAddress = `${complaint.localAddress}, ${complaint.city}`;
+  sendWhatsApp(sc.phone1, templateSC, [
+    sc.ownerName,
+    complaint.complaintId,
+    complaint.customerName,
+    complaint.phone1,
+    customerAddress,
+    complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+    complaint.complaintType,
+    complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty'
+  ]);
 };
 
 // ─────────────────────────────────────────────────────────────

@@ -10,15 +10,16 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
       setError('Please enter your email address.');
       return;
     }
     setLoading(true);
     try {
-      await api.post('/api/auth/forgot-password', { email });
+      await api.post('/api/auth/forgot-password', { email: trimmedEmail });
       // Navigate to OTP page, pass email via state
-      navigate('/verify-otp', { state: { email } });
+      navigate('/verify-otp', { state: { email: trimmedEmail } });
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {

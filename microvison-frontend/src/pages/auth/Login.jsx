@@ -24,7 +24,10 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      const { data } = await api.post('/api/auth/login', formData);
+      const { data } = await api.post('/api/auth/login', {
+        email: formData.email.trim(),
+        password: formData.password,
+      });
       login(data.token, data.user);
       // Redirect by role per TBP Phase 3 item 11
       navigate(data.user.role === 'admin' ? '/admin' : '/sc', { replace: true });
