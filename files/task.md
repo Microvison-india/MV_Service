@@ -153,10 +153,15 @@
   - [ ] Finalize Vite PWA config & Icons
   - [ ] Add global Toaster to `main.jsx`
   - [ ] Loading Skeletons & Empty States
-  - [ ] Railway Backend Deploy
-  - [ ] MongoDB Atlas setup
-  - [ ] Cloudinary and Brevo setup verification
-  - [ ] Vercel Frontend Deploy
+  - [x] Railway Backend Deploy
+  - [x] MongoDB Atlas setup
+  - [ ] Cloudflare R2 File Storage Migration
+    - [x] Install `@aws-sdk/client-s3` in backend
+    - [x] Configure R2 environment variables in `.env.example` and `.env`
+    - [x] Remove Cloudinary config file (`config/cloudinary.js`)
+    - [x] Refactor upload middleware (`middleware/upload.js`) to use R2
+    - [x] Verify ESLint and local build correctness
+  - [x] Vercel Frontend Deploy
 
 - [/] **Phase 14 — Messaging Integrations (Deferred to End)**
   - [x] Direct Meta WhatsApp Cloud API wrapper utility (`utils/sendWhatsApp.js`) (Sandbox Mode implemented)

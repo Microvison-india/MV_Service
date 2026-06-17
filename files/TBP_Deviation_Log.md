@@ -270,6 +270,14 @@ Each entry follows this structure:
 - **Type:** CHANGED
 - **Summary:** Modified JSX rendering in both detail views to output a styled Customer Profile card. Added a grid container to output Name, Phone (standardized `phone1 / phone2` format), Address (concatenated localAddress, city, district, state), Warranty Status, Bill Date, Warranty Expiry Date, Serial Number, and Tracking ID with clear labels. Checked if variables exist (such as `latestBillDate` and `latestWarrantyExpiryDate`) and formatted them using a localized `formatDate` helper. Included a manual selection check on warranty status. Adjusted fields to align with timeline visibility differences.
 
+## Phase 13 — PWA + Polish + Deploy
+
+### DEV-TBP-034
+- **Phase:** 13
+- **TBP Section / File:** `middleware/upload.js` / File Upload storage provider
+- **Type:** CHANGED
+- **Summary:** Replaced **Cloudinary** and **multer-storage-cloudinary** storage engines with **Cloudflare R2** via the S3-compatible protocol. Created a central config file `config/r2.js` exporting the initialized S3 client. Refactored `middleware/upload.js` to process image uploads with `sharp` (compressing them to JPEGs under 1200px width/height at 80% quality) and upload the resulting buffers directly to R2. The middleware maps output properties to `file.path` and `file.filename` to preserve compatibility with existing controller endpoints and schemas.
+
 ---
 
 ## Future Phases

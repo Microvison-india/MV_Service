@@ -260,6 +260,14 @@ graph TD
   - **Admin Panel:** Shows the overall **Current Warranty Status** of the product tracking profile, along with the **Bill Date** and **Warranty Expiry Date** if they exist. It hides the **Product Type** (LED/Cooler) on the top card because the type can vary from complaint to complaint in the multi-job timeline below it.
   - **SC Panel:** Shows all of the above, but retains the **Product Type** and **Warranty Status** directly on the card since the SC view is focused solely on the single, individual assigned complaint context.
 
+## Phase 13 — PWA + Polish + Deploy
+
+### DEV-GRD-025
+- **Phase:** 13
+- **GRD Section:** 6.3 (Notes and Media) / 10.2 / 12 (Proof Photos and Media Storage)
+- **Type:** CHANGED
+- **Summary:** Migrated the media storage provider from **Cloudinary** to **Cloudflare R2** using standard S3 compatibility. For image files, we integrated **sharp.js** on the backend to perform image compression (reducing width/height to fit 1200px and converting to web-optimized JPEG at 80% quality) prior to uploading to R2. This replaces Cloudinary's built-in image transformation rules while keeping the file storage extremely efficient and free of egress bandwidth fees.
+
 ---
 
 ## Future Phases
