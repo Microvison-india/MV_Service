@@ -15,7 +15,25 @@ connectDB().then(() => {
 const app = express();
 
 // Middleware
-app.use(cors({ origin: process.env.FRONTEND_URL }));
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
+  'https://microvisonservice.co.in',
+  'https://www.microvisonservice.co.in',
+  'https://mv-service.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json());
 
 // Routes
