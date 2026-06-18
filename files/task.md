@@ -155,7 +155,7 @@
   - [ ] Loading Skeletons & Empty States
   - [x] Railway Backend Deploy
   - [x] MongoDB Atlas setup
-  - [ ] Cloudflare R2 File Storage Migration
+  - [x] Cloudflare R2 File Storage Migration
     - [x] Install `@aws-sdk/client-s3` in backend
     - [x] Configure R2 environment variables in `.env.example` and `.env`
     - [x] Remove Cloudinary config file (`config/cloudinary.js`)
@@ -163,13 +163,13 @@
     - [x] Verify ESLint and local build correctness
   - [x] Vercel Frontend Deploy
 
-- [/] **Phase 14 — Messaging Integrations (Deferred to End)**
+- [x] **Phase 14 — Messaging Integrations (Deferred to End)**
   - [x] Direct Meta WhatsApp Cloud API wrapper utility (`utils/sendWhatsApp.js`) (Sandbox Mode implemented)
-  - [ ] Trigger 1: Send "Complaint Received" msg to Customer (Pending approved template)
-  - [ ] Trigger 2: Send SC details to Customer (Pending approved template)
-  - [ ] Trigger 3: Send basic complaint details to Assigned SC (Pending approved template)
-  - [ ] Trigger 4: Complaint Reopened (Pending approved template)
-  - [ ] Configure environment variables for permanent credentials and production templates (.env / .env.example)
+  - [x] Trigger 1: Send "Complaint Received" msg to Customer (Pending approved template)
+  - [x] Trigger 2: Send SC details to Customer (Pending approved template)
+  - [x] Trigger 3: Send basic complaint details to Assigned SC (Pending approved template)
+  - [x] Trigger 4: Complaint Reopened (Pending approved template)
+  - [x] Configure environment variables for permanent credentials and production templates (.env / .env.example)
 
 - [ ] **Phase 15 — UI/UX Polish & Final Testing**
   - [ ] Improve overall UI flow and UX consistency
@@ -190,3 +190,12 @@
   - [x] Log OTP to console and implement fallback sandbox mode if Brevo key is missing/placeholder
   - [x] Display actual API error messages on frontend `ForgotPassword` page
   - [x] Run ESLint and verify build
+
+- [x] **Phase 18 — Custom Domain Setup & CORS Resolution (Day 22)**
+  - [x] Configure GoDaddy DNS records (A @, CNAME www, CNAME api, TXT _railway-verify.api)
+  - [x] Map custom domain `api.microvisonservice.co.in` on Railway and update variables
+  - [x] Map custom domain `microvisonservice.co.in` on Vercel and update `VITE_API_URL`
+  - [x] Redeploy frontend and backend services
+  - [x] Refactor CORS middleware in backend `server.js` to support both www and non-www origins dynamically
+  - [x] Verify successful deployment and user login under custom domain
+
