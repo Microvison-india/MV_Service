@@ -508,9 +508,16 @@ const assignComplaint = async (req, res) => {
     sc.phone1
   ]);
 
-  // Trigger 3: Send basic complaint details to Assigned SC
+  // Trigger 3: Send basic complaint details to Assigned SC (WA-01)
   const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'complaint_details_to_sc';
-  const customerAddress = `${complaint.localAddress}, ${complaint.city}`;
+  const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
+  
+  let reopenInfo = 'NO';
+  if (complaint.isReopened && complaint.reopenParentId) {
+    const parent = await Complaint.findById(complaint.reopenParentId);
+    reopenInfo = `REOPENED (Original Job ID: ${parent ? parent.complaintId : 'Unknown'})`;
+  }
+
   sendWhatsApp(sc.phone1, templateSC, [
     sc.ownerName,
     complaint.complaintId,
@@ -519,7 +526,10 @@ const assignComplaint = async (req, res) => {
     customerAddress,
     complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
     complaint.complaintType,
-    complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty'
+    complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
+    complaint.notes || 'None',
+    process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in/login',
+    reopenInfo
   ]);
 };
 
@@ -595,6 +605,29 @@ const acceptComplaint = async (req, res) => {
   });
 
   res.status(200).json({ message: 'Complaint accepted.', complaint });
+
+  // Trigger WA-04: Sent to Customer immediately on SC acceptance
+  const templateCustomer = process.env.WHATSAPP_TEMPLATE_ACCEPT_CUSTOMER || 'sc_accept_to_customer';
+  const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
+  const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
+  
+  sendWhatsApp(complaint.phone1, templateCustomer, [
+    complaint.complaintId,
+    productType,
+    complaintType,
+    sc.businessName,
+    sc.phone1
+  ]);
+
+  if (complaint.phone2) {
+    sendWhatsApp(complaint.phone2, templateCustomer, [
+      complaint.complaintId,
+      productType,
+      complaintType,
+      sc.businessName,
+      sc.phone1
+    ]);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -685,9 +718,18 @@ const updateStatus = async (req, res) => {
     petrolSC,
     extraChargeRequest,
     customerPaymentAmount,
+    // SC Flow v1.1 Fields
+    notDoneReason,
+    notDoneVoiceUrl,
+    partDetails,
+    partPendingVoiceUrl,
+    doneVoiceUrl,
+    distanceTravelled,
+    totalVisits,
+    extraCharges,
   } = req.body;
 
-  const ALLOWED_FINAL_STATUSES = ['done', 'not_done', 'part_pending', 'replacement'];
+  const ALLOWED_FINAL_STATUSES = ['done', 'not_done', 'part_pending'];
 
   if (!ALLOWED_FINAL_STATUSES.includes(newStatus)) {
     return res.status(400).json({
@@ -705,58 +747,128 @@ const updateStatus = async (req, res) => {
     return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
   }
 
-  // Must be in accepted or going state to submit final result (GRD 7.3)
-  if (!['accepted', 'going'].includes(complaint.status)) {
+  // Must be in accepted, going, or part_received state to submit final result (SC Flow v1.1)
+  if (!['accepted', 'going', 'part_received'].includes(complaint.status)) {
     return res.status(400).json({
       message: `Cannot submit final status from current status '${complaint.status}'.`,
     });
   }
 
-  // Proof photos are mandatory for 'done'
   const photos = Array.isArray(proofPhotos) ? proofPhotos : [];
-  if (newStatus === 'done' && photos.length === 0) {
-    return res.status(400).json({ message: 'At least one proof photo is required before marking as done.' });
-  }
-
-  // Out-of-warranty: customer payment amount is required for 'done'
-  if (newStatus === 'done' && complaint.warrantyStatus === 'out_of_warranty') {
-    if (customerPaymentAmount == null || customerPaymentAmount === '') {
-      return res.status(400).json({ message: 'Amount collected from customer is required for out-of-warranty completed jobs.' });
-    }
-  }
-
   const oldStatus = complaint.status;
+  let timelineNote = '';
+  let timelineVoiceUrl = '';
 
-  // Apply updates
+  // ── Path 1: Done ─────────────────────────────────────────────────────────
+  if (newStatus === 'done') {
+    if (photos.length < 1) {
+      return res.status(400).json({ message: 'At least one proof photo is required before marking as done.' });
+    }
+
+    if (complaint.warrantyStatus === 'out_of_warranty') {
+      if (customerPaymentAmount == null || customerPaymentAmount === '') {
+        return res.status(400).json({ message: 'Amount collected from customer is required for out-of-warranty completed jobs.' });
+      }
+      complaint.customerPaymentAmount = Number(customerPaymentAmount);
+    }
+
+    // Save lifecycle metrics
+    if (totalVisits != null && totalVisits !== '') {
+      complaint.totalVisits = Number(totalVisits);
+    }
+    if (distanceTravelled != null && distanceTravelled !== '') {
+      complaint.distanceTravelled = Number(distanceTravelled);
+    }
+    if (doneVoiceUrl) {
+      complaint.doneVoiceUrl = doneVoiceUrl;
+    }
+
+    // Petrol Edit 2 — SC's turn only if editCount is 0 or 1 and in-warranty (GRD 6.3)
+    if (
+      complaint.warrantyStatus === 'in_warranty' &&
+      petrolSC != null &&
+      petrolSC !== '' &&
+      (complaint.petrolEditCount === 1 || complaint.petrolEditCount === 0) &&
+      !complaint.petrolLocked
+    ) {
+      complaint.petrolSC = Number(petrolSC);
+      complaint.petrolEditCount = 2;
+    }
+
+    // Extra charges (multiple line items)
+    if (Array.isArray(extraCharges)) {
+      for (const item of extraCharges) {
+        if (item.label && item.label.trim() && item.amount) {
+          complaint.extraCharges.push({
+            label: item.label.trim(),
+            amount: Number(item.amount),
+            requestedBy: 'sc',
+            status: 'pending',
+          });
+        }
+      }
+    }
+    // Backward compatibility for single extra charge request
+    if (extraChargeRequest && extraChargeRequest.label && extraChargeRequest.amount) {
+      complaint.extraCharges.push({
+        label: extraChargeRequest.label.trim(),
+        amount: Number(extraChargeRequest.amount),
+        requestedBy: 'sc',
+        status: 'pending',
+      });
+    }
+
+    if (scNotes) complaint.scNotes = scNotes.trim();
+    timelineNote = scNotes ? scNotes.trim() : 'SC marked as done.';
+    timelineVoiceUrl = doneVoiceUrl || '';
+  }
+
+  // ── Path 2: Not Done ─────────────────────────────────────────────────────
+  else if (newStatus === 'not_done') {
+    const hasReason = notDoneReason && notDoneReason.trim() !== '';
+    const hasVoice = notDoneVoiceUrl && notDoneVoiceUrl.trim() !== '';
+
+    if (!hasReason && !hasVoice) {
+      return res.status(400).json({ message: 'Either a text reason or a voice note is required before marking as not done.' });
+    }
+
+    if (notDoneReason) complaint.notDoneReason = notDoneReason.trim();
+    if (notDoneVoiceUrl) complaint.notDoneVoiceUrl = notDoneVoiceUrl;
+
+    if (scNotes) complaint.scNotes = scNotes.trim();
+    timelineNote = notDoneReason ? `Not Done: ${notDoneReason.trim()}` : 'SC marked as not done (voice note attached).';
+    timelineVoiceUrl = notDoneVoiceUrl || '';
+  }
+
+  // ── Path 3: Part Pending ─────────────────────────────────────────────────
+  else if (newStatus === 'part_pending') {
+    if (photos.length < 2) {
+      return res.status(400).json({ message: 'At least two proof photos (proof of diagnosis) are required before marking as part pending.' });
+    }
+    if (!partDetails || partDetails.trim() === '') {
+      return res.status(400).json({ message: 'Parts detail description is compulsory before marking as part pending.' });
+    }
+    if (!partPendingVoiceUrl || partPendingVoiceUrl.trim() === '') {
+      return res.status(400).json({ message: 'A voice note explanation is compulsory before marking as part pending.' });
+    }
+    if (!scNotes || scNotes.trim() === '') {
+      return res.status(400).json({ message: 'Text notes are compulsory before marking as part pending.' });
+    }
+
+    // Reset delivery details to trigger a new cycle
+    complaint.partDetails = partDetails.trim();
+    complaint.partPendingVoiceUrl = partPendingVoiceUrl;
+    complaint.partDeliveredAt = null;
+    complaint.partDeliveredNote = '';
+    complaint.partReceivedAt = null;
+
+    complaint.scNotes = scNotes.trim();
+    timelineNote = `Part Pending: Sourcing requested for "${partDetails.trim()}". ${scNotes.trim()}`;
+    timelineVoiceUrl = partPendingVoiceUrl;
+  }
+
   complaint.status = newStatus;
   complaint.proofPhotos = photos;
-  if (scNotes) complaint.scNotes = scNotes.trim();
-
-  // Petrol Edit 2 — SC's turn only if editCount is 0 or 1 and in-warranty (GRD 6.3)
-  if (
-    complaint.warrantyStatus === 'in_warranty' &&
-    petrolSC != null &&
-    (complaint.petrolEditCount === 1 || complaint.petrolEditCount === 0) &&
-    !complaint.petrolLocked
-  ) {
-    complaint.petrolSC = Number(petrolSC);
-    complaint.petrolEditCount = 2;
-  }
-
-  // Extra charge request from SC (GRD 6.3 & 10.2) — pushed as pending, admin approves
-  if (extraChargeRequest && extraChargeRequest.label && extraChargeRequest.amount) {
-    complaint.extraCharges.push({
-      label: extraChargeRequest.label.trim(),
-      amount: Number(extraChargeRequest.amount),
-      requestedBy: 'sc',
-      status: 'pending',
-    });
-  }
-
-  // Out-of-warranty: store customer payment amount (GRD 10.2 — record only, not in invoice)
-  if (complaint.warrantyStatus === 'out_of_warranty' && customerPaymentAmount != null) {
-    complaint.customerPaymentAmount = Number(customerPaymentAmount);
-  }
 
   await complaint.save();
 
@@ -766,8 +878,9 @@ const updateStatus = async (req, res) => {
     role: 'service_centre',
     oldStatus,
     newStatus,
-    note: scNotes ? scNotes.trim() : `SC marked as ${newStatus}.`,
+    note: timelineNote,
     images: photos,
+    voiceUrl: timelineVoiceUrl,
   });
 
   res.status(200).json({ message: `Complaint status updated to ${newStatus}.`, complaint });
@@ -786,12 +899,12 @@ const confirmDone = async (req, res) => {
     return res.status(404).json({ message: 'Complaint not found.' });
   }
 
-  if (!['done', 'not_done', 'part_pending', 'replacement'].includes(complaint.status)) {
-    return res.status(400).json({ message: 'Complaint is not in a completed status from SC.' });
+  if (complaint.status !== 'done') {
+    return res.status(400).json({ message: 'Complaint is not in Done status. Admin can only confirm completed Done jobs.' });
   }
 
-  // Determine if bill should be generated. Only for in_warranty.
-  const billGenerated = complaint.warrantyStatus === 'in_warranty';
+  // Determine if bill should be generated. Generated for all closed complaints to track in Billing.
+  const billGenerated = true;
   
   const oldStatus = complaint.status;
   
@@ -911,7 +1024,7 @@ const getComplaintById = async (req, res) => {
       path: 'trackingId',
       populate: {
         path: 'complaintHistory.complaintId',
-        select: 'status'
+        select: 'status assignedCentreId'
       }
     });
     
@@ -932,12 +1045,15 @@ const getComplaintById = async (req, res) => {
   if (complaint.trackingId && complaint.trackingId.complaintHistory) {
     productTimeline = complaint.trackingId.complaintHistory.map(item => {
       const plain = item.toObject ? item.toObject() : item;
-      const liveStatus = (plain.complaintId && plain.complaintId.status) ? plain.complaintId.status : plain.status;
-      const compId = (plain.complaintId && plain.complaintId._id) ? plain.complaintId._id : plain.complaintId;
+      const compObj = plain.complaintId || {};
+      const liveStatus = compObj.status || plain.status;
+      const compId = compObj._id || plain.complaintId;
+      const assignedCentreId = compObj.assignedCentreId || plain.assignedCentreId;
       return {
         ...plain,
         complaintId: compId,
         status: liveStatus,
+        assignedCentreId: assignedCentreId,
         isCurrent: String(compId) === String(complaint._id)
       };
     });
@@ -959,7 +1075,7 @@ const getActionItems = async (req, res) => {
 
   // 2. Pending Confirmations (Jobs done by SC, waiting for admin to close)
   const pendingConfirmations = await Complaint.find({
-    status: { $in: ['done', 'not_done', 'part_pending', 'replacement'] }
+    status: 'done'
   })
     .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
@@ -976,18 +1092,121 @@ const getActionItems = async (req, res) => {
     .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
 
+  // 5. Part Pending Complaints (Sourcing requested, not yet delivered)
+  const partPendingComplaints = await Complaint.find({
+    status: 'part_pending',
+    partDeliveredAt: null
+  })
+    .populate('assignedCentreId', 'ownerName businessName phone1')
+    .sort({ updatedAt: -1 });
+
   res.status(200).json({
     pendingSCRegistrations,
     pendingConfirmations,
     rejectedBySC,
     pendingExtraApprovals,
+    partPendingComplaints,
     counts: {
       pendingSCRegistrations: pendingSCRegistrations.length,
       pendingConfirmations: pendingConfirmations.length,
       rejectedBySC: rejectedBySC.length,
       pendingExtraApprovals: pendingExtraApprovals.length,
+      partPendingComplaints: partPendingComplaints.length,
     }
   });
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Admin marks Part/Unit as Delivered
+// @route   PATCH /api/complaints/:id/mark-delivered
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const markPartDelivered = async (req, res) => {
+  const { id } = req.params;
+  const { note } = req.body;
+
+  const complaint = await Complaint.findById(id);
+  if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+  if (complaint.status !== 'part_pending') {
+    return res.status(400).json({ message: 'Complaint is not in a Part Pending status.' });
+  }
+
+  // Update delivered state (does NOT change the status)
+  complaint.partDeliveredAt = new Date();
+  complaint.partDeliveredNote = note ? note.trim() : '';
+
+  await complaint.save();
+
+  // Find Service Centre to get their phone number
+  const sc = await ServiceCentre.findById(complaint.assignedCentreId);
+  if (sc && sc.phone1) {
+    const templateName = process.env.WHATSAPP_TEMPLATE_PART_DELIVERED || 'part_delivered_to_sc';
+    const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}`;
+    sendWhatsApp(sc.phone1, templateName, [
+      complaint.complaintId,
+      complaint.customerName,
+      customerAddress,
+      note ? note.trim() : 'No delivery note.'
+    ]);
+  }
+
+  // Record timeline entry
+  await ComplaintUpdate.create({
+    complaintId: complaint._id,
+    updatedBy: req.user.id,
+    role: 'admin',
+    oldStatus: 'part_pending',
+    newStatus: 'part_pending', // status stays part_pending
+    note: `Admin marked Part/Unit as Delivered. Note: ${note ? note.trim() : 'None'}`,
+  });
+
+  res.status(200).json({ message: 'Part/unit marked as delivered. WhatsApp sent to Service Centre.', complaint });
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    SC marks Part/Unit as Received
+// @route   PATCH /api/complaints/:id/part-received
+// @access  Private (SC only)
+// ─────────────────────────────────────────────────────────────
+const markPartReceived = async (req, res) => {
+  const { id } = req.params;
+
+  const sc = await ServiceCentre.findOne({ userId: req.user.id });
+  if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
+
+  const complaint = await Complaint.findById(id);
+  if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+  if (String(complaint.assignedCentreId) !== String(sc._id)) {
+    return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+  }
+
+  if (complaint.status !== 'part_pending') {
+    return res.status(400).json({ message: 'Complaint is not in a Part Pending status.' });
+  }
+
+  if (!complaint.partDeliveredAt) {
+    return res.status(400).json({ message: 'Cannot mark as received. Admin has not marked it as delivered yet.' });
+  }
+
+  const oldStatus = complaint.status;
+  complaint.status = 'part_received';
+  complaint.partReceivedAt = new Date();
+
+  await complaint.save();
+
+  // Record timeline entry
+  await ComplaintUpdate.create({
+    complaintId: complaint._id,
+    updatedBy: req.user.id,
+    role: 'service_centre',
+    oldStatus,
+    newStatus: 'part_received',
+    note: 'SC marked Part/Unit as Received.',
+  });
+
+  res.status(200).json({ message: 'Part/unit marked as received successfully.', complaint });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1135,4 +1354,6 @@ module.exports = {
   getActionItems,
   getComplaintById,
   getAllComplaints,
+  markPartDelivered,
+  markPartReceived,
 };

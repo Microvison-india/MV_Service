@@ -65,6 +65,18 @@ const complaintSchema = new mongoose.Schema(
     assignedCentreId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCentre', default: null },
     assignedAt: { type: Date, default: null },
 
+    // ── SC Flow v1.1 Fields ───────────────────────────────────
+    doneVoiceUrl: { type: String, default: '' },
+    notDoneReason: { type: String, default: '' },
+    notDoneVoiceUrl: { type: String, default: '' },
+    partDetails: { type: String, default: '' },
+    partPendingVoiceUrl: { type: String, default: '' },
+    partDeliveredAt: { type: Date, default: null },
+    partDeliveredNote: { type: String, default: '' },
+    partReceivedAt: { type: Date, default: null },
+    distanceTravelled: { type: Number, default: null },
+    totalVisits: { type: Number, default: null },
+
     // ── Status (per GRD Section 7.2) ──────────────────────────
     status: {
       type: String,
@@ -77,7 +89,7 @@ const complaintSchema = new mongoose.Schema(
         'done',
         'not_done',
         'part_pending',
-        'replacement',
+        'part_received',
         'reopened',
         'closed',
       ],

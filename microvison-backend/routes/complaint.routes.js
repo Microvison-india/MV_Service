@@ -19,6 +19,8 @@ const {
   getActionItems,
   getComplaintById,
   getAllComplaints,
+  markPartDelivered,
+  markPartReceived,
 } = require('../controllers/complaint.controller');
 
 // ── Admin Routes (all require auth + isAdmin) ───────────────────
@@ -53,6 +55,9 @@ router.patch('/:id/extras/:extraId/approve', auth, isAdmin, approveExtra);
 // PATCH /api/complaints/:id/extras/:extraId/reject — Reject extra charge
 router.patch('/:id/extras/:extraId/reject', auth, isAdmin, rejectExtra);
 
+// PATCH /api/complaints/:id/mark-delivered — Admin marks part delivered (SC Flow v1.1)
+router.patch('/:id/mark-delivered', auth, isAdmin, markPartDelivered);
+
 
 
 // ── SC Routes (all require auth + isSC) ────────────────────────
@@ -74,5 +79,8 @@ router.patch('/:id/going', auth, isSC, markGoing);
 
 // PATCH /api/complaints/:id/status — SC submits final result after visit
 router.patch('/:id/status', auth, isSC, updateStatus);
+
+// PATCH /api/complaints/:id/part-received — SC marks part received (SC Flow v1.1)
+router.patch('/:id/part-received', auth, isSC, markPartReceived);
 
 module.exports = router;

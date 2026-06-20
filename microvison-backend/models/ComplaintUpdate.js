@@ -9,6 +9,7 @@ const complaintUpdateSchema = new mongoose.Schema(
     newStatus: { type: String, required: true },
     note: { type: String, default: '' },
     images: [{ type: String }],       // Cloudinary URLs — SC proof photos uploaded at this status update
+    voiceUrl: { type: String, default: '' },
   },
   { timestamps: true }
 );

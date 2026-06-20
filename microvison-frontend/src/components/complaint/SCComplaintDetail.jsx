@@ -3,17 +3,11 @@ import api from '../../api/axios';
 import ImageUploader from '../forms/ImageUploader';
 import PetrolEditField from './PetrolEditField';
 import BillSummary from './BillSummary';
+import VoiceRecorder from '../forms/VoiceRecorder';
 
 // GRD Section 10.2 — SC Complaint Detail slide panel
 // Opened from MyComplaints when SC clicks "Open Details"
 // SC can: mark going, upload proof, submit final status, adjust petrol, request extra charge, add notes
-
-const FINAL_STATUS_OPTIONS = [
-  { value: 'done', label: '✅ Done — Work Completed' },
-  { value: 'not_done', label: '❌ Not Done — Could Not Complete' },
-  { value: 'part_pending', label: '⚙️ Part Pending — Follow-up Needed' },
-  { value: 'replacement', label: '🔄 Replacement — Product Needs Replacing' },
-];
 
 const inputCls =
   'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition';
@@ -23,10 +17,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [c, setC] = useState(initial);
   const [proofPhotos, setProofPhotos] = useState(c.proofPhotos || []);
   const [scNotes, setScNotes] = useState(c.scNotes || '');
-  const [finalStatus, setFinalStatus] = useState('done');
+  const [activeForm, setActiveForm] = useState('done'); // 'done' | 'not_done' | 'part_pending'
   const [petrolSC, setPetrolSC] = useState('');
-  const [extraLabel, setExtraLabel] = useState('');
-  const [extraAmount, setExtraAmount] = useState('');
   const [customerPayment, setCustomerPayment] = useState(c.customerPaymentAmount || '');
   const [submitting, setSubmitting] = useState(false);
   const [markingGoing, setMarkingGoing] = useState(false);
@@ -34,6 +26,49 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [success, setSuccess] = useState('');
   const [productTimeline, setProductTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // SC Flow v1.1 State Variables
+  const [doneVoiceUrl, setDoneVoiceUrl] = useState('');
+  const [notDoneReason, setNotDoneReason] = useState('');
+  const [notDoneVoiceUrl, setNotDoneVoiceUrl] = useState('');
+  const [partDetails, setPartDetails] = useState('');
+  const [partPendingVoiceUrl, setPartPendingVoiceUrl] = useState('');
+  const [totalVisits, setTotalVisits] = useState(1);
+  const [distanceTravelled, setDistanceTravelled] = useState('');
+  const [extraCharges, setExtraCharges] = useState([]);
+  const [markingReceived, setMarkingReceived] = useState(false);
+
+  // Sibling timeline expand state variables (lazy-loading)
+  const [expandedComplaintId, setExpandedComplaintId] = useState(null);
+  const [loadedDetails, setLoadedDetails] = useState({});
+  const [loadingHistoryDetails, setLoadingHistoryDetails] = useState(null);
+
+  const handleToggleExpand = async (compId) => {
+    if (expandedComplaintId === compId) {
+      setExpandedComplaintId(null);
+      return;
+    }
+    setExpandedComplaintId(compId);
+
+    if (compId === c?._id) return;
+    if (loadedDetails[compId]) return;
+
+    setLoadingHistoryDetails(compId);
+    try {
+      const { data } = await api.get(`/api/complaints/${compId}`);
+      setLoadedDetails((prev) => ({
+        ...prev,
+        [compId]: {
+          complaint: data.complaint,
+          updates: data.updates,
+        },
+      }));
+    } catch (err) {
+      console.error('Failed to load historical complaint details', err);
+    } finally {
+      setLoadingHistoryDetails(null);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -56,8 +91,11 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
   const isInWarranty = c.warrantyStatus === 'in_warranty';
   const canMarkGoing = c.status === 'accepted';
-  const canSubmitFinal = ['accepted', 'going'].includes(c.status);
-  const alreadyFinished = ['done', 'not_done', 'part_pending', 'replacement', 'closed'].includes(c.status);
+  const showMarkReceived = c.status === 'part_pending' && c.partDeliveredAt;
+  const showWaitingDelivery = c.status === 'part_pending' && !c.partDeliveredAt;
+  const canSubmitFinal = ['accepted', 'going', 'not_done', 'part_received'].includes(c.status);
+  const alreadyClosed = c.status === 'closed';
+  const alreadyDone = c.status === 'done';
 
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
 
@@ -104,39 +142,101 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
     }
   };
 
+  const handleMarkReceived = async () => {
+    setMarkingReceived(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { data } = await api.patch(`/api/complaints/${c._id}/part-received`);
+      setC(data.complaint);
+      setSuccess('Part/Unit marked as received! 📦');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to update status.');
+    } finally {
+      setMarkingReceived(false);
+    }
+  };
+
   const handleSubmitFinal = async () => {
     setError('');
-    if (finalStatus === 'done' && proofPhotos.length === 0) {
-      setError('Please upload at least one proof photo before marking as done.');
-      return;
-    }
-    if (finalStatus === 'done' && c.warrantyStatus === 'out_of_warranty' && !customerPayment) {
-      setError('Please enter the amount collected from the customer.');
-      return;
-    }
+    setSuccess('');
 
-    setSubmitting(true);
-    try {
-      const body = {
-        newStatus: finalStatus,
-        proofPhotos,
-        scNotes,
-        customerPaymentAmount: c.warrantyStatus === 'out_of_warranty' ? Number(customerPayment) : undefined,
-      };
+    const body = {
+      newStatus: activeForm,
+      proofPhotos,
+      scNotes,
+    };
 
-      // Petrol SC edit (only if in-warranty and it's SC's turn)
+    // ── Path 1: Done Form ────────────────────────────────────
+    if (activeForm === 'done') {
+      if (proofPhotos.length < 1) {
+        setError('At least one proof photo is required before marking as done.');
+        return;
+      }
+      if (!isInWarranty && !customerPayment) {
+        setError('Please enter the amount collected from the customer.');
+        return;
+      }
+      if (!isInWarranty) {
+        body.customerPaymentAmount = Number(customerPayment);
+      }
+
+      body.totalVisits = totalVisits ? Number(totalVisits) : undefined;
+      body.distanceTravelled = distanceTravelled ? Number(distanceTravelled) : undefined;
+      body.doneVoiceUrl = doneVoiceUrl;
+
+      // Petrol SC (only if in-warranty and SC's turn)
       if (isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && petrolSC !== '') {
         body.petrolSC = Number(petrolSC);
       }
 
-      // Extra charge request
-      if (extraLabel.trim() && extraAmount) {
-        body.extraChargeRequest = { label: extraLabel.trim(), amount: Number(extraAmount) };
+      // Extra Charges
+      body.extraCharges = extraCharges;
+    }
+
+    // ── Path 2: Not Done Form ────────────────────────────────
+    else if (activeForm === 'not_done') {
+      const hasReason = notDoneReason && notDoneReason.trim() !== '';
+      const hasVoice = notDoneVoiceUrl && notDoneVoiceUrl.trim() !== '';
+      
+      if (!hasReason && !hasVoice) {
+        setError('Either a text reason or a voice note must be provided before marking as not done.');
+        return;
       }
 
+      body.notDoneReason = notDoneReason;
+      body.notDoneVoiceUrl = notDoneVoiceUrl;
+    }
+
+    // ── Path 3: Part Pending Form ────────────────────────────
+    else if (activeForm === 'part_pending') {
+      if (proofPhotos.length < 2) {
+        setError('At least two proof photos (proof of diagnosis) are required before marking as part pending.');
+        return;
+      }
+      if (!partDetails || !partDetails.trim()) {
+        setError('Parts detail description is compulsory.');
+        return;
+      }
+      if (!partPendingVoiceUrl) {
+        setError('A voice note explanation is compulsory.');
+        return;
+      }
+      if (!scNotes || !scNotes.trim()) {
+        setError('Text notes are compulsory.');
+        return;
+      }
+
+      body.partDetails = partDetails;
+      body.partPendingVoiceUrl = partPendingVoiceUrl;
+    }
+
+    setSubmitting(true);
+    try {
       const { data } = await api.patch(`/api/complaints/${c._id}/status`, body);
       setC(data.complaint);
-      setSuccess(`Complaint marked as "${finalStatus.replace(/_/g, ' ')}" successfully!`);
+      setSuccess(`Complaint marked as "${activeForm.replace(/_/g, ' ')}" successfully!`);
       setTimeout(onUpdated, 1200);
     } catch (err) {
       setError(err?.response?.data?.message || 'Submission failed. Please try again.');
