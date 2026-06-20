@@ -64,6 +64,20 @@ export default function StatusTimeline({ updates = [] }) {
                   {update.note}
                 </p>
               )}
+              {update.voiceUrl && (
+                <div className="mt-2">
+                  <audio src={update.voiceUrl} controls className="w-full max-h-8" />
+                </div>
+              )}
+              {update.images && update.images.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {update.images.map((img, i) => (
+                    <a key={i} href={img} target="_blank" rel="noopener noreferrer">
+                      <img src={img} alt="" className="w-12 h-12 object-cover rounded border border-border hover:opacity-90 transition" />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );

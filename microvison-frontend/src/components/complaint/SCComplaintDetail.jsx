@@ -442,16 +442,58 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
           )}
 
           {/* ── Action Section ── */}
-          {alreadyFinished ? (
+          {alreadyClosed ? (
             <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-4 text-center">
-              <p className="text-green-800 font-semibold">
-                {c.status === 'closed' ? 'Job Closed & Locked!' : 'Job submitted!'}
+              <p className="text-green-800 font-semibold">Job Closed & Locked!</p>
+              <p className="text-sm text-green-700 mt-1">This complaint has been verified and closed by admin.</p>
+            </div>
+          ) : alreadyDone ? (
+            <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-4 text-center">
+              <p className="text-blue-800 font-semibold">Job Submitted!</p>
+              <p className="text-sm text-blue-700 mt-1">Waiting for admin to confirm and close the complaint.</p>
+            </div>
+          ) : showWaitingDelivery ? (
+            <div className="rounded-xl bg-yellow-50 border border-yellow-200 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⚙️</span>
+                <p className="text-yellow-800 font-semibold text-sm">Part Pending Sourcing</p>
+              </div>
+              <p className="text-xs text-yellow-700">
+                You requested: <strong className="text-yellow-900">{c.partDetails}</strong>. Waiting for Admin to mark the part as dispatched/delivered.
               </p>
-              <p className="text-sm text-green-700 mt-1">
-                {c.status === 'closed'
-                  ? 'This complaint has been verified and closed by admin.'
-                  : `Status: ${c.status.replace(/_/g, ' ')}. Waiting for admin to confirm.`}
+              {c.partPendingVoiceUrl && (
+                <div>
+                  <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-wide">Your Sourcing Voice Explanation</span>
+                  <audio src={c.partPendingVoiceUrl} controls className="w-full mt-1" />
+                </div>
+              )}
+            </div>
+          ) : showMarkReceived ? (
+            <div className="rounded-xl bg-green-50 border border-green-200 p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📦</span>
+                <p className="text-green-800 font-semibold text-sm">Part / Unit Dispatched!</p>
+              </div>
+              <p className="text-xs text-green-700">
+                Admin marked requested part (<strong className="text-green-900">{c.partDetails}</strong>) as delivered.
               </p>
+              {c.partDeliveredNote && (
+                <div className="bg-white/60 p-2.5 rounded-lg border border-green-100 text-xs">
+                  <span className="font-bold text-green-800 text-[10px] uppercase">Delivery note / courier details</span>
+                  <p className="text-green-900 mt-0.5">{c.partDeliveredNote}</p>
+                </div>
+              )}
+              
+              {error && <p className="text-xs text-red-600">{error}</p>}
+              {success && <p className="text-xs text-green-700">{success}</p>}
+
+              <button
+                onClick={handleMarkReceived}
+                disabled={markingReceived}
+                className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-50 transition"
+              >
+                {markingReceived ? 'Updating...' : '✓ Mark as Received'}
+              </button>
             </div>
           ) : (
             <>
@@ -460,24 +502,65 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 <button
                   onClick={handleMarkGoing}
                   disabled={markingGoing}
-                  className="w-full py-3 bg-yellow-500 text-white rounded-xl text-sm font-semibold hover:bg-yellow-600 disabled:opacity-50 transition"
+                  className="w-full py-3 bg-yellow-500 text-white rounded-xl text-sm font-semibold hover:bg-yellow-600 disabled:opacity-50 transition mb-4"
                 >
                   {markingGoing ? 'Updating...' : '🚗 Mark as Going (On the Way)'}
                 </button>
               )}
 
-              {/* Final submission form */}
+              {/* Action Form Group */}
               {canSubmitFinal && (
-                <div className="space-y-5 rounded-xl border border-border p-5">
-                  <p className="text-sm font-bold text-foreground">Submit Job Result</p>
+                <div className="space-y-5 rounded-xl border border-border p-5 bg-card">
+                  <p className="text-sm font-bold text-foreground">Submit Job Conclusion</p>
+                  
+                  {/* Path Tab Selectors */}
+                  <div className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-lg border border-border">
+                    <button
+                      type="button"
+                      onClick={() => { setActiveForm('done'); setError(''); }}
+                      className={`py-2 text-xs font-bold rounded-md transition ${
+                        activeForm === 'done'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Done
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveForm('not_done'); setError(''); }}
+                      className={`py-2 text-xs font-bold rounded-md transition ${
+                        activeForm === 'not_done'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Not Done
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveForm('part_pending'); setError(''); }}
+                      className={`py-2 text-xs font-bold rounded-md transition ${
+                        activeForm === 'part_pending'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Part Pending
+                    </button>
+                  </div>
 
-                  {/* Proof photos */}
+                  {/* ────────────────── Path Form Fields ────────────────── */}
+
+                  {/* Proof Photos (Compulsory for Done & Part Pending, Optional for Not Done) */}
                   <div>
                     <label className={labelCls}>
-                      Proof Photos {finalStatus === 'done' && <span className="text-red-500">*</span>}
+                      Proof Photos {activeForm === 'done' && <span className="text-red-500">*</span>} {activeForm === 'part_pending' && <span className="text-red-500">*(Min 2)</span>}
                     </label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Upload up to 5 photos. {finalStatus === 'done' ? '(Required for completed jobs)' : '(Optional)'}
+                    <p className="text-[10px] text-muted-foreground mb-1.5">
+                      {activeForm === 'done' && 'Upload proof of completed resolution (Min 1, max 5).'}
+                      {activeForm === 'part_pending' && 'Upload proof of diagnosis / fault (Min 2, max 5).'}
+                      {activeForm === 'not_done' && 'Upload optional proof photos (Max 5).'}
                     </p>
                     <ImageUploader
                       maxFiles={5}
@@ -486,102 +569,214 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                     />
                   </div>
 
-                  {/* Final status selector */}
-                  <div>
-                    <label className={labelCls}>Final Status <span className="text-red-500">*</span></label>
-                    <select
-                      value={finalStatus}
-                      onChange={(e) => setFinalStatus(e.target.value)}
-                      className={inputCls}
-                    >
-                      {FINAL_STATUS_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Form Path 1: Done Fields */}
+                  {activeForm === 'done' && (
+                    <div className="space-y-4">
+                      {/* Out of Warranty Customer Payment */}
+                      {!isInWarranty && (
+                        <div>
+                          <label className={labelCls}>
+                            Amount Collected from Customer (₹) <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={customerPayment}
+                            onChange={(e) => setCustomerPayment(e.target.value)}
+                            placeholder="e.g. 800"
+                            className={`${inputCls} max-w-xs`}
+                          />
+                        </div>
+                      )}
 
-                  {/* Out-of-warranty: customer payment */}
-                  {!isInWarranty && (
-                    <div>
-                      <label className={labelCls}>
-                        Amount Collected from Customer (₹) {finalStatus === 'done' && <span className="text-red-500">*</span>}
-                      </label>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        This is the total cash or UPI amount paid directly by the customer. {finalStatus === 'done' ? 'Required.' : 'Optional.'}
-                      </p>
-                      <input
-                        type="number"
-                        min="0"
-                        value={customerPayment}
-                        onChange={(e) => setCustomerPayment(e.target.value)}
-                        placeholder="e.g. 800"
-                        className={`${inputCls} max-w-xs`}
-                      />
+                      {/* Petrol adjustment (In Warranty only) */}
+                      {isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && (
+                        <div>
+                          <label className={labelCls}>Actual Petrol / Diesel (₹)</label>
+                          <p className="text-[10px] text-muted-foreground mb-1">
+                            Estimated by admin: ₹{c.petrolAdmin ?? 0}. Enter your actual travel cost.
+                          </p>
+                          <input
+                            type="number"
+                            min="0"
+                            value={petrolSC}
+                            onChange={(e) => setPetrolSC(e.target.value)}
+                            placeholder={`Currently using ₹${c.petrolAdmin ?? 0}`}
+                            className={`${inputCls} max-w-xs`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Lifecycle visits & distance */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Total Visits</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={totalVisits}
+                            onChange={(e) => setTotalVisits(e.target.value)}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Distance Travelled (km)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={distanceTravelled}
+                            onChange={(e) => setDistanceTravelled(e.target.value)}
+                            placeholder="e.g. 24"
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Done voice note */}
+                      <div>
+                        <label className={labelCls}>Verbal Work Description (Optional)</label>
+                        <VoiceRecorder
+                          uploadedUrl={doneVoiceUrl}
+                          onUpload={setDoneVoiceUrl}
+                        />
+                      </div>
+
+                      {/* Multiple Extra Charges */}
+                      <div className="space-y-3 pt-3 border-t border-border">
+                        <span className={labelCls}>Extra Charges Incurred (Optional)</span>
+                        
+                        {extraCharges.length > 0 && (
+                          <div className="space-y-1.5">
+                            {extraCharges.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-muted p-2 rounded-lg text-xs">
+                                <span className="font-medium">{item.label}</span>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-bold text-foreground">₹{item.amount}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExtraCharges(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-red-600 font-bold hover:text-red-800"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            id="new-extra-label"
+                            placeholder="Description (e.g., replacement motor)"
+                            className={`${inputCls} flex-1`}
+                          />
+                          <input
+                            type="number"
+                            id="new-extra-amount"
+                            placeholder="₹ Amount"
+                            className={`${inputCls} w-24`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const lbl = document.getElementById('new-extra-label')?.value || '';
+                              const amt = document.getElementById('new-extra-amount')?.value || '';
+                              if (lbl.trim() && amt && !isNaN(Number(amt))) {
+                                setExtraCharges(prev => [...prev, { label: lbl.trim(), amount: Number(amt) }]);
+                                document.getElementById('new-extra-label').value = '';
+                                document.getElementById('new-extra-amount').value = '';
+                              }
+                            }}
+                            className="px-3 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Done General Notes */}
+                      <div>
+                        <label className={labelCls}>Closing Notes (Optional)</label>
+                        <textarea
+                          rows={2}
+                          value={scNotes}
+                          onChange={(e) => setScNotes(e.target.value)}
+                          placeholder="Any final details about the work done..."
+                          className={inputCls}
+                        />
+                      </div>
                     </div>
                   )}
 
-                  {/* Petrol SC input (if it's SC's turn and in-warranty) */}
-                  {isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && (
-                    <div>
-                      <label className={labelCls}>Actual Petrol / Diesel (₹) — Your Turn</label>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Admin estimated ₹{c.petrolAdmin ?? 0}. Enter your actual travel cost.
-                      </p>
-                      <input
-                        type="number"
-                        min="0"
-                        value={petrolSC}
-                        onChange={(e) => setPetrolSC(e.target.value)}
-                        placeholder={`Was ₹${c.petrolAdmin ?? 0}`}
-                        className={`${inputCls} max-w-xs`}
-                      />
+                  {/* Form Path 2: Not Done Fields */}
+                  {activeForm === 'not_done' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className={labelCls}>Text Reason <span className="text-muted-foreground">(At least reason or voice required)</span></label>
+                        <textarea
+                          rows={3}
+                          value={notDoneReason}
+                          onChange={(e) => setNotDoneReason(e.target.value)}
+                          placeholder="Why could the complaint not be completed on this visit?..."
+                          className={inputCls}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>Voice Note Explanation <span className="text-muted-foreground">(At least reason or voice required)</span></label>
+                        <VoiceRecorder
+                          uploadedUrl={notDoneVoiceUrl}
+                          onUpload={setNotDoneVoiceUrl}
+                        />
+                      </div>
                     </div>
                   )}
 
-                  {/* Extra charge request */}
-                  <div>
-                    <label className={labelCls}>Request Extra Charge (Optional)</label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      If you incurred an extra cost (e.g. spare part), request admin approval here.
-                    </p>
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={extraLabel}
-                        onChange={(e) => setExtraLabel(e.target.value)}
-                        placeholder="Label (e.g. Motor part)"
-                        className={`${inputCls} flex-1`}
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        value={extraAmount}
-                        onChange={(e) => setExtraAmount(e.target.value)}
-                        placeholder="₹ Amount"
-                        className={`${inputCls} w-28`}
-                      />
+                  {/* Form Path 3: Part Pending Fields */}
+                  {activeForm === 'part_pending' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className={labelCls}>Parts Needed Description <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          value={partDetails}
+                          onChange={(e) => setPartDetails(e.target.value)}
+                          placeholder="e.g., 10uF capacitor / replacement unit"
+                          className={inputCls}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>Voice Note Diagnosis Explanation <span className="text-red-500">*</span></label>
+                        <VoiceRecorder
+                          uploadedUrl={partPendingVoiceUrl}
+                          onUpload={setPartPendingVoiceUrl}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelCls}>Diagnosis Notes / Symptoms <span className="text-red-500">*</span></label>
+                        <textarea
+                          rows={2}
+                          value={scNotes}
+                          onChange={(e) => setScNotes(e.target.value)}
+                          placeholder="Describe your diagnostics and symptoms..."
+                          className={inputCls}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* SC Notes */}
-                  <div>
-                    <label className={labelCls}>Your Notes (Optional)</label>
-                    <textarea
-                      rows={3}
-                      value={scNotes}
-                      onChange={(e) => setScNotes(e.target.value)}
-                      placeholder="Any notes about the visit or what was done..."
-                      className={inputCls}
-                    />
-                  </div>
-
+                  {/* Submit Feedbacks & Button */}
                   {error && (
-                    <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                    <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700">
                       {error}
                     </div>
                   )}
                   {success && (
-                    <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+                    <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-700">
                       {success}
                     </div>
                   )}
@@ -591,11 +786,147 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                     disabled={submitting}
                     className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 disabled:opacity-50 transition"
                   >
-                    {submitting ? 'Submitting...' : '✓ Submit Job Result'}
+                    {submitting ? 'Submitting...' : '✓ Submit Job Conclusion'}
                   </button>
                 </div>
               )}
             </>
+          )}
+
+          {/* Unified Product Lifecycle Timeline */}
+          {productTimeline.length > 0 && (
+            <div className="space-y-4 pt-6 border-t border-border">
+              <h3 className="font-bold text-sm text-foreground border-b border-border pb-2 uppercase tracking-wide">
+                Product History & Timeline
+              </h3>
+              <div className="relative border-l-2 border-border ml-3 pl-6 space-y-6">
+                {productTimeline.map((item) => {
+                  const isCurrent = String(item.complaintId) === String(c?._id);
+                  const isAssignedToMe = String(item.assignedCentreId) === String(c.assignedCentreId?._id || c.assignedCentreId);
+                  const isExpanded = expandedComplaintId === String(item.complaintId);
+                  
+                  let nodeDetails;
+                  let nodeUpdates;
+                  let isNodeLoading = false;
+                  
+                  if (isCurrent) {
+                    nodeDetails = c;
+                    nodeUpdates = [];
+                  } else if (isAssignedToMe) {
+                    nodeDetails = loadedDetails[item.complaintId]?.complaint;
+                    nodeUpdates = loadedDetails[item.complaintId]?.updates || [];
+                    isNodeLoading = loadingHistoryDetails === String(item.complaintId);
+                  }
+
+                  return (
+                    <div key={item.complaintId} className="relative">
+                      {/* Timeline dot */}
+                      <div className={`absolute -left-[31px] top-2.5 w-3 h-3 rounded-full border-2 bg-background transition-colors ${
+                        isCurrent 
+                          ? 'border-primary bg-primary' 
+                          : 'border-muted-foreground/60 bg-muted-foreground/30'
+                      }`} />
+
+                      {/* Timeline Node Card */}
+                      <div 
+                        className={`rounded-xl border transition-all ${
+                          isCurrent 
+                            ? 'border-primary bg-primary/5 shadow-sm' 
+                            : 'border-border bg-card'
+                        } ${isAssignedToMe ? 'hover:bg-muted/10' : ''}`}
+                      >
+                        {/* Node Header */}
+                        <div 
+                          onClick={() => isAssignedToMe && handleToggleExpand(String(item.complaintId))}
+                          className={`p-3.5 flex justify-between items-center select-none ${isAssignedToMe ? 'cursor-pointer' : 'cursor-default'}`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-bold text-xs text-foreground">{item.mvId}</span>
+                              <span className="text-[9px] uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-bold">
+                                {item.type}
+                              </span>
+                              {isCurrent && (
+                                <span className="bg-primary text-primary-foreground text-[8px] px-1 py-0.5 rounded font-extrabold uppercase tracking-wider">
+                                  Current
+                                </span>
+                              )}
+                              {!isAssignedToMe && (
+                                <span className="bg-muted text-muted-foreground text-[8px] px-1 py-0.5 rounded font-bold uppercase tracking-wider">
+                                  Other SC (Private)
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              {new Date(item.date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-muted uppercase text-foreground">
+                              {(item.status || 'new').replace(/_/g, ' ')}
+                            </span>
+                            {isAssignedToMe && (
+                              <span className="text-muted-foreground text-xs font-bold w-4 text-center">
+                                {isExpanded ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Node Details (Only if assigned to me and expanded) */}
+                        {isAssignedToMe && isExpanded && (
+                          <div className="border-t border-border p-4 space-y-4 bg-background/40 rounded-b-xl text-xs">
+                            {isNodeLoading ? (
+                              <div className="py-4 text-center text-xs text-muted-foreground animate-pulse">
+                                Loading job details...
+                              </div>
+                            ) : nodeDetails ? (
+                              <div className="space-y-3">
+                                {nodeDetails.scNotes && (
+                                  <div>
+                                    <span className="font-bold text-muted-foreground uppercase tracking-wide text-[9px]">SC Notes</span>
+                                    <p className="text-foreground mt-0.5">{nodeDetails.scNotes}</p>
+                                  </div>
+                                )}
+                                {nodeDetails.partDetails && (
+                                  <div>
+                                    <span className="font-bold text-muted-foreground uppercase tracking-wide text-[9px]">Requested Part Details</span>
+                                    <p className="text-foreground mt-0.5 font-semibold text-red-700">{nodeDetails.partDetails}</p>
+                                  </div>
+                                )}
+                                {nodeDetails.partPendingVoiceUrl && (
+                                  <div>
+                                    <span className="font-bold text-muted-foreground uppercase tracking-wide text-[9px]">Part Diagnosis Voice Note</span>
+                                    <audio src={nodeDetails.partPendingVoiceUrl} controls className="w-full mt-1" />
+                                  </div>
+                                )}
+                                {nodeDetails.partDeliveredAt && (
+                                  <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 mt-2">
+                                    <p className="font-semibold text-green-800 text-[10px]">📦 Part Delivered by Admin</p>
+                                    <p className="text-green-700 text-[10px] mt-0.5">Date: {formatDate(nodeDetails.partDeliveredAt)}</p>
+                                    {nodeDetails.partDeliveredNote && <p className="text-green-900 text-[10px] mt-0.5 font-medium">Note: {nodeDetails.partDeliveredNote}</p>}
+                                  </div>
+                                )}
+                                {nodeDetails.partReceivedAt && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                                    <p className="font-semibold text-blue-800 text-[10px]">✓ Received by SC</p>
+                                    <p className="text-blue-700 text-[10px] mt-0.5">Date: {formatDate(nodeDetails.partReceivedAt)}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="py-2 text-center text-xs text-red-600 font-semibold">
+                                Failed to load details. Click header to retry.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -13,7 +13,7 @@ const STATUS_COLORS = {
   done: 'bg-green-100 text-green-800',
   not_done: 'bg-red-100 text-red-800',
   part_pending: 'bg-orange-100 text-orange-800',
-  replacement: 'bg-purple-100 text-purple-800',
+  part_received: 'bg-teal-100 text-teal-800',
   rejected_by_sc: 'bg-gray-100 text-gray-800',
   closed: 'bg-gray-200 text-gray-700',
 };

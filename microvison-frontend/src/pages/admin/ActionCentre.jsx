@@ -211,6 +211,58 @@ export default function ActionCentre() {
               </section>
             )}
 
+            {/* Pending Part Sourcing / Deliveries */}
+            {data.partPendingComplaints && data.partPendingComplaints.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-base font-semibold text-foreground">Pending Part Sourcing & Deliveries</h2>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold">
+                    {data.counts.partPendingComplaints}
+                  </span>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {data.partPendingComplaints.map((c) => (
+                    <div
+                      key={c._id}
+                      onClick={() => setSelectedComplaintId(c._id)}
+                      className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between gap-3 cursor-pointer hover:border-orange-500/50 transition relative overflow-hidden group"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-bl-full pointer-events-none transition-colors group-hover:bg-orange-500/10" />
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-mono text-muted-foreground">{c.complaintId}</span>
+                          <span className="bg-orange-100 text-orange-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                            Part Pending
+                          </span>
+                        </div>
+                        <p className="font-semibold text-foreground text-sm">{c.customerName} · {c.city}</p>
+                        
+                        {c.partDetails && (
+                          <div className="mt-2 text-xs bg-orange-50/50 border border-orange-100/60 p-2 rounded-lg text-orange-950 font-medium">
+                            <span className="text-[10px] text-orange-800 uppercase block font-bold tracking-wide">Requested Part:</span>
+                            {c.partDetails}
+                          </div>
+                        )}
+                        
+                        <p className="text-xs text-muted-foreground mt-2">
+                          SC: <span className="font-medium text-foreground">{c.assignedCentreId?.businessName || 'Unassigned'}</span>
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-border mt-1">
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          Updated: {new Date(c.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <span className="text-xs font-bold text-orange-600 group-hover:text-orange-700 transition flex items-center gap-1">
+                          Source & Dispatch &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* 4. Rejected by SC */}
             {data.rejectedBySC.length > 0 && (
               <section>
@@ -230,7 +282,8 @@ export default function ActionCentre() {
             {data.counts.pendingSCRegistrations === 0 &&
              data.counts.pendingConfirmations === 0 &&
              data.counts.rejectedBySC === 0 &&
-             data.counts.pendingExtraApprovals === 0 && (
+             data.counts.pendingExtraApprovals === 0 &&
+             (!data.counts.partPendingComplaints || data.counts.partPendingComplaints === 0) && (
               <div className="bg-card border border-border rounded-xl px-6 py-12 text-center">
                 <span className="text-4xl">🎉</span>
                 <h3 className="text-lg font-bold text-foreground mt-4">Inbox Zero!</h3>

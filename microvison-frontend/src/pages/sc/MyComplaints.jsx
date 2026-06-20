@@ -13,7 +13,7 @@ const STATUS_OPTIONS = [
   { value: 'done', label: 'Done' },
   { value: 'not_done', label: 'Not Done' },
   { value: 'part_pending', label: 'Part Pending' },
-  { value: 'replacement', label: 'Replacement' },
+  { value: 'part_received', label: 'Part Received' },
   { value: 'rejected_by_sc', label: 'Rejected by Me' },
   { value: 'closed', label: 'Closed' },
 ];
@@ -44,7 +44,7 @@ export default function MyComplaints() {
   const [loading, setLoading] = useState(true);
   const [activeComplaint, setActiveComplaint] = useState(null);
   const [filters, setFilters] = useState({
-    status: 'accepted,going',
+    status: 'accepted,going,not_done,part_received',
     product: '',
     complaintType: '',
     warrantyStatus: '',

@@ -24,6 +24,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   // Admin action states
   const [disputeNote, setDisputeNote] = useState('');
   const [adminNote, setAdminNote] = useState(''); // For confirm
+  const [deliveryNote, setDeliveryNote] = useState(''); // For marking parts delivered
   const [petrolFinal, setPetrolFinal] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -164,7 +165,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
   const isInWarranty = c.warrantyStatus === 'in_warranty';
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
-  const canConfirmOrDispute = ['done', 'not_done', 'part_pending', 'replacement'].includes(c.status);
+  const canConfirmOrDispute = c.status === 'done';
 
   const getPreCloseStatus = () => {
     if (!updates || updates.length === 0) return null;
@@ -208,6 +209,21 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       setTimeout(onUpdated, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to dispute job.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMarkDelivered = async () => {
+    setActionLoading('deliver');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/mark-delivered`, { note: deliveryNote });
+      setSuccess('Part/Unit marked as delivered successfully!');
+      setDeliveryNote('');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to mark part as delivered.');
     } finally {
       setActionLoading(false);
     }
@@ -340,6 +356,94 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-3">
               <p className="text-[10px] font-semibold text-blue-800 uppercase tracking-wide mb-1">SC Note</p>
               <p className="text-xs text-blue-900">{comp.scNotes}</p>
+            </div>
+          )}
+
+          {/* Part Pending Details */}
+          {(comp.partDetails || comp.status === 'part_pending' || comp.status === 'part_received') && (
+            <div className="bg-orange-50/50 border border-orange-100 rounded-lg p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-orange-800 uppercase tracking-wide">Part Sourcing Request</p>
+              {comp.partDetails && (
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase">Requested Part / Unit:</span>
+                  <p className="text-xs font-semibold text-orange-950">{comp.partDetails}</p>
+                </div>
+              )}
+              {comp.partPendingVoiceUrl && (
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase">Voice Explanation:</span>
+                  <audio src={comp.partPendingVoiceUrl} controls className="w-full max-h-8 mt-1" />
+                </div>
+              )}
+              {/* Delivery Tracking */}
+              <div className="text-[11px] pt-1.5 border-t border-orange-200/60 space-y-1">
+                <div>
+                  <span className="font-semibold">Delivery Status: </span>
+                  {comp.partDeliveredAt ? (
+                    <span className="text-green-700 font-medium">
+                      Delivered by Admin on {new Date(comp.partDeliveredAt).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="text-red-600 font-medium">Pending Sourcing / Dispatch</span>
+                  )}
+                </div>
+                {comp.partDeliveredNote && (
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase">Admin Delivery Note:</span>
+                    <p className="text-xs italic text-muted-foreground">"{comp.partDeliveredNote}"</p>
+                  </div>
+                )}
+                {comp.partDeliveredAt && (
+                  <div>
+                    <span className="font-semibold">SC Receipt: </span>
+                    {comp.partReceivedAt ? (
+                      <span className="text-green-700 font-medium">
+                        Confirmed Received on {new Date(comp.partReceivedAt).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span className="text-amber-600 font-medium">Awaiting receipt confirmation from SC</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Not Done Details */}
+          {(comp.notDoneReason || comp.notDoneVoiceUrl) && (
+            <div className="bg-red-50/40 border border-red-100 rounded-lg p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-red-800 uppercase tracking-wide">Not Done Details</p>
+              {comp.notDoneReason && (
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase">Reason:</span>
+                  <p className="text-xs text-red-950">{comp.notDoneReason}</p>
+                </div>
+              )}
+              {comp.notDoneVoiceUrl && (
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase">Voice Explanation:</span>
+                  <audio src={comp.notDoneVoiceUrl} controls className="w-full max-h-8 mt-1" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Done Execution Metrics */}
+          {(comp.totalVisits != null || comp.distanceTravelled != null || comp.doneVoiceUrl) && (
+            <div className="bg-muted/40 border border-border rounded-lg p-3 space-y-1.5 text-xs">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Done Execution Metrics</p>
+              {comp.totalVisits != null && (
+                <p><span className="text-muted-foreground">Total Visits:</span> <strong>{comp.totalVisits}</strong></p>
+              )}
+              {comp.distanceTravelled != null && (
+                <p><span className="text-muted-foreground">Distance Travelled:</span> <strong>{comp.distanceTravelled} km</strong></p>
+              )}
+              {comp.doneVoiceUrl && (
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Done Voice Explanation:</span>
+                  <audio src={comp.doneVoiceUrl} controls className="w-full max-h-8 mt-1" />
+                </div>
+              )}
             </div>
           )}
 
@@ -725,6 +829,43 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   {actionLoading === 'dispute' ? 'Disputing...' : '✕ Dispute Job'}
                 </button>
               </div>
+            </div>
+          ) : c.status === 'part_pending' ? (
+            <div className="pt-6 border-t border-border space-y-6">
+              <h3 className="font-bold text-sm text-foreground uppercase tracking-wide">
+                Part Sourcing & Delivery (Current Job)
+              </h3>
+              {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">{error}</p>}
+              {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">{success}</p>}
+
+              {!c.partDeliveredAt ? (
+                <div className="space-y-3 p-4 bg-orange-50/50 rounded-xl border border-orange-200">
+                  <label className="block text-xs font-semibold text-orange-800 uppercase tracking-wide mb-1">
+                    Mark Part/Unit as Delivered to SC
+                  </label>
+                  <textarea
+                    placeholder="Enter delivery details, courier tracking info, or notes (Optional)..."
+                    value={deliveryNote}
+                    onChange={(e) => setDeliveryNote(e.target.value)}
+                    className={`${inputCls} border-orange-200 focus:ring-orange-500`}
+                    rows={2}
+                  />
+                  <button
+                    onClick={handleMarkDelivered}
+                    disabled={!!actionLoading}
+                    className="w-full py-2.5 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 transition text-sm"
+                  >
+                    {actionLoading === 'deliver' ? 'Updating...' : '🚚 Mark as Delivered'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-green-50/50 border border-green-200 rounded-xl p-4 text-xs text-green-800 space-y-1">
+                  <p className="font-semibold text-sm">🚚 Delivered to SC</p>
+                  <p>Admin marked the part as delivered on {new Date(c.partDeliveredAt).toLocaleString()}.</p>
+                  {c.partDeliveredNote && <p className="italic">"Note: {c.partDeliveredNote}"</p>}
+                  <p className="mt-2 text-muted-foreground">Awaiting Service Centre confirmation of receipt to resume the job.</p>
+                </div>
+              )}
             </div>
           ) : ['new', 'assigned', 'rejected_by_sc'].includes(c?.status) ? (
             <div className="pt-6 border-t border-border space-y-4">
