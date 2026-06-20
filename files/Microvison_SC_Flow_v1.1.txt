@@ -1,0 +1,294 @@
+# MICROVISON
+## Service Centre Flow & WhatsApp Integration
+### Theory Document v1.1 — Full SC Lifecycle, Status Flows, WhatsApp Triggers, Billing Logic
+
+**Flow Overview:** Admin Assign → SC Portal → Done / Not Done / Part Pending / Replacement → Billing
+
+---
+
+### 1. Overview
+This document describes the complete lifecycle of a complaint from the moment an admin assigns it to a Service Centre (SC), through all possible paths (Done, Not Done, Part Pending, Replacement), to the final billing step. It also documents every WhatsApp message trigger across the entire flow.
+
+**Key principles that govern this entire flow:**
+* **Billing Trigger:** A bill is generated **ONLY** when the complaint reaches a final Done status and the admin confirms it. Never before.
+* **Cycles:** A complaint can cycle through `Not Done` and `Part Pending` multiple times before reaching `Done`. Each cycle is recorded in the complaint timeline.
+* **Done:** Done can only be confirmed once — it is the permanent final closure of a complaint.
+* **Replacement:** Replacement is a sub-case of `Part Pending`. The admin delivers a full replacement unit instead of a single part. The flow is identical.
+* **WhatsApp Recipients:** WhatsApp messages are sent to the SC for assignment, reminders, and part/replacement delivery. WhatsApp is sent to the customer only once — when the SC accepts the complaint.
+* **Billing Details:** SC fills all billing details (petrol, extras, visits) at the time of marking Done. Admin reviews, can edit, then confirms. The bill locks permanently on admin confirmation.
+
+---
+
+### 2. Admin Assigns Complaint to SC
+Admin registers the complaint and assigns it to a Service Centre. This is the starting point of the SC flow.
+
+#### WhatsApp Trigger WA-01 — Sent to SC immediately on assignment OR reopen
+* **Recipient:** SC's registered WhatsApp number
+* **Timing:** Immediately when admin clicks Assign
+* **Content:** Complaint ID, Customer name, Phone, Full address (local address + city + district), Product type (LED/Cooler), Complaint type (Installation/Complaint), Warranty status (In Warranty / Out of Warranty), Admin notes (if any), Portal login URL, `REOPENED` flag + original Complaint ID if this is a reopen.
+
+#### 2.1 No Action Reminder System — SC has not accepted or rejected
+Once assigned, if the SC takes no action the system sends automated WhatsApp reminders:
+
+| Time Since Assignment | Trigger | Recipient |
+| :--- | :--- | :--- |
+| **24 hours** — no action | **WA-02:** Reminder — you have a new complaint pending your response | SC |
+| **48 hours** — still no action | **WA-03:** Reminder (repeat) | SC |
+| **Every 2 days** after that | **WA-0X:** Repeat reminder every 2 days until SC acts | SC |
+
+*The reminder cycle stops the moment SC either Accepts or Rejects. There is no auto-rejection or auto-escalation — admin must manually reassign if SC keeps ignoring.*
+
+---
+
+### 3. SC Rejects the Complaint
+SC taps Reject in their portal. Complaint status moves to `rejected_by_sc`.
+
+* Admin sees this in the Action Centre immediately (badge count updates).
+* Admin reviews and reassigns to a different SC (or the same SC again — no block).
+* On reassignment, the full cycle from Section 2 restarts — `WA-01` fires again to the newly assigned SC.
+* The rejection is recorded in the complaint timeline (who rejected, when, and any rejection notes).
+
+---
+
+### 4. SC Accepts the Complaint
+SC taps Accept. Complaint status moves to `accepted`.
+
+#### WhatsApp Trigger WA-04 — Sent to Customer immediately on SC acceptance
+* **Recipient:** Customer's phone1 (and phone2 if exists)
+* **Timing:** Immediately when SC taps Accept
+* **Content:** Complaint ID (customer's reference number), Product type (LED/Cooler), Complaint type (Installation/Complaint), SC business name, SC phone number, Acknowledgment message that SC has accepted and will visit soon.
+
+#### 4.1 No Action After Acceptance — Reminder System
+Once SC accepts the complaint, if they take no further action (do not mark Going, Done, Not Done, or Part Pending), the system sends automated WhatsApp reminders:
+
+| Time Since Acceptance | Trigger | Recipient |
+| :--- | :--- | :--- |
+| **24 hours** — no action after acceptance | **WA-04B:** Reminder — you have accepted a complaint but have not updated its status. Please visit the customer and update. | SC |
+| **Every 2 days** after that | **WA-0X:** Repeat every 2 days until SC takes any action (Going, Done, Not Done, or Part Pending) | SC |
+
+*Reminder cycle stops the moment SC takes any action on the complaint — marks Going, Done, Not Done, or Part Pending. Going alone counts as an action and resets/stops the timer.*
+
+#### 4.2 SC Marks Going (Optional)
+* SC can optionally tap *Mark as Going* when they are travelling to the customer.
+* This is informational only — no WhatsApp trigger, no form, just a status update.
+* Status moves to `going`. No blocking — SC can skip this entirely and go straight to a conclusion status.
+
+---
+
+### 5. SC Marks Done
+SC visited the customer, completed the work, and is marking the complaint as resolved.
+
+#### 5.1 Done Form — Fields
+Form slides open when SC taps *Mark as Done*:
+
+| Field | Required? | Details |
+| :--- | :--- | :--- |
+| **Photos** | Yes (Min 1, max 5) | Proof of work completed — site photos, installation proof, repair evidence. |
+| **Audio note** | Optional | Max 2 minutes. SC's verbal description of work done. |
+| **Text notes** | Optional | Additional written notes about the visit. |
+| **Petrol / travel charges** | Optional (recommended) | Amount field + distance traveled (km) + number of visits total. Subject to 3-lock system (see Section 5.2). |
+| **Extra charges** | Optional | Multiple line items allowed. Each has: description/reason + amount. SC can add as many as needed. |
+
+#### 5.2 Petrol 3-Lock System
+* **Edit 1:** Admin sets estimate at complaint registration time.
+* **Edit 2:** SC fills actual petrol amount + distance + visits in the Done form.
+* **Edit 3:** Admin can override the SC's amount if too high.
+* After **Edit 3**, the petrol field is permanently locked. All 3 values are stored separately for auditing.
+
+*For complaints that went through multiple Not Done cycles before Done: SC fills OVERALL totals in this single Done form — total petrol for ALL visits combined, total distance across all visits, total visit count. System does not ask per-visit separately.*
+
+#### 5.3 After SC Submits Done Form
+* Complaint status moves to `done` (pending admin confirmation).
+* Admin sees this in the Action Centre.
+* No WhatsApp is sent to anyone at this stage.
+
+#### 5.4 Admin Reviews and Confirms Done
+Admin opens the complaint from the Action Centre. Before confirming, the admin can:
+* Edit petrol amount (**Edit 3** — if SC's amount seems too high). This locks the petrol field permanently.
+* Approve or reject individual extra charge line items submitted by SC.
+* Add admin-side extra charges if needed.
+* Add admin notes.
+* Edit any other complaint detail before locking.
+
+Once satisfied, the admin clicks **Confirm Done**. This action:
+* Moves complaint status to `closed` (permanent — cannot be changed after this).
+* Generates and locks the bill based on: *Preset price (in-warranty only) + Petrol final + All approved extra charges*.
+* The bill is now visible in the Billing tab for both admin and SC.
+* No WhatsApp is sent after Done confirmation.
+
+*If admin disputes the SC's work — admin clicks **Dispute** instead of Confirm. Complaint reverts to `accepted`. SC must re-submit. A note is attached explaining why it was disputed.*
+
+---
+
+### 6. SC Marks Not Done
+SC visited the customer but could not complete the work (customer not home, access issue, scope mismatch, etc.). This is **NOT** a closure — the complaint remains open and the SC is expected to return.
+
+#### 6.1 Not Done Form — Fields
+Form slides open when SC taps *Mark as Not Done*:
+
+| Field | Required? | Details |
+| :--- | :--- | :--- |
+| **Reason text box** | Yes (if no Audio) | Written explanation of why work could not be completed. |
+| **Voice note** | Yes (if no Text) | Max 2 minutes. At least one of reason text OR voice note must be provided. |
+| **Photos** | Optional | Max 5 photos. Not compulsory for Not Done — SC may not have anything to photograph. |
+
+*Either the reason text box OR the voice note must be filled. Both can be filled. Neither can be empty — system blocks submission if both are blank.*
+
+#### 6.2 After SC Submits Not Done
+* Complaint status stays as `not_done` (complaint remains open — not closed).
+* Recorded in complaint timeline: who marked not done, when, and reason.
+* Admin sees this in the Action Centre for awareness — no required action from admin at this point.
+* No WhatsApp is sent immediately on Not Done submission.
+
+#### 6.3 Not Done Reminder System — SC must eventually act
+
+| Time Since Not Done Submission | Trigger | Recipient |
+| :--- | :--- | :--- |
+| **24 hours** — no further action by SC | **WA-05:** Reminder — complaint still open, please update status | SC |
+| **Every 2 days** after that | **WA-0X:** Repeat reminder every 2 days until SC acts | SC |
+
+*Reminder cycle stops when SC takes any action: marks Done, Part Pending, Replacement, or another Not Done submission. Another Not Done resets the 24-hour timer.*
+
+#### 6.4 SC Returns and Acts Again
+SC can come back at any time and choose any conclusion:
+* **Mark Done:** triggers the full Done form (Section 5). Petrol and extras in this form cover ALL visits (totals across the entire complaint lifecycle).
+* **Mark Part Pending:** triggers Part Pending flow (Section 7).
+* **Mark Not Done again:** triggers Not Done form again, timeline records another `not_done` entry, and reminder cycle resets.
+
+---
+
+### 7. SC Marks Part Pending (including Replacement)
+SC visited, diagnosed the issue, but cannot complete the work because a part (or the entire unit) needs to be sourced and delivered. Replacement is a sub-case of Part Pending where the full product unit is delivered instead of a single component.
+
+#### 7.1 Part Pending Form — Fields
+Form slides open when SC taps *Mark as Part Pending*:
+
+| Field | Required? | Details |
+| :--- | :--- | :--- |
+| **Voice note** | Yes | Max 2 minutes. SC explains what part is needed and why. |
+| **Text notes** | Yes | Written description of the issue and part requirement. |
+| **Parts detail** | Yes | Name/description of part(s) needed. If replacement: clearly state full unit replacement required. |
+| **Photos** | Yes (Min 2, max 5) | Proof of diagnosis — damaged part, fault evidence, unit condition. |
+
+#### 7.2 After SC Submits Part Pending
+* Complaint status moves to `part_pending`.
+* Admin sees this in the Action Centre.
+* Admin reviews the request — understands what part or unit is needed.
+* Admin arranges the part/replacement unit (sourcing, ordering — happens outside the app).
+* When part/unit is ready and dispatched, admin marks **Delivered** in the app.
+* This Delivered marker appears as a timeline entry on the complaint — date and admin note (e.g., *'Part dispatched via courier, tracking: XXXX'* or *'Replacement unit dispatched'*).
+* No form is required from the admin for this step — just a timeline marker with an optional note.
+
+#### WhatsApp Trigger WA-06 — Sent to SC when Admin marks Part/Unit as Delivered
+* **Recipient:** SC's WhatsApp number
+* **Timing:** Immediately when admin clicks *Mark as Delivered*
+* **Content:** Complaint ID, Customer name, Address, Part/unit delivery notification, Admin note (if any).
+
+#### 7.3 SC Marks Part / Unit Received
+* SC receives the part or replacement unit in real life.
+* SC opens the complaint in their portal and taps **Mark as Received**.
+* This adds a Received marker to the complaint timeline.
+* Complaint status moves to `part_received`.
+
+#### 7.4 No Action After Received — Reminder System
+
+| Time Since SC Marked Received | Trigger | Recipient |
+| :--- | :--- | :--- |
+| **24 hours** — no further action | **WA-07:** Reminder — part received, please complete the job and update status | SC |
+| **Every 2 days** after that | **WA-0X:** Repeat every 2 days until SC acts | SC |
+
+#### 7.5 SC Acts After Receiving Part / Unit
+SC goes to the customer and completes (or attempts) the work. SC then chooses:
+* **Mark Done:** full Done form (Section 5). Overall billing covering the entire complaint lifecycle is submitted here.
+* **Mark Not Done:** Not Done form (Section 6). Complaint stays open, 24-hour reminder cycle begins.
+* **Mark Part Pending again:** a new Part Pending cycle starts. Another part is needed. Full Part Pending form again. Admin delivers again. Cycle repeats.
+
+*Replacement is handled exactly like Part Pending — the only difference is that the 'part' being delivered is the full product unit. The admin marks Delivered the same way, SC marks Received the same way, with the same reminders and timeline entries. There is no separate flow.*
+
+---
+
+### 8. Billing — When and How
+
+| Scenario | When Bill is Generated |
+| :--- | :--- |
+| **Normal Done (first visit)** | Admin confirms Done → bill generated and locked immediately. |
+| **Done after multiple Not Done cycles** | Admin confirms the FINAL Done → single bill generated covering all visits (petrol + extras SC filled in Done form are overall totals). |
+| **Done after Part Pending cycle(s)** | Admin confirms Done → single bill generated. SC fills overall totals in final Done form. |
+| **Done after Replacement (full unit)** | Same as Part Pending — admin confirms Done, single bill generated. |
+| **Not Done — never reaches Done** | No bill ever generated. Complaint stays open indefinitely. |
+| **Part Pending — never reaches Done** | No bill generated until Done is eventually confirmed. |
+
+#### 8.1 Bill Components
+
+| Component | In Warranty | Out of Warranty |
+| :--- | :--- | :--- |
+| **Preset base price** | Included — locked at complaint creation. | Not applicable. |
+| **Petrol / travel** | SC fills overall total in Done form (edit 2). Admin can override (edit 3). | Not applicable — Microvison does not cover petrol for out-of-warranty. |
+| **Extra charges (SC-requested)** | Each line item approved/rejected by admin before billing. | Same — admin approves/rejects. |
+| **Extra charges (admin-added)** | Auto-approved. | Auto-approved — only Microvison-side extras. |
+| **Customer payment** | Not collected by SC (Microvison pays SC). | SC collects directly from customer. SC fills 'Amount collected from customer' field. *Record only — never in Microvison invoice.* |
+| **Total (Microvison owes SC)** | **Preset + petrol + approved extras** | **Approved admin extras only (if any). Zero if none.** |
+
+---
+
+### 9. Complete WhatsApp Trigger Summary
+
+| Trigger ID | Event | Recipient | Timing |
+| :--- | :--- | :--- | :--- |
+| **WA-01** | Admin assigns complaint to SC (new or reopened) | SC | Immediately on assignment or reopen-assignment. If reopen: includes REOPENED flag + original complaint ID. |
+| **WA-02** | SC has not acted for 24 hours after assignment | SC | 24 hours after WA-01 if no action. |
+| **WA-03** | SC still not acted after 48 hours | SC | 48 hours after WA-01 if no action. |
+| **WA-0X** | SC still not acted — ongoing | SC | Every 2 days after WA-03 until SC acts. |
+| **WA-04** | SC accepts the complaint | Customer | Immediately on SC acceptance. Sent to phone1 (+ phone2 if exists). |
+| **WA-04B** | SC accepted but no action for 24 hours | SC | 24 hours after acceptance if no action (no Going, Done, Not Done, or Part Pending). |
+| **WA-0X** | SC still not acted after acceptance | SC | Every 2 days after WA-04B until SC acts. |
+| **WA-05** | SC submitted Not Done, no further action for 24 hours | SC | 24 hours after Not Done submission. |
+| **WA-0X** | SC still not acted after Not Done | SC | Every 2 days after WA-05 until SC acts. |
+| **WA-06** | Admin marks Part / Replacement unit as Delivered | SC | Immediately when admin marks Delivered. |
+| **WA-07** | SC marked Received but no further action for 24 hours | SC | 24 hours after SC marks Received. |
+| **WA-0X** | SC still not acted after Received | SC | Every 2 days after WA-07 until SC acts. |
+
+*No WhatsApp is sent to the customer after SC acceptance. No WhatsApp is sent on Done, Not Done, or Part Pending submissions, or on final bill generation. No reminder if admin marks Delivered but SC has not marked Received. Customer communication is limited to WA-04 only.*
+
+---
+
+### 10. Complete Status Flow
+
+| Status | Set By | Meaning | Next Possible Statuses |
+| :--- | :--- | :--- | :--- |
+| **new** | System | Complaint created, not yet assigned | `assigned` |
+| **assigned** | Admin | Assigned to SC, awaiting SC response | `accepted`, `rejected_by_sc` |
+| **rejected_by_sc** | SC | SC rejected — admin must reassign | `assigned` (admin reassigns) |
+| **accepted** | SC | SC accepted — will visit customer | `going`, `done`, `not_done`, `part_pending` |
+| **going** | SC | SC is on the way (optional) | `done`, `not_done`, `part_pending` |
+| **done** | SC | SC completed work — pending admin confirmation | `closed` (admin confirms), `accepted` (admin disputes) |
+| **not_done** | SC | SC could not complete — complaint stays open | `done`, `not_done`, `part_pending` |
+| **part_pending** | SC | Part or unit needed — awaiting admin delivery | `part_received` (after admin marks delivered + SC marks received) |
+| **part_received** | SC | Part/unit received — SC will act | `done`, `not_done`, `part_pending` |
+| **closed** | Admin | Final — admin confirmed Done, bill generated | `reopened` (if eligible within 30 days) |
+| **reopened** | Admin | New complaint created referencing this one | Full new complaint lifecycle |
+
+---
+
+### 11. Complaint Timeline — What Gets Recorded
+Every action in the complaint lifecycle is recorded as a timeline entry. This is the full audit trail visible on the complaint detail view.
+
+| Event | Recorded In Timeline |
+| :--- | :--- |
+| **Complaint created** | Date, time, admin who created, customer + product details |
+| **Assigned to SC** | Date, time, which SC, admin who assigned |
+| **SC rejected** | Date, time, SC name, rejection note (if any) |
+| **Reassigned to new SC** | Date, time, new SC name, admin who reassigned |
+| **SC accepted** | Date, time, SC name |
+| **SC marked Going** | Date, time |
+| **SC marked Done** | Date, time, photos, audio, notes, petrol, extra charges submitted |
+| **Admin disputed Done** | Date, time, admin note explaining reason |
+| **SC marked Not Done** | Date, time, reason text/audio, photos |
+| **SC marked Part Pending** | Date, time, voice note, notes, parts detail, photos |
+| **Admin marked Part/Unit Delivered** | Date, time, admin note |
+| **SC marked Part/Unit Received** | Date, time |
+| **Admin confirmed Done (Closed)** | Date, time, final bill amount |
+| **Reopened** | Date, time, reopen notes, reference to new complaint ID |
+
+---
+**End of Document** · Microvison SC Flow & WhatsApp Integration v1.1
