@@ -107,10 +107,82 @@
   - [x] `components/complaint/PetrolEditField.jsx` (3-round petrol history + correct-turn editing)
   - [x] `App.jsx` — SC nested routes wired (/sc, /sc/new-requests, /sc/my-complaints, /sc/billing)
 
-- [ ] **Phase 8.5 — App Polish & Logic Tweaks (Deferred)**
-  - [ ] Create distinct UI flows/fields for `not_done`, `part_pending`, and `replacement` final statuses on the SC portal.
-  - [ ] Refine SC Assignment Logic (Filter/limit "To whom we can assign" during complaint creation Step 4).
-  - [ ] Changes in flow and state of complaint (will change later and update deviation logs if needed).
+- [ ] **Phase 8.5 — Full SC Flow v1.1 Implementation (SC Portal Rebuild)**
+  > ⚠ This phase is a major expansion of the SC portal based on `Microvison_SC_Flow_v1.1.txt`. It introduces new statuses (`part_received`), new forms (Not Done, Part Pending), a new admin action (Mark as Delivered), SC action (Mark as Received), and a complete WhatsApp reminder system. Replacement is NOT a separate status — it is Part Pending where the 'part' being delivered is the full unit.
+
+  **A. Backend — New Statuses & Schema**
+  - [ ] Add `part_received` to Complaint model status enum (currently missing from schema)
+  - [ ] Remove `replacement` from status enum — replacement is handled as a Part Pending flow (no separate status)
+  - [ ] Add fields to Complaint model: `notDoneReason` (String), `notDoneVoiceUrl` (String), `partDetails` (String), `partPendingVoiceUrl` (String), `partDeliveredAt` (Date), `partDeliveredNote` (String), `partReceivedAt` (Date), `distanceTravelled` (Number), `totalVisits` (Number)
+
+  **B. Backend — SC Controllers (Revamp `updateStatus`)**
+  - [ ] Revamp `updateStatus` controller to handle 3 distinct SC action paths:
+    - [ ] **Done path:** Requires min 1 photo (max 5), optional audio, optional text notes, optional petrol + distance + visits, optional multiple extra charge line items. Status → `done`.
+    - [ ] **Not Done path:** Requires EITHER reason text OR voice note (or both). Optional max 5 photos. Status → `not_done`. Complaint stays open.
+    - [ ] **Part Pending path:** Requires voice note (compulsory), text notes (compulsory), parts detail description (compulsory), min 2 photos (max 5). Replacement is the same path — SC states in text/voice that full unit replacement is required. Status → `part_pending`.
+  - [ ] Add `markPartReceived` controller — SC taps Mark as Received after receiving part/unit. Requires complaint in `part_pending` state. Status → `part_received`. Timeline entry created.
+  - [ ] Update `updateStatus` to also allow submission from `part_received` status (in addition to `accepted` and `going`), so SC can go Done/Not Done/Part Pending again after receiving a part.
+
+  **C. Backend — Admin Controllers (New: Mark as Delivered)**
+  - [ ] Add `markPartDelivered` controller — Admin taps Mark as Delivered from Action Centre. Requires complaint in `part_pending` status. Stores delivery note (optional). Adds timeline entry. Does NOT change complaint status — only adds a marker. Fires WA-06 to SC.
+  - [ ] Update `getActionItems` to surface `part_pending` complaints in admin Action Centre (so admin knows when to arrange parts).
+
+  **D. Backend — New Routes**
+  - [ ] `PATCH /api/complaints/:id/part-received` → `markPartReceived` (SC only)
+  - [ ] `PATCH /api/complaints/:id/mark-delivered` → `markPartDelivered` (Admin only)
+
+  **E. Frontend — SC Portal (Distinct Forms per Path)**
+  - [ ] Revamp `SCComplaintDetail.jsx` action panel to show 3 distinct action buttons: **Mark Done**, **Mark Not Done**, **Mark Part Pending** (based on current complaint status — available from `accepted`, `going`, or `part_received`)
+  - [ ] **Done Form slide-out:**
+    - [ ] Photo uploader (min 1, max 5) — blocks submit if empty
+    - [ ] Audio recorder (optional, max 2 min)
+    - [ ] Text notes (optional)
+    - [ ] Petrol amount + distance (km) + total visits count fields (optional but recommended) — respects 3-lock system
+    - [ ] Multiple extra charge line items (optional) — each with label + amount
+    - [ ] Out-of-warranty: 'Amount collected from customer' field (required if OOW)
+  - [ ] **Not Done Form slide-out:**
+    - [ ] Reason text box (required if no voice note)
+    - [ ] Voice recorder (required if no text) — max 2 min. At least one of text or voice must be filled. System blocks submit if both blank.
+    - [ ] Photo uploader (optional, max 5)
+  - [ ] **Part Pending Form slide-out:**
+    - [ ] Voice note (compulsory, max 2 min)
+    - [ ] Text notes (compulsory)
+    - [ ] Parts detail field (compulsory) — describes what part/unit is needed
+    - [ ] Photo uploader (min 2, max 5 — proof of diagnosis)
+    - [ ] Note: No separate Replacement button/form. SC states replacement requirement in text + voice inside the Part Pending form.
+  - [ ] **Mark as Received button** — visible on `part_pending` complaints after admin marks delivered. SC taps this to confirm they received the part. Status → `part_received`.
+  - [ ] Update `MyComplaints.jsx` filter to include `part_pending`, `part_received`, `not_done` statuses
+  - [ ] Update `SCComplaintCard.jsx` to display `part_pending` and `part_received` status badges correctly
+
+  **F. Frontend — Admin Portal (Part Pending + Delivered flow)**
+  - [ ] Show `part_pending` complaints in Admin Action Centre with context: what part SC requested (parts detail text + photos + voice note)
+  - [ ] Add **Mark as Delivered** button inside `AdminComplaintDetail.jsx` for `part_pending` complaints
+    - [ ] Simple: just an optional admin note text field + confirm button. No file upload needed.
+    - [ ] Adds a timeline entry with date, time, and admin note
+    - [ ] Triggers WA-06 to SC
+  - [ ] Show Part Pending details (voice note, text, parts description, photos) in admin detail view
+  - [ ] Show Not Done history (reason, voice, photos) clearly in timeline
+
+  **G. Status Flow Map (for dev reference)**
+  - [ ] `new` → `assigned` (admin assigns)
+  - [ ] `assigned` → `accepted` or `rejected_by_sc` (SC action)
+  - [ ] `rejected_by_sc` → `assigned` (admin reassigns)
+  - [ ] `accepted` → `going` (optional) or `done` / `not_done` / `part_pending`
+  - [ ] `going` → `done` / `not_done` / `part_pending`
+  - [ ] `done` → `closed` (admin confirms) or `accepted` (admin disputes)
+  - [ ] `not_done` → `done` / `not_done` / `part_pending` (SC acts again)
+  - [ ] `part_pending` → `part_received` (admin marks delivered → SC marks received)
+  - [ ] `part_received` → `done` / `not_done` / `part_pending` (SC acts again)
+  - [ ] `closed` → `reopened` (if eligible within 30 days)
+
+  **H. Billing Logic Updates**
+  - [ ] Billing always and only triggers on admin **Confirm Done** (status: `closed`). Never before.
+  - [ ] SC fills overall petrol + extra charges ONCE in the final Done form — covers ALL visits across Not Done and Part Pending cycles. System does not track per-visit petrol.
+  - [ ] Out-of-warranty: SC fills 'amount collected from customer' field. This is stored for records only. The Microvison invoice to SC shows zero (unless admin-added extras).
+  - [ ] `confirmDone` controller should only accept complaints in `done` status (not `not_done`, `part_pending`, or `replacement` — remove those from allowed statuses in the current controller)
+
+  **I. Refine SC Assignment Logic**
+  - [ ] Refine SC Assignment Logic (Filter/limit "To whom we can assign" during complaint creation Step 4)
 
 - [x] **Phase 9 — Admin Action Centre (Day 12-13)**
   - [x] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
@@ -163,13 +235,40 @@
     - [x] Verify ESLint and local build correctness
   - [x] Vercel Frontend Deploy
 
-- [x] **Phase 14 — Messaging Integrations (Deferred to End)**
+- [/] **Phase 14 — WhatsApp Messaging Integrations (Full SC Flow v1.1 Triggers)**
+  > ⚠ Phase 14 must be done AFTER Phase 8.5 is fully complete, since triggers depend on the new statuses and controllers. All triggers below are from `Microvison_SC_Flow_v1.1.txt` Section 9.
+
+  **Infrastructure (already done)**
   - [x] Direct Meta WhatsApp Cloud API wrapper utility (`utils/sendWhatsApp.js`) (Sandbox Mode implemented)
-  - [x] Trigger 1: Send "Complaint Received" msg to Customer (Pending approved template)
-  - [x] Trigger 2: Send SC details to Customer (Pending approved template)
-  - [x] Trigger 3: Send basic complaint details to Assigned SC (Pending approved template)
-  - [x] Trigger 4: Complaint Reopened (Pending approved template)
-  - [x] Configure environment variables for permanent credentials and production templates (.env / .env.example)
+  - [x] Configure environment variables for WhatsApp credentials in `.env` / `.env.example`
+
+  **Immediate Triggers (fire on specific admin/SC actions — no scheduler needed)**
+  - [x] **WA-01:** SC assigned new complaint — fires immediately in `assignComplaint` controller. Content: Complaint ID, Customer name, Phone, Full address, Product type, Complaint type, Warranty status, Admin notes, Portal login URL. If reopen: add REOPENED flag + original Complaint ID.
+  - [x] **WA-04:** SC accepts complaint — fires immediately in `acceptComplaint` controller. Recipient: Customer phone1 (+ phone2 if exists). Content: Complaint ID, Product type, Complaint type, SC business name, SC phone number, acknowledgment message.
+  - [ ] **WA-06:** Admin marks Part/Unit as Delivered — fires immediately in new `markPartDelivered` controller (Phase 8.5). Recipient: SC. Content: Complaint ID, Customer name, Address, Part/unit delivery notification, Admin note (if any). *Depends on Phase 8.5 controller being built first.*
+
+  **Scheduled/Reminder Triggers (require a background cron job / scheduler)**
+  > These triggers fire at a time DELAY after an event. They need a background task that runs periodically (e.g. every hour) to check which complaints are overdue and fire the reminder.
+  - [ ] **WA-02:** SC not acted 24 hours after assignment (no accept/reject). Recipient: SC.
+  - [ ] **WA-03:** SC still not acted 48 hours after assignment. Recipient: SC.
+  - [ ] **WA-0X (post-assign):** SC still not acted — repeat every 2 days after WA-03. Stops when SC accepts or rejects. Recipient: SC.
+  - [ ] **WA-04B:** SC accepted but no action for 24 hours (no Going, Done, Not Done, Part Pending). Recipient: SC.
+  - [ ] **WA-0X (post-accept):** Repeat every 2 days after WA-04B until SC takes any action. Recipient: SC.
+  - [ ] **WA-05:** SC submitted Not Done, no further action for 24 hours. Recipient: SC.
+  - [ ] **WA-0X (post-not-done):** Repeat every 2 days after WA-05 until SC takes any action. Recipient: SC.
+  - [ ] **WA-07:** SC marked Part Received but no further action for 24 hours. Recipient: SC.
+  - [ ] **WA-0X (post-received):** Repeat every 2 days after WA-07 until SC acts. Recipient: SC.
+
+  **Scheduler Infrastructure (needed for all WA-0X triggers above)**
+  - [ ] Build a cron job utility (e.g., `utils/whatsappReminder.js`) that runs periodically (hourly/daily)
+  - [ ] Query DB for complaints that match each reminder condition (status + time elapsed since last action)
+  - [ ] Integrate cron scheduler into `server.js` on startup (e.g. using `node-cron` package)
+
+  **NOT sent (per v1.1 spec — do NOT implement these)**
+  - No WhatsApp is sent to customer after SC acceptance (WA-04 is the only customer message)
+  - No WhatsApp on Done, Not Done, or Part Pending submission
+  - No WhatsApp on admin Confirm Done or bill generation
+  - No reminder to SC if admin marks Delivered but SC has not yet marked Received
 
 - [ ] **Phase 15 — UI/UX Polish & Final Testing**
   - [ ] Improve overall UI flow and UX consistency

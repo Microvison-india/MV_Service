@@ -280,5 +280,65 @@ Each entry follows this structure:
 
 ---
 
+## Phase 8.5 — Full SC Flow v1.1 (SC Portal Rebuild)
+
+> Source document: `files/Microvison_SC_Flow_v1.1.txt`
+
+### DEV-TBP-035
+- **Phase:** 8.5
+- **TBP Section / File:** `models/Complaint.js` — status enum
+- **Type:** CHANGED
+- **Summary:** The `replacement` status value is **removed** from the Complaint status enum. Per SC Flow v1.1 Section 7 and Section 16, Replacement is NOT a separate flow or status — it is Part Pending where the 'part' being delivered is the full product unit. The SC states this clearly in the Part Pending form's text and voice note. No code or UI change is needed to handle replacement differently from Part Pending. This aligns with Phase 8.5.A in the task.md.
+
+### DEV-TBP-036
+- **Phase:** 8.5
+- **TBP Section / File:** `models/Complaint.js` — new fields
+- **Type:** ADDED
+- **Summary:** New fields required by SC Flow v1.1 are added to the Complaint model: `notDoneReason` (String), `notDoneVoiceUrl` (String), `partDetails` (String — description of part/unit needed), `partPendingVoiceUrl` (String), `partDeliveredAt` (Date), `partDeliveredNote` (String — admin note on delivery), `partReceivedAt` (Date), `distanceTravelled` (Number — km, SC fills in Done form), `totalVisits` (Number — SC fills in Done form). Also: `part_received` is added to the status enum.
+
+### DEV-TBP-037
+- **Phase:** 8.5
+- **TBP Section / File:** SC Flow v1.1 Section 5 — Done Form
+- **Type:** DECISION
+- **Summary:** The Done form captures OVERALL totals for the ENTIRE complaint lifecycle (all visits combined). If a complaint went through 3 Not Done cycles before Done, the SC enters the TOTAL petrol for all 4 visits in a single Done form. The system does NOT ask for per-visit petrol. This was explicitly specified in SC Flow v1.1 Section 5.2 and Section 6.4.
+
+### DEV-TBP-038
+- **Phase:** 8.5
+- **TBP Section / File:** SC Flow v1.1 Section 6 — Not Done Form
+- **Type:** DECISION
+- **Summary:** Not Done does NOT close the complaint. Status stays as `not_done` (open). The SC is expected to return and take further action. The form requires EITHER a reason text box OR a voice note (or both) — the system blocks submission if both are blank. Photos are optional (max 5). Multiple Not Done submissions are allowed — each resets the 24-hour WA-05 reminder timer.
+
+### DEV-TBP-039
+- **Phase:** 8.5
+- **TBP Section / File:** SC Flow v1.1 Section 7 — Part Pending Flow
+- **Type:** DECISION
+- **Summary:** Part Pending requires 4 compulsory inputs: voice note (max 2 min), text notes, parts detail (description of what is needed), and minimum 2 photos (max 5, proof of diagnosis). After SC submits Part Pending, the complaint waits for the admin to physically arrange the part and mark it as **Delivered** in the app. The admin's Delivered marker is a timeline entry only — it does NOT change the complaint status. Once admin marks Delivered, SC taps **Mark as Received** which changes status to `part_received`. Only then can SC take the next action (Done, Not Done, or another Part Pending).
+
+### DEV-TBP-040
+- **Phase:** 8.5
+- **TBP Section / File:** SC Flow v1.1 Section 8 — Billing
+- **Type:** DECISION
+- **Summary:** Billing rules confirmed. Bill is ONLY generated when admin clicks **Confirm Done** (status moves to `closed`). No bill for complaints that stay in Not Done or Part Pending indefinitely. Out-of-warranty billing: Microvison does NOT cover petrol for OOW complaints. SC fills 'amount collected from customer' field in Done form — this is stored as a record but NEVER included in the Microvison invoice to SC. The Microvison invoice for OOW complaints shows zero unless admin-added extras exist.
+
+### DEV-TBP-041
+- **Phase:** 8.5
+- **TBP Section / File:** SC Flow v1.1 Section 4.2 — Mark as Going
+- **Type:** DECISION
+- **Summary:** Mark as Going is **optional** and informational only. No WhatsApp trigger, no form required. Status moves to `going`. SC can skip Going entirely and go straight to Done, Not Done, or Part Pending from `accepted`. This behaviour is already partially implemented in Phase 8 but needed explicit confirmation in the documentation.
+
+## Phase 14 — WhatsApp Integrations (SC Flow v1.1 Triggers)
+
+### DEV-TBP-042
+- **Phase:** 14
+- **TBP Section / File:** Phase 14 — WhatsApp Triggers (Full SC Flow v1.1)
+- **Type:** CHANGED
+- **Summary:** The original Phase 14 in TBP listed only 4 generic triggers. Per SC Flow v1.1 Section 9, the complete trigger set is: WA-01 (SC assigned), WA-02 (24h no action after assign), WA-03 (48h no action), WA-0X (repeat every 2 days), WA-04 (SC accepts — to customer), WA-04B (accepted but no action 24h), WA-05 (Not Done submitted — no action 24h), WA-06 (admin marks Part Delivered — to SC), WA-07 (Part Received but no action 24h), WA-0X variants for all recurring reminder cycles. WA-01 and WA-04 were already partially implemented (marked [x] in task.md). WA-06 depends on Phase 8.5 `markPartDelivered` controller. All WA-0X/reminder triggers require a cron scheduler.
+
+### DEV-TBP-043
+- **Phase:** 14
+- **TBP Section / File:** SC Flow v1.1 Section 9 — WhatsApp Rules
+- **Type:** DECISION
+- **Summary:** Confirmed hard rules for what WhatsApp messages are NOT sent: (1) No WA to customer after SC acceptance. WA-04 is the ONLY customer WhatsApp message in the entire system. (2) No WA on Done, Not Done, or Part Pending submissions. (3) No WA on admin Confirm Done or bill generation. (4) No reminder to SC if admin marks Delivered but SC hasn't marked Received (admin-side delivery reminder is NOT in the spec). These exclusions are intentional per v1.1.
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

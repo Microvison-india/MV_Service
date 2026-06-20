@@ -139,7 +139,7 @@ Each entry follows this structure:
 - **Phase:** 10
 - **GRD Section:** 7.2 (Status Flow) / 7.3 (Status Transition Rules)
 - **Type:** DECISION
-- **Summary:** Clarified and mapped the exact status transition rules, definitions, and flowchart for the complaint lifecycle (including how the `new` status represents `Unassigned` complaints, and how SC updates transition to `done`, `not_done`, `part_pending`, and `replacement` states). Added a Mermaid diagram documenting this flow.
+- **Summary:** Clarified and mapped the exact status transition rules, definitions, and flowchart for the complaint lifecycle (updated for SC Flow v1.1). Added a Mermaid diagram documenting this flow. Note that `replacement` is no longer a distinct status (it is handled as `part_pending`), and `part_received` has been added.
 
 #### Complaint Status Lifecycle Flowchart:
 ```mermaid
@@ -156,10 +156,13 @@ graph TD
     Accepted & Going -->|SC submits work| Done(done):::sc
     Accepted & Going -->|SC submits block| NotDone(not_done):::sc
     Accepted & Going -->|SC awaits parts| PartPending(part_pending):::sc
-    Accepted & Going -->|SC escalates| Replacement(replacement):::sc
     
-    Done & NotDone & PartPending & Replacement -->|Admin disputes work| Accepted
-    Done & NotDone & PartPending & Replacement -->|Admin approves & locks| Closed(closed):::admin
+    PartPending -->|Admin delivers & SC receives| PartReceived(part_received):::sc
+    PartReceived -->|SC tries again| Done & NotDone & PartPending
+    NotDone -->|SC tries again| Done & NotDone & PartPending
+    
+    Done -->|Admin disputes work| Accepted
+    Done -->|Admin approves & locks| Closed(closed):::admin
     Closed -->|Admin triggers Reopen| Reopened(reopened):::admin
 ```
 
@@ -235,10 +238,11 @@ graph TD
 - **GRD Section:** N/A (New Feature — not in GRD v1.1)
 - **Type:** ADDED
 - **Summary:** **Product Timeline** is a new inline history timeline section integrated directly into the Admin complaint detail panel, grouping all complaints (by their individual Complaint IDs) under their parent Product Tracking ID:
-  - Displays a vertical timeline of all complaints/installations associated with that specific product.
+  - Displays a vertical timeline of all complaints/installations associated with that specific product, tracking the entire product lifecycle over months and years.
   - The current active complaint card is visually highlighted and expanded by default.
-  - All other historical complaints on the timeline are collapsible. Clicking a historical card acts as an accordion, dynamically loading its specific details (SC notes, proof photos, petrol logs, invoice details) via `GET /api/complaints/:id` and expanding them inline on the same slide-out panel.
-  - **SC Role restriction:** On the SC portal complaint detail panel, the timeline details for other jobs are hidden or shown as plain text only (not clickable) to enforce data privacy between different service centres.
+  - All other historical complaints on the timeline are collapsible. Clicking a historical card acts as an accordion, dynamically loading its specific details (SC notes, proof photos, petrol logs, invoice details, Not Done history, Part deliveries) via `GET /api/complaints/:id` and expanding them inline on the same slide-out panel.
+  - **Admin View:** The admin sees the full flow and history of the product perfectly, including all SC interactions, Part deliveries, Not Done cycles, etc.
+  - **SC Role restriction:** On the SC portal complaint detail panel, the timeline details for other jobs are hidden or shown as plain text only (not clickable) to enforce data privacy between different service centres. The SC only sees detailed flow and forms for the tasks specifically assigned to them.
   - Backend: `productTimeline` list is returned as part of the standard `GET /complaints/:id` payload.
   - Filters: Added Serial Number and Tracking ID search filters on the All Complaints tab.
 
@@ -269,6 +273,39 @@ graph TD
 - **Summary:** Migrated the media storage provider from **Cloudinary** to **Cloudflare R2** using standard S3 compatibility. For image files, we integrated **sharp.js** on the backend to perform image compression (reducing width/height to fit 1200px and converting to web-optimized JPEG at 80% quality) prior to uploading to R2. This replaces Cloudinary's built-in image transformation rules while keeping the file storage extremely efficient and free of egress bandwidth fees.
 
 ---
+
+---
+
+## Phase 8.5 — Full SC Flow v1.1 (SC Portal Rebuild)
+
+> Source document: `files/Microvison_SC_Flow_v1.1.txt`
+
+### DEV-GRD-026
+- **Phase:** 8.5
+- **GRD Section:** 7.3 / 10.2 (SC Complaint Flow)
+- **Type:** CHANGED
+- **Summary:** GRD previously treated SC statuses somewhat generically. Addendum SC Flow v1.1 introduces a highly structured 3-path system:
+  1. **Done:** Requires photo(s). Petrol and extras are submitted here as OVERALL totals for the entire complaint lifecycle. 
+  2. **Not Done:** Requires text reason OR voice note. Does NOT close the complaint. Complaint remains open for SC to return later.
+  3. **Part Pending:** Requires voice note, text notes, part details, and photos. Admin must physically arrange the part and mark it **Delivered** (timeline entry only). SC must then tap **Mark as Received** (changes status to `part_received`).
+  - **Replacement** is no longer a separate status. It is handled through the Part Pending flow where the 'part' is the full unit.
+
+### DEV-GRD-027
+- **Phase:** 8.5
+- **GRD Section:** 9 (Billing Logic)
+- **Type:** DECISION
+- **Summary:** GRD billing logic is refined per SC Flow v1.1. Billing is ONLY generated when the admin confirms `Done` (closing the complaint). Complaints that stay in `not_done` or `part_pending` never generate bills. Out-of-warranty travel/petrol is NOT covered by Microvison. SC collects payment from customer directly, which is logged for record-keeping but excluded from the Microvison invoice.
+
+## Phase 14 — WhatsApp Integrations (SC Flow v1.1 Triggers)
+
+### DEV-GRD-028
+- **Phase:** 14
+- **GRD Section:** 6.4 (Assignment) / 8 (Reopen)
+- **Type:** CHANGED
+- **Summary:** GRD mentioned WhatsApp triggers sparsely. SC Flow v1.1 Section 9 defines the complete trigger set, replacing any previous assumptions:
+  - **Immediate:** WA-01 (SC assigned), WA-04 (SC accepts - sent to customer), WA-06 (Admin marks part delivered - sent to SC).
+  - **Scheduled/Reminders:** WA-02/03/04B/05/07 and WA-0X (repeaters) to chase SCs who haven't acted. Requires cron scheduler.
+  - **Exclusions:** NO WhatsApp to customer on Done/Not Done/Part Pending. NO WhatsApp to SC on bill generation or confirm done.
 
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
