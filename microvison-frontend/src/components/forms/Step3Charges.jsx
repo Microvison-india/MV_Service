@@ -174,13 +174,14 @@ export default function Step3Charges({ formData, setFormData }) {
           Admin-added extras are pre-approved. SC can also request extras after the visit.
         </p>
         {(formData.extraCharges || []).map((ec, idx) => (
-          <div key={idx} className="flex gap-3 items-center mb-2">
+          <div key={idx} className="flex gap-3 items-center mb-2 w-full">
             <input
               type="text"
               value={ec.label}
               onChange={(e) => updateExtraCharge(idx, 'label', e.target.value)}
               placeholder="Label (e.g. Spare part)"
-              className={`${inputCls} flex-1`}
+              className={`${inputCls} flex-grow flex-1 min-w-[120px]`}
+              style={{ width: '0px' }}
             />
             <input
               type="number"
@@ -188,12 +189,13 @@ export default function Step3Charges({ formData, setFormData }) {
               value={ec.amount}
               onChange={(e) => updateExtraCharge(idx, 'amount', e.target.value)}
               placeholder="₹ Amount"
-              className={`${inputCls} w-32`}
+              className={`${inputCls} shrink-0`}
+              style={{ width: '100px' }}
             />
             <button
               type="button"
               onClick={() => removeExtraCharge(idx)}
-              className="text-red-500 hover:text-red-700 text-sm font-bold px-2"
+              className="text-red-500 hover:text-red-700 text-sm font-bold px-2 shrink-0"
               title="Remove"
             >
               ✕

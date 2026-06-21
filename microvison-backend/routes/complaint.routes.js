@@ -21,6 +21,8 @@ const {
   getAllComplaints,
   markPartDelivered,
   markPartReceived,
+  updateExtraCharges,
+  updateSingleExtraCharge,
 } = require('../controllers/complaint.controller');
 
 // ── Admin Routes (all require auth + isAdmin) ───────────────────
@@ -54,6 +56,12 @@ router.patch('/:id/extras/:extraId/approve', auth, isAdmin, approveExtra);
 
 // PATCH /api/complaints/:id/extras/:extraId/reject — Reject extra charge
 router.patch('/:id/extras/:extraId/reject', auth, isAdmin, rejectExtra);
+
+// PATCH /api/complaints/:id/extras/:extraId — Update a single extra charge (label/amount)
+router.patch('/:id/extras/:extraId', auth, isAdmin, updateSingleExtraCharge);
+
+// PATCH /api/complaints/:id/extra-charges — Update all extra charges
+router.patch('/:id/extra-charges', auth, isAdmin, updateExtraCharges);
 
 // PATCH /api/complaints/:id/mark-delivered — Admin marks part delivered (SC Flow v1.1)
 router.patch('/:id/mark-delivered', auth, isAdmin, markPartDelivered);

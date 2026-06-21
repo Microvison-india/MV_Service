@@ -747,8 +747,8 @@ const updateStatus = async (req, res) => {
     return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
   }
 
-  // Must be in accepted, going, or part_received state to submit final result (SC Flow v1.1)
-  if (!['accepted', 'going', 'part_received'].includes(complaint.status)) {
+  // Must be in accepted, going, part_received, or not_done state to submit final result (SC Flow v1.1)
+  if (!['accepted', 'going', 'part_received', 'not_done'].includes(complaint.status)) {
     return res.status(400).json({
       message: `Cannot submit final status from current status '${complaint.status}'.`,
     });
@@ -795,11 +795,20 @@ const updateStatus = async (req, res) => {
       complaint.petrolEditCount = 2;
     }
 
-    // Extra charges (multiple line items)
+    // Preserve existing extra charges and append only new ones
+    const updatedCharges = [];
+    for (const ec of complaint.extraCharges) {
+      const foundInFrontend = Array.isArray(extraCharges) && extraCharges.find(item => item._id && String(item._id) === String(ec._id));
+      if (foundInFrontend) {
+        updatedCharges.push(ec);
+      } else if (ec.requestedBy === 'admin') {
+        updatedCharges.push(ec);
+      }
+    }
     if (Array.isArray(extraCharges)) {
       for (const item of extraCharges) {
-        if (item.label && item.label.trim() && item.amount) {
-          complaint.extraCharges.push({
+        if (!item._id && item.label && item.label.trim() && item.amount) {
+          updatedCharges.push({
             label: item.label.trim(),
             amount: Number(item.amount),
             requestedBy: 'sc',
@@ -808,6 +817,7 @@ const updateStatus = async (req, res) => {
         }
       }
     }
+    complaint.extraCharges = updatedCharges;
     // Backward compatibility for single extra charge request
     if (extraChargeRequest && extraChargeRequest.label && extraChargeRequest.amount) {
       complaint.extraCharges.push({
@@ -912,17 +922,39 @@ const confirmDone = async (req, res) => {
   complaint.billGenerated = billGenerated;
   complaint.billLockedAt = new Date();
   
+  // Update petrol Admin & SC estimates if sent
+  if (req.body.petrolAdmin !== undefined && req.body.petrolAdmin !== null && req.body.petrolAdmin !== '') {
+    complaint.petrolAdmin = Number(req.body.petrolAdmin);
+  }
+  if (req.body.petrolSC !== undefined && req.body.petrolSC !== null && req.body.petrolSC !== '') {
+    complaint.petrolSC = Number(req.body.petrolSC);
+  }
+
   // Admin final petrol lock (edit 3)
-  if (req.body.petrolFinal !== undefined && req.body.petrolFinal !== '') {
+  if (req.body.petrolFinal !== undefined && req.body.petrolFinal !== null && req.body.petrolFinal !== '') {
     complaint.petrolFinal = Number(req.body.petrolFinal);
-    complaint.petrolEditCount = 3;
-    complaint.petrolLocked = true;
   } else {
-    // If they just confirm, it gets locked anyway
-    complaint.petrolLocked = true;
-    if (complaint.petrolEditCount < 3) {
-      complaint.petrolEditCount = 3; // admin skipped their turn, locked it
+    // If they just confirm without override, copy the last entered value
+    if (complaint.petrolSC != null) {
+      complaint.petrolFinal = complaint.petrolSC;
+    } else if (complaint.petrolAdmin != null) {
+      complaint.petrolFinal = complaint.petrolAdmin;
+    } else {
+      complaint.petrolFinal = 0;
     }
+  }
+  complaint.petrolLocked = true;
+  complaint.petrolEditCount = 3;
+
+  // Update extra charges if provided
+  if (Array.isArray(req.body.extraCharges)) {
+    complaint.extraCharges = req.body.extraCharges.map(ec => ({
+      label: ec.label.trim(),
+      amount: Number(ec.amount),
+      requestedBy: ec.requestedBy || 'admin',
+      status: ec.status || 'approved',
+      approvedAt: ec.status === 'approved' ? (ec.approvedAt || new Date()) : (ec.approvedAt || null),
+    }));
   }
 
   await complaint.save();
@@ -989,21 +1021,8 @@ const handleExtraCharge = async (req, res, status) => {
   const extra = complaint.extraCharges.id(extraId);
   if (!extra) return res.status(404).json({ message: 'Extra charge not found.' });
 
-  if (extra.status !== 'pending') {
-    return res.status(400).json({ message: `Extra charge is already ${extra.status}.` });
-  }
-
   extra.status = status;
   await complaint.save();
-
-  await ComplaintUpdate.create({
-    complaintId: complaint._id,
-    updatedBy: req.user.id,
-    role: 'admin',
-    oldStatus: complaint.status,
-    newStatus: complaint.status,
-    note: `Admin ${status} extra charge: ${extra.label} (₹${extra.amount})`,
-  });
 
   res.status(200).json({ message: `Extra charge ${status}.`, complaint });
 };
@@ -1024,7 +1043,7 @@ const getComplaintById = async (req, res) => {
       path: 'trackingId',
       populate: {
         path: 'complaintHistory.complaintId',
-        select: 'status assignedCentreId'
+        select: 'status assignedCentreId reopenParentId isReopened'
       }
     });
     
@@ -1054,6 +1073,8 @@ const getComplaintById = async (req, res) => {
         complaintId: compId,
         status: liveStatus,
         assignedCentreId: assignedCentreId,
+        reopenParentId: compObj.reopenParentId || null,
+        isReopened: compObj.isReopened || false,
         isCurrent: String(compId) === String(complaint._id)
       };
     });
@@ -1337,6 +1358,63 @@ const getAllComplaints = async (req, res) => {
   }
 };
 
+// @desc    Admin updates all extra charges on a complaint
+// @route   PATCH /api/complaints/:id/extra-charges
+// @access  Private (Admin only)
+const updateExtraCharges = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { extraCharges } = req.body;
+
+    if (!Array.isArray(extraCharges)) {
+      return res.status(400).json({ message: 'extraCharges must be an array.' });
+    }
+
+    const complaint = await Complaint.findById(id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+    // Update extra charges
+    complaint.extraCharges = extraCharges.map(ec => ({
+      label: ec.label.trim(),
+      amount: Number(ec.amount),
+      requestedBy: ec.requestedBy || 'admin',
+      status: ec.status || 'approved',
+      approvedAt: ec.status === 'approved' ? (ec.approvedAt || new Date()) : (ec.approvedAt || null),
+    }));
+
+    await complaint.save();
+    res.status(200).json({ message: 'Extra charges updated successfully.', complaint });
+  } catch (error) {
+    console.error('Error in updateExtraCharges:', error);
+    res.status(500).json({ message: 'Server error while updating extra charges.' });
+  }
+};
+
+// @desc    Admin updates a single extra charge (label/amount)
+// @route   PATCH /api/complaints/:id/extras/:extraId
+// @access  Private (Admin only)
+const updateSingleExtraCharge = async (req, res) => {
+  try {
+    const { id, extraId } = req.params;
+    const { label, amount } = req.body;
+
+    const complaint = await Complaint.findById(id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+
+    const extra = complaint.extraCharges.id(extraId);
+    if (!extra) return res.status(404).json({ message: 'Extra charge not found.' });
+
+    if (label !== undefined) extra.label = label.trim();
+    if (amount !== undefined) extra.amount = Number(amount);
+
+    await complaint.save();
+    res.status(200).json({ message: 'Extra charge updated successfully.', complaint });
+  } catch (error) {
+    console.error('Error in updateSingleExtraCharge:', error);
+    res.status(500).json({ message: 'Server error while updating extra charge.' });
+  }
+};
+
 module.exports = {
   reopenCheck,
   reopenComplaint,
@@ -1356,4 +1434,6 @@ module.exports = {
   getAllComplaints,
   markPartDelivered,
   markPartReceived,
+  updateExtraCharges,
+  updateSingleExtraCharge,
 };

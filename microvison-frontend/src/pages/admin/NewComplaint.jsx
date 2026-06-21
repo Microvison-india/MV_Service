@@ -144,6 +144,7 @@ export default function NewComplaint() {
         product: formData.product,
         complaintType: formData.complaintType,
         warrantyStatus: formData.warrantyStatus,
+        trackingId: formData.trackingId || undefined,
         presetId: formData.warrantyStatus === 'in_warranty' && formData.presetId !== 'manual' ? formData.presetId : null,
         presetName: formData.presetId === 'manual' ? formData.customPresetName.trim() : undefined,
         presetPrice: formData.presetId === 'manual' ? Number(formData.customPresetPrice) : undefined,

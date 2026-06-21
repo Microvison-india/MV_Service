@@ -21,6 +21,13 @@ export default function PetrolEditField({
   // editCount 1 → SC's turn (edit 2)
   // editCount 2 → admin's turn (edit 3)
   // editCount >= 3 → locked
+  const hasValue = (val) => val !== null && val !== undefined && val !== '';
+
+  // Determine whose turn it is:
+  // editCount 0 → no one has set yet (admin at registration)
+  // editCount 1 → SC's turn (edit 2)
+  // editCount 2 → admin's turn (edit 3)
+  // editCount >= 3 → locked
   const isMyTurn =
     !locked &&
     ((userRole === 'service_centre' && editCount === 1) ||
@@ -28,7 +35,7 @@ export default function PetrolEditField({
 
   // Current effective value shown
   const currentValue =
-    petrolFinal != null ? petrolFinal : petrolSC != null ? petrolSC : petrolAdmin;
+    hasValue(petrolFinal) ? petrolFinal : hasValue(petrolSC) ? petrolSC : petrolAdmin;
 
   const handleSave = async () => {
     if (!inputVal || isNaN(Number(inputVal))) return;
@@ -46,9 +53,9 @@ export default function PetrolEditField({
 
       {/* History rows */}
       <div className="space-y-2 mb-4">
-        <PetrolRow label="Admin Estimate (Edit 1)" value={petrolAdmin} active={petrolSC == null && petrolFinal == null} />
-        <PetrolRow label="SC Actual (Edit 2)" value={petrolSC} active={petrolSC != null && petrolFinal == null} />
-        <PetrolRow label="Admin Override (Edit 3)" value={petrolFinal} active={petrolFinal != null} />
+        <PetrolRow label="Admin Estimate (Edit 1)" value={petrolAdmin} active={!hasValue(petrolSC) && !hasValue(petrolFinal)} />
+        <PetrolRow label="SC Actual (Edit 2)" value={petrolSC} active={hasValue(petrolSC) && !hasValue(petrolFinal)} />
+        <PetrolRow label="Admin Override (Edit 3)" value={petrolFinal} active={hasValue(petrolFinal)} />
       </div>
 
       {locked && (
@@ -103,11 +110,12 @@ export default function PetrolEditField({
 }
 
 function PetrolRow({ label, value, active }) {
+  const hasVal = value !== null && value !== undefined && value !== '';
   return (
     <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${active ? 'bg-primary/10 font-semibold' : 'opacity-60'}`}>
       <span className="text-muted-foreground">{label}</span>
       <span className={active ? 'text-foreground' : 'text-muted-foreground'}>
-        {value != null ? `₹${value}` : '—'}
+        {hasVal ? `₹${value}` : '—'}
       </span>
     </div>
   );
