@@ -10,6 +10,31 @@ const complaintUpdateSchema = new mongoose.Schema(
     note: { type: String, default: '' },
     images: [{ type: String }],       // Cloudinary URLs — SC proof photos uploaded at this status update
     voiceUrl: { type: String, default: '' },
+
+    // Status-specific Snapshot Fields
+    parentUpdateId: { type: mongoose.Schema.Types.ObjectId, ref: 'ComplaintUpdate' },
+    partDetails: { type: String, default: '' },
+    partDeliveredAt: { type: Date },
+    partDeliveredNote: { type: String, default: '' },
+    partReceivedAt: { type: Date },
+    notDoneReason: { type: String, default: '' },
+    scNotes: { type: String, default: '' },
+    totalVisits: { type: Number },
+    distanceTravelled: { type: Number },
+
+    // Petrol & Extra Charges Snapshots
+    petrolAdmin: { type: Number },
+    petrolSC: { type: Number },
+    petrolFinal: { type: Number },
+    extraCharges: [
+      {
+        label: { type: String, required: true },
+        amount: { type: Number, required: true },
+        requestedBy: { type: String, enum: ['admin', 'sc'], required: true },
+        status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+        approvedAt: { type: Date }
+      }
+    ],
   },
   { timestamps: true }
 );

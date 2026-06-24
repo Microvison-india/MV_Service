@@ -340,5 +340,21 @@ Each entry follows this structure:
 - **Type:** DECISION
 - **Summary:** Confirmed hard rules for what WhatsApp messages are NOT sent: (1) No WA to customer after SC acceptance. WA-04 is the ONLY customer WhatsApp message in the entire system. (2) No WA on Done, Not Done, or Part Pending submissions. (3) No WA on admin Confirm Done or bill generation. (4) No reminder to SC if admin marks Delivered but SC hasn't marked Received (admin-side delivery reminder is NOT in the spec). These exclusions are intentional per v1.1.
 
+## Phase 15 — Timeline Snapshots & Card Details Refinements
+
+### DEV-TBP-044
+- **Phase:** 15
+- **TBP Section / File:** `models/ComplaintUpdate.js` / `controllers/complaint.controller.js`
+- **Type:** ADDED
+- **Summary:** Added snapshot fields to `ComplaintUpdate` model (`parentUpdateId`, `partDetails`, `partDeliveredAt`, `partDeliveredNote`, `partReceivedAt`, `notDoneReason`, `scNotes`, `totalVisits`, `distanceTravelled`, `petrolAdmin`, `petrolSC`, `petrolFinal`, `extraCharges`). Refactored status transition controller endpoints (`updateStatus`, `confirmDone`, `markPartDelivered`, `markPartReceived`) to log these snapshots and link dispatch/receipt cycles back to parent request nodes.
+
+### DEV-TBP-045
+- **Phase:** 15
+- **TBP Section / File:** `StatusTimeline.jsx`
+- **Type:** CHANGED
+- **Summary:** Refactored `StatusTimeline.jsx` to render per-node historical snapshots, bypassing live `complaint` values unless required for legacy fallback. Implemented layout refinements to conditionally render claims (e.g. only show `petrolSC` if > 0, only show final `petrolFinal`, filter closed extra charges to show only Admin actions/exceptions compared against original SC requests).
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

@@ -59,10 +59,62 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
         const isLast = index === sortedUpdates.length - 1;
         const isExpanded = !!expandedIds[update._id];
 
-        const isNotDoneCustom = complaint && update.newStatus === 'not_done' && (complaint.notDoneReason || complaint.notDoneVoiceUrl);
-        const isDoneCustom = complaint && update.newStatus === 'done' && (complaint.totalVisits != null || complaint.distanceTravelled != null || complaint.doneVoiceUrl || (complaint.proofPhotos && complaint.proofPhotos.length > 0));
-        const isPartPendingCustom = complaint && (update.newStatus === 'part_pending' || update.newStatus === 'part_received') && (complaint.partDetails || complaint.partPendingVoiceUrl);
-        const hideGenericInfo = isNotDoneCustom || isDoneCustom || isPartPendingCustom;
+        // Snapshots / Fallbacks for Part Pending
+        const partDetailsText = update.partDetails || (complaint ? complaint.partDetails : '');
+        const partPendingVoice = update.voiceUrl || (complaint ? complaint.partPendingVoiceUrl : '');
+        const partScNotes = update.scNotes || (complaint ? complaint.scNotes : '');
+        const partProofPhotos = (update.images && update.images.length > 0) ? update.images : (complaint && complaint.proofPhotos ? complaint.proofPhotos : []);
+        const partDeliveredAt = update.partDeliveredAt || (complaint ? complaint.partDeliveredAt : null);
+        const partDeliveredNote = update.partDeliveredNote || (complaint ? complaint.partDeliveredNote : '');
+        const partReceivedAt = update.partReceivedAt || (complaint ? complaint.partReceivedAt : null);
+
+        // Snapshots / Fallbacks for Not Done
+        const notDoneReasonText = update.notDoneReason || (complaint ? complaint.notDoneReason : '');
+        const notDoneVoice = update.voiceUrl || (complaint ? complaint.notDoneVoiceUrl : '');
+        const notDoneScNotes = update.scNotes || (complaint ? complaint.scNotes : '');
+        const notDoneProofPhotos = (update.images && update.images.length > 0) ? update.images : (complaint && complaint.proofPhotos ? complaint.proofPhotos : []);
+
+        // Snapshots / Fallbacks for Done
+        const doneTotalVisits = update.totalVisits != null ? update.totalVisits : (complaint ? complaint.totalVisits : null);
+        const doneDistanceTravelled = update.distanceTravelled != null ? update.distanceTravelled : (complaint ? complaint.distanceTravelled : null);
+        const doneVoice = update.voiceUrl || (complaint ? complaint.doneVoiceUrl : '');
+        const doneScNotes = update.scNotes || (complaint ? complaint.scNotes : '');
+        const doneProofPhotos = (update.images && update.images.length > 0) ? update.images : (complaint && complaint.proofPhotos ? complaint.proofPhotos : []);
+        const donePetrolSC = update.petrolSC != null ? update.petrolSC : (complaint ? complaint.petrolSC : null);
+        const donePetrolAdmin = update.petrolAdmin != null ? update.petrolAdmin : (complaint ? complaint.petrolAdmin : null);
+        const doneExtraCharges = (update.extraCharges && update.extraCharges.length > 0) ? update.extraCharges : (complaint ? complaint.extraCharges : []);
+        const scDoneCharges = doneExtraCharges.filter(ec => ec.requestedBy === 'sc');
+
+        // Snapshots / Fallbacks for Closed
+        const closedPetrolAdmin = update.petrolAdmin != null ? update.petrolAdmin : (complaint ? complaint.petrolAdmin : null);
+        const closedPetrolSC = update.petrolSC != null ? update.petrolSC : (complaint ? complaint.petrolSC : null);
+        const closedPetrolFinal = update.petrolFinal != null ? update.petrolFinal : (complaint ? complaint.petrolFinal : null);
+        const closedExtraCharges = (update.extraCharges && update.extraCharges.length > 0) ? update.extraCharges : (complaint ? complaint.extraCharges : []);
+        const closedScNotes = update.scNotes || (complaint ? complaint.scNotes : '');
+        const closedNote = update.note || 'Admin confirmed and closed the job.';
+
+        const doneUpdate = updates.find(u => u.newStatus === 'done');
+        const filteredClosedCharges = closedExtraCharges.filter(ec => {
+          if (ec.status === 'rejected') return true;
+          if (ec.requestedBy === 'sc') {
+            if (doneUpdate && doneUpdate.extraCharges) {
+              const original = doneUpdate.extraCharges.find(o => String(o._id) === String(ec._id) || o.label === ec.label);
+              if (original) {
+                return ec.amount !== original.amount;
+              }
+            }
+            return false;
+          }
+          return true;
+        });
+
+        // Custom render checks
+        const isNotDoneCustom = (update.newStatus === 'not_done') && (notDoneReasonText || notDoneVoice);
+        const isDoneCustom = (update.newStatus === 'done') && 
+          (doneTotalVisits != null || doneDistanceTravelled != null || doneVoice || doneProofPhotos.length > 0 || (donePetrolSC != null && donePetrolSC > 0) || scDoneCharges.length > 0);
+        const isPartPendingCustom = (update.newStatus === 'part_pending' || update.newStatus === 'part_received') && (partDetailsText || partPendingVoice);
+        const isClosedCustom = (update.newStatus === 'closed');
+        const hideGenericInfo = isNotDoneCustom || isDoneCustom || isPartPendingCustom || isClosedCustom;
 
         return (
           <div key={update._id} className="relative flex gap-4">
@@ -129,33 +181,33 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                     </div>
                   )}
 
-                  {/* Status-specific Integrated Details from Complaint */}
-                  {complaint && (update.newStatus === 'part_pending' || update.newStatus === 'part_received') && (complaint.partDetails || complaint.partPendingVoiceUrl) && (
+                  {/* Status-specific Integrated Details */}
+                  {isPartPendingCustom && (
                     <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3.5 space-y-2.5">
                       <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider border-b border-orange-200/50 pb-1">⚙️ Part Sourcing Info</p>
-                      {complaint.partDetails && (
+                      {partDetailsText && (
                         <div>
                           <span className="text-[10px] text-orange-700 uppercase tracking-wider font-semibold">Requested Part / Unit:</span>
-                          <p className="text-xs font-bold text-orange-950 mt-0.5">{complaint.partDetails}</p>
+                          <p className="text-xs font-bold text-orange-950 mt-0.5">{partDetailsText}</p>
                         </div>
                       )}
-                      {complaint.scNotes && (
+                      {partScNotes && (
                         <div>
                           <span className="text-[10px] text-orange-700 uppercase tracking-wider font-semibold">Sourcing Note / Reason:</span>
-                          <p className="text-xs text-orange-950 font-medium mt-0.5 whitespace-pre-wrap">{complaint.scNotes}</p>
+                          <p className="text-xs text-orange-950 font-medium mt-0.5 whitespace-pre-wrap">{partScNotes}</p>
                         </div>
                       )}
-                      {complaint.partPendingVoiceUrl && (
+                      {partPendingVoice && (
                         <div>
                           <span className="text-[10px] text-orange-700 uppercase tracking-wider font-semibold">Diagnosis Voice Explanation:</span>
-                          <audio src={complaint.partPendingVoiceUrl} controls className="w-full max-h-8 mt-1.5" />
+                          <audio src={partPendingVoice} controls className="w-full max-h-8 mt-1.5" />
                         </div>
                       )}
-                      {complaint.proofPhotos && complaint.proofPhotos.length > 0 && (
+                      {partProofPhotos && partProofPhotos.length > 0 && (
                         <div>
                           <span className="text-[10px] text-orange-700 uppercase tracking-wider font-semibold block mb-1">Diagnosis Proof Photos:</span>
                           <div className="flex flex-wrap gap-1.5 mt-1">
-                            {complaint.proofPhotos.map((img, i) => (
+                            {partProofPhotos.map((img, i) => (
                               <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="hover:scale-[1.03] transition duration-150">
                                 <img src={img} alt="" className="w-14 h-14 object-cover rounded-lg border border-orange-200" />
                               </a>
@@ -166,7 +218,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                       <div className="text-[11px] pt-2 border-t border-orange-200/60 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-orange-800">Dispatch Status:</span>
-                          {complaint.partDeliveredAt ? (
+                          {partDeliveredAt ? (
                             <span className="text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-200">
                               Delivered by Admin
                             </span>
@@ -176,21 +228,21 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                             </span>
                           )}
                         </div>
-                        {complaint.partDeliveredAt && (
+                        {partDeliveredAt && (
                           <p className="text-xs text-muted-foreground">
-                            Dispatched on: <strong>{new Date(complaint.partDeliveredAt).toLocaleDateString()}</strong>
+                            Dispatched on: <strong>{new Date(partDeliveredAt).toLocaleDateString()}</strong>
                           </p>
                         )}
-                        {complaint.partDeliveredNote && (
+                        {partDeliveredNote && (
                           <div className="bg-white/70 p-2 rounded border border-orange-100 text-xs">
                             <span className="text-[9px] text-muted-foreground uppercase font-bold">Courier / Delivery Note:</span>
-                            <p className="text-orange-950 font-medium italic">"{complaint.partDeliveredNote}"</p>
+                            <p className="text-orange-950 font-medium italic">"{partDeliveredNote}"</p>
                           </div>
                         )}
-                        {complaint.partDeliveredAt && (
+                        {partDeliveredAt && (
                           <div className="flex items-center justify-between pt-1 border-t border-dashed border-orange-200">
                             <span className="font-semibold text-orange-800">SC Receipt Status:</span>
-                            {complaint.partReceivedAt ? (
+                            {partReceivedAt ? (
                               <span className="text-green-700 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-200">
                                 Received & Confirmed
                               </span>
@@ -201,41 +253,41 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                             )}
                           </div>
                         )}
-                        {complaint.partReceivedAt && (
+                        {partReceivedAt && (
                           <p className="text-xs text-muted-foreground">
-                            Confirmed on: <strong>{new Date(complaint.partReceivedAt).toLocaleDateString()}</strong>
+                            Confirmed on: <strong>{new Date(partReceivedAt).toLocaleDateString()}</strong>
                           </p>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {complaint && update.newStatus === 'not_done' && (complaint.notDoneReason || complaint.notDoneVoiceUrl) && (
+                  {isNotDoneCustom && (
                     <div className="bg-red-50/40 border border-red-100 rounded-xl p-3.5 space-y-2.5">
                       <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider border-b border-red-200/40 pb-1">⚠️ Not Done Details</p>
-                      {complaint.notDoneReason && (
+                      {notDoneReasonText && (
                         <div>
                           <span className="text-[10px] text-red-700 uppercase tracking-wider font-semibold">Reason Category/Text:</span>
-                          <p className="text-xs text-red-950 font-medium mt-0.5">{complaint.notDoneReason}</p>
+                          <p className="text-xs text-red-950 font-medium mt-0.5">{notDoneReasonText}</p>
                         </div>
                       )}
-                      {complaint.scNotes && (
+                      {notDoneScNotes && (
                         <div>
                           <span className="text-[10px] text-red-700 uppercase tracking-wider font-semibold">Remarks / Closing Notes:</span>
-                          <p className="text-xs text-red-950 font-medium mt-0.5 whitespace-pre-wrap">{complaint.scNotes}</p>
+                          <p className="text-xs text-red-950 font-medium mt-0.5 whitespace-pre-wrap">{notDoneScNotes}</p>
                         </div>
                       )}
-                      {complaint.notDoneVoiceUrl && (
+                      {notDoneVoice && (
                         <div>
                           <span className="text-[10px] text-red-700 uppercase tracking-wider font-semibold">Voice Explanation:</span>
-                          <audio src={complaint.notDoneVoiceUrl} controls className="w-full max-h-8 mt-1.5" />
+                          <audio src={notDoneVoice} controls className="w-full max-h-8 mt-1.5" />
                         </div>
                       )}
-                      {complaint.proofPhotos && complaint.proofPhotos.length > 0 && (
+                      {notDoneProofPhotos && notDoneProofPhotos.length > 0 && (
                         <div>
                           <span className="text-[10px] text-red-700 uppercase tracking-wider font-semibold block mb-1">Attached Proof Photos:</span>
                           <div className="flex flex-wrap gap-1.5 mt-1">
-                            {complaint.proofPhotos.map((img, i) => (
+                            {notDoneProofPhotos.map((img, i) => (
                               <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="hover:scale-[1.03] transition duration-150">
                                 <img src={img} alt="" className="w-14 h-14 object-cover rounded-lg border border-red-200" />
                               </a>
@@ -246,40 +298,69 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                     </div>
                   )}
 
-                  {complaint && update.newStatus === 'done' && (complaint.totalVisits != null || complaint.distanceTravelled != null || complaint.doneVoiceUrl || (complaint.proofPhotos && complaint.proofPhotos.length > 0)) && (
+                  {isDoneCustom && (
                     <div className="bg-muted/30 border border-border/80 rounded-xl p-3.5 space-y-3">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/40 pb-1">🚗 Job Execution Metrics</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        {complaint.totalVisits != null && (
+                        {doneTotalVisits != null && (
                           <div>
                             <span className="text-muted-foreground text-[10px] uppercase font-bold">Total Site Visits</span>
-                            <p className="font-bold text-sm text-foreground">{complaint.totalVisits}</p>
+                            <p className="font-bold text-sm text-foreground">{doneTotalVisits}</p>
                           </div>
                         )}
-                        {complaint.distanceTravelled != null && (
+                        {doneDistanceTravelled != null && (
                           <div>
                             <span className="text-muted-foreground text-[10px] uppercase font-bold">Distance Travelled</span>
-                            <p className="font-bold text-sm text-foreground">{complaint.distanceTravelled} km</p>
+                            <p className="font-bold text-sm text-foreground">{doneDistanceTravelled} km</p>
                           </div>
                         )}
                       </div>
-                      {complaint.scNotes && (
+
+                      {donePetrolSC != null && donePetrolSC > 0 && (
+                        <div className="pt-2 border-t border-border/40 space-y-1">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block mb-1">Petrol Claims</span>
+                          <p className="text-xs text-foreground">
+                            <span className="text-muted-foreground">2nd Petrol (SC Claim):</span>{" "}
+                            <strong className="font-bold text-foreground">₹{donePetrolSC}</strong>
+                          </p>
+                        </div>
+                      )}
+
+                      {scDoneCharges && scDoneCharges.length > 0 && (
+                        <div className="pt-2 border-t border-border/40 space-y-1.5">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold block">Requested Extra Charges</span>
+                          <div className="space-y-1">
+                            {scDoneCharges.map((ec, idx) => (
+                              <div key={ec._id || idx} className="flex justify-between items-center bg-secondary/25 border border-border/30 rounded-lg p-2 text-xs">
+                                <div>
+                                  <p className="font-medium text-foreground">{ec.label}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-foreground">₹{ec.amount}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {doneScNotes && (
                         <div className="pt-1.5 border-t border-border/40">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold">Closing Notes / Remarks</span>
-                          <p className="text-xs text-foreground mt-0.5 whitespace-pre-wrap">{complaint.scNotes}</p>
+                          <p className="text-xs text-foreground mt-0.5 whitespace-pre-wrap">{doneScNotes}</p>
                         </div>
                       )}
-                      {complaint.doneVoiceUrl && (
+                      {doneVoice && (
                         <div className="pt-1.5">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold">Closing Voice Note</span>
-                          <audio src={complaint.doneVoiceUrl} controls className="w-full max-h-8 mt-1" />
+                          <audio src={doneVoice} controls className="w-full max-h-8 mt-1" />
                         </div>
                       )}
-                      {complaint.proofPhotos && complaint.proofPhotos.length > 0 && (
+                      {doneProofPhotos && doneProofPhotos.length > 0 && (
                         <div className="space-y-1.5 pt-1.5 border-t border-border/40">
                           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Proof Photos / Diagnosis Photos</span>
                           <div className="flex gap-2.5 flex-wrap">
-                            {complaint.proofPhotos.map((url, i) => (
+                            {doneProofPhotos.map((url, i) => (
                               <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="hover:scale-[1.03] transition duration-200">
                                 <img src={url} alt="" className="w-20 h-20 object-cover rounded-xl border border-border" />
                               </a>
@@ -290,12 +371,78 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                     </div>
                   )}
 
+                  {isClosedCustom && (
+                    <div className="bg-green-50/40 border border-green-100 rounded-xl p-3.5 space-y-3">
+                      <p className="text-[10px] font-bold text-green-800 uppercase tracking-wider border-b border-green-200/40 pb-1">🔒 Final Closure Details</p>
+                      
+                      {closedNote && (
+                        <div>
+                          <span className="text-[10px] text-green-700 uppercase tracking-wider font-semibold">Admin Closing Notes / Remarks:</span>
+                          <p className="text-xs text-green-950 font-medium mt-0.5 whitespace-pre-wrap">{closedNote}</p>
+                        </div>
+                      )}
+
+                      {closedPetrolFinal != null && closedPetrolFinal > 0 && (
+                        <div className="pt-2 border-t border-green-200/30 space-y-1">
+                          <span className="text-[10px] text-green-700 uppercase tracking-wider font-bold block mb-1">Petrol Allowance</span>
+                          <p className="text-xs text-foreground">
+                            {closedPetrolFinal === closedPetrolSC && closedPetrolSC > 0 ? (
+                              <>
+                                <span className="text-muted-foreground">Admin accepted SC Claim:</span>{" "}
+                                <strong className="font-extrabold text-green-950 text-sm">₹{closedPetrolFinal}</strong>
+                              </>
+                            ) : closedPetrolFinal === closedPetrolAdmin && closedPetrolAdmin > 0 ? (
+                              <>
+                                <span className="text-muted-foreground">Admin accepted initial estimate:</span>{" "}
+                                <strong className="font-extrabold text-green-950 text-sm">₹{closedPetrolFinal}</strong>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-muted-foreground">Final Locked Petrol:</span>{" "}
+                                <strong className="font-extrabold text-green-950 text-sm">₹{closedPetrolFinal}</strong>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      {filteredClosedCharges && filteredClosedCharges.length > 0 && (
+                        <div className="pt-2 border-t border-green-200/30 space-y-1.5">
+                          <span className="text-[10px] text-green-700 uppercase tracking-wider font-bold block">Final Extra Charges Actions</span>
+                          <div className="space-y-1">
+                            {filteredClosedCharges.map((ec, idx) => (
+                              <div key={ec._id || idx} className="flex justify-between items-center bg-white/60 border border-green-100 rounded-lg p-2 text-xs">
+                                <div>
+                                  <p className="font-medium text-foreground">{ec.label}</p>
+                                  <span className="text-[9px] text-muted-foreground capitalize">Requested by: {ec.requestedBy}</span>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-foreground">₹{ec.amount}</p>
+                                  <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                                    ec.status === 'approved' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                    ec.status === 'rejected' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                    'bg-amber-100 text-amber-800 border border-amber-200'
+                                  }`}>
+                                    {ec.status === 'approved' ? 'Edited & Approved' : ec.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {closedScNotes && (
+                        <div className="pt-2 border-t border-green-200/30">
+                          <span className="text-[10px] text-green-700 uppercase tracking-wider font-semibold">SC Done Notes / Remarks:</span>
+                          <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{closedScNotes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {!update.note && !update.voiceUrl && (!update.images || update.images.length === 0) &&
-                    !(complaint && (
-                      (update.newStatus === 'part_pending' && (complaint.partDetails || complaint.partPendingVoiceUrl)) ||
-                      (update.newStatus === 'not_done' && (complaint.notDoneReason || complaint.notDoneVoiceUrl)) ||
-                      (update.newStatus === 'done' && (complaint.totalVisits != null || complaint.distanceTravelled != null || complaint.doneVoiceUrl))
-                    )) && (
+                    !isPartPendingCustom && !isNotDoneCustom && !isDoneCustom && !isClosedCustom && (
                       <p className="text-[11px] text-muted-foreground italic">No additional details recorded for this status update.</p>
                     )}
                 </div>

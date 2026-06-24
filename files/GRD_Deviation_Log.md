@@ -307,5 +307,19 @@ graph TD
   - **Scheduled/Reminders:** WA-02/03/04B/05/07 and WA-0X (repeaters) to chase SCs who haven't acted. Requires cron scheduler.
   - **Exclusions:** NO WhatsApp to customer on Done/Not Done/Part Pending. NO WhatsApp to SC on bill generation or confirm done.
 
+## Phase 15 — Timeline Snapshots & Card Details Refinements
+
+### DEV-GRD-029
+- **Phase:** 15
+- **GRD Section:** 7.2 (Status Flow) / 10.2 / 11.1 (Complaint detail views)
+- **Type:** ADDED
+- **Summary:** Implemented chronological historical snapshots for each timeline node in the Activity Timeline. Instead of older nodes overriding their contents with live/latest complaint values, they now store and render:
+  - **Done Node:** Snapshots of SC claimed petrol (`petrolSC`), visits, distance, SC done notes, closing voice, and proof photos. It only displays the petrol section if `petrolSC > 0`, and only lists extra charges requested by the SC.
+  - **Closed Node:** A custom final closure card showing Admin closing remarks, final locked petrol (`petrolFinal`) with clear source explanations, and a filtered extra charges list displaying only items that were rejected or edited (amount changed) by the Admin.
+  - **Part Pending Node:** Snapshot of requested part details and the specific dispatch (`partDeliveredAt`/`partDeliveredNote`) and receipt (`partReceivedAt`) records linked to that request cycle.
+  - **Not Done Node:** Snapshots of not done reasons, closing notes, voice note, and proof photos.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

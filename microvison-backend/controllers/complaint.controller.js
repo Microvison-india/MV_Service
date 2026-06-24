@@ -882,7 +882,7 @@ const updateStatus = async (req, res) => {
 
   await complaint.save();
 
-  await ComplaintUpdate.create({
+  const updateData = {
     complaintId: complaint._id,
     updatedBy: req.user.id,
     role: 'service_centre',
@@ -891,7 +891,26 @@ const updateStatus = async (req, res) => {
     note: timelineNote,
     images: photos,
     voiceUrl: timelineVoiceUrl,
-  });
+    scNotes: scNotes ? scNotes.trim() : '',
+  };
+
+  if (newStatus === 'part_pending') {
+    updateData.partDetails = partDetails ? partDetails.trim() : '';
+  } else if (newStatus === 'not_done') {
+    updateData.notDoneReason = notDoneReason ? notDoneReason.trim() : '';
+  } else if (newStatus === 'done') {
+    if (totalVisits != null && totalVisits !== '') {
+      updateData.totalVisits = Number(totalVisits);
+    }
+    if (distanceTravelled != null && distanceTravelled !== '') {
+      updateData.distanceTravelled = Number(distanceTravelled);
+    }
+    updateData.petrolAdmin = complaint.petrolAdmin;
+    updateData.petrolSC = complaint.petrolSC;
+    updateData.extraCharges = complaint.extraCharges;
+  }
+
+  await ComplaintUpdate.create(updateData);
 
   res.status(200).json({ message: `Complaint status updated to ${newStatus}.`, complaint });
 };
@@ -966,6 +985,11 @@ const confirmDone = async (req, res) => {
     oldStatus,
     newStatus: 'closed',
     note: req.body.note ? req.body.note.trim() : 'Admin confirmed and closed the job.',
+    petrolAdmin: complaint.petrolAdmin,
+    petrolSC: complaint.petrolSC,
+    petrolFinal: complaint.petrolFinal,
+    extraCharges: complaint.extraCharges,
+    scNotes: complaint.scNotes || '',
   });
 
   res.status(200).json({ message: 'Complaint confirmed and closed.', complaint });
@@ -1154,10 +1178,28 @@ const markPartDelivered = async (req, res) => {
   }
 
   // Update delivered state (does NOT change the status)
-  complaint.partDeliveredAt = new Date();
-  complaint.partDeliveredNote = note ? note.trim() : '';
+  const deliveredAt = new Date();
+  const deliveredNote = note ? note.trim() : '';
+  
+  complaint.partDeliveredAt = deliveredAt;
+  complaint.partDeliveredNote = deliveredNote;
 
   await complaint.save();
+
+  // Find the latest SC part_pending update to attach these delivery details snapshot
+  const lastPartPendingUpdate = await ComplaintUpdate.findOne({
+    complaintId: complaint._id,
+    newStatus: 'part_pending',
+    role: 'service_centre',
+  }).sort({ createdAt: -1 });
+
+  let parentUpdateId = null;
+  if (lastPartPendingUpdate) {
+    lastPartPendingUpdate.partDeliveredAt = deliveredAt;
+    lastPartPendingUpdate.partDeliveredNote = deliveredNote;
+    await lastPartPendingUpdate.save();
+    parentUpdateId = lastPartPendingUpdate._id;
+  }
 
   // Find Service Centre to get their phone number
   const sc = await ServiceCentre.findById(complaint.assignedCentreId);
@@ -1180,6 +1222,9 @@ const markPartDelivered = async (req, res) => {
     oldStatus: 'part_pending',
     newStatus: 'part_pending', // status stays part_pending
     note: `Admin marked Part/Unit as Delivered. Note: ${note ? note.trim() : 'None'}`,
+    parentUpdateId,
+    partDeliveredAt: deliveredAt,
+    partDeliveredNote: deliveredNote,
   });
 
   res.status(200).json({ message: 'Part/unit marked as delivered. WhatsApp sent to Service Centre.', complaint });
@@ -1212,10 +1257,25 @@ const markPartReceived = async (req, res) => {
   }
 
   const oldStatus = complaint.status;
+  const receivedAt = new Date();
   complaint.status = 'part_received';
-  complaint.partReceivedAt = new Date();
+  complaint.partReceivedAt = receivedAt;
 
   await complaint.save();
+
+  // Find the latest SC part_pending update to attach this receipt snapshot
+  const lastPartPendingUpdate = await ComplaintUpdate.findOne({
+    complaintId: complaint._id,
+    newStatus: 'part_pending',
+    role: 'service_centre',
+  }).sort({ createdAt: -1 });
+
+  let parentUpdateId = null;
+  if (lastPartPendingUpdate) {
+    lastPartPendingUpdate.partReceivedAt = receivedAt;
+    await lastPartPendingUpdate.save();
+    parentUpdateId = lastPartPendingUpdate._id;
+  }
 
   // Record timeline entry
   await ComplaintUpdate.create({
@@ -1225,6 +1285,8 @@ const markPartReceived = async (req, res) => {
     oldStatus,
     newStatus: 'part_received',
     note: 'SC marked Part/Unit as Received.',
+    parentUpdateId,
+    partReceivedAt: receivedAt,
   });
 
   res.status(200).json({ message: 'Part/unit marked as received successfully.', complaint });
