@@ -143,7 +143,7 @@ const reopenComplaint = async (req, res) => {
       reopenNotes: reopenNotes.trim(),
       reopenPhotos: reopenPhotos || [],
       
-      status: 'new',
+      status: 'unassigned',
       createdBy: req.user.id,
     });
 
@@ -153,7 +153,7 @@ const reopenComplaint = async (req, res) => {
       updatedBy: req.user.id,
       role: 'admin',
       oldStatus: '',
-      newStatus: 'new',
+      newStatus: 'unassigned',
       note: `Complaint reopened from ${parent.complaintId}. Reopen notes: ${reopenNotes.trim()}`,
     });
 
@@ -179,8 +179,7 @@ const reopenComplaint = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// @desc    Create a new complaint (status = 'new', no SC assigned yet)
-// @desc    Create a new complaint (status = 'new', no SC assigned yet)
+// @desc    Create a new complaint (status = 'unassigned', no SC assigned yet)
 // @route   POST /api/complaints
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
@@ -392,7 +391,7 @@ const createComplaint = async (req, res) => {
     reopenParentId: isReopened ? reopenParentId : null,
     reopenNotes: isReopened ? reopenNotes : '',
     reopenPhotos: isReopened && Array.isArray(reopenPhotos) ? reopenPhotos : [],
-    status: 'new',
+    status: 'unassigned',
     createdBy: req.user.id,
   });
 
@@ -415,7 +414,7 @@ const createComplaint = async (req, res) => {
     updatedBy: req.user.id,
     role: 'admin',
     oldStatus: '',
-    newStatus: 'new',
+    newStatus: 'unassigned',
     note: isReopened ? `Complaint reopened. Notes: ${reopenNotes}` : 'Complaint registered.',
   });
 
@@ -464,8 +463,8 @@ const assignComplaint = async (req, res) => {
     return res.status(404).json({ message: 'Complaint not found.' });
   }
 
-  // Only allow assigning if status is 'new' or 're-assigning' after 'rejected_by_sc'
-  if (!['new', 'rejected_by_sc'].includes(complaint.status)) {
+  // Only allow assigning if status is 'unassigned', 'new' or 're-assigning' after 'rejected_by_sc'
+  if (!['unassigned', 'new', 'rejected_by_sc'].includes(complaint.status)) {
     return res.status(400).json({
       message: `Cannot assign a complaint with status '${complaint.status}'.`,
     });
@@ -1145,18 +1144,26 @@ const getActionItems = async (req, res) => {
     .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
 
+  // 6. Unassigned Complaints (New/reopened complaints with no SC assigned)
+  const unassignedComplaints = await Complaint.find({
+    status: 'unassigned'
+  })
+    .sort({ createdAt: -1 });
+
   res.status(200).json({
     pendingSCRegistrations,
     pendingConfirmations,
     rejectedBySC,
     pendingExtraApprovals,
     partPendingComplaints,
+    unassignedComplaints,
     counts: {
       pendingSCRegistrations: pendingSCRegistrations.length,
       pendingConfirmations: pendingConfirmations.length,
       rejectedBySC: rejectedBySC.length,
       pendingExtraApprovals: pendingExtraApprovals.length,
       partPendingComplaints: partPendingComplaints.length,
+      unassignedComplaints: unassignedComplaints.length,
     }
   });
 };
@@ -1303,6 +1310,7 @@ const getAllComplaints = async (req, res) => {
       page = 1,
       limit = 10,
       search,
+      q,
       city,
       district,
       state,
@@ -1315,21 +1323,36 @@ const getAllComplaints = async (req, res) => {
       dateFrom,
       dateTo,
       isReopened,
+      reopenedOnly,
+      originalOnly,
       serialNumber,
       trackingId
     } = req.query;
 
     const query = {};
 
-    // 1. Text Search (customerName, phone1, phone2, complaintId)
-    if (search) {
-      const searchRegex = new RegExp(search.trim(), 'i');
-      const complaintPattern = makeComplaintIdPattern(search);
+    // 1. Text Search (customerName, phone1, phone2, complaintId, product serialNumber, product trackingId)
+    const term = q || search;
+    if (term) {
+      const searchRegex = new RegExp(term.trim(), 'i');
+      const complaintPattern = makeComplaintIdPattern(term);
+      
+      // Query Product to find matching serialNumber or trackingId
+      const Product = require('../models/Product');
+      const matchingProducts = await Product.find({
+        $or: [
+          { serialNumber: searchRegex },
+          { trackingId: searchRegex }
+        ]
+      }).select('_id').lean();
+      const productIds = matchingProducts.map(p => p._id);
+
       query.$or = [
         { customerName: searchRegex },
         { phone1: searchRegex },
         { phone2: searchRegex },
         { complaintId: { $regex: complaintPattern, $options: 'i' } },
+        { trackingId: { $in: productIds } }
       ];
     }
 
@@ -1373,8 +1396,12 @@ const getAllComplaints = async (req, res) => {
       }
     }
 
-    // 7. Reopened flag filter
-    if (isReopened !== undefined) {
+    // 7. Reopened flag filter (handles reopenedOnly, originalOnly, and legacy isReopened)
+    if (reopenedOnly === 'true') {
+      query.isReopened = true;
+    } else if (originalOnly === 'true') {
+      query.isReopened = { $ne: true };
+    } else if (isReopened !== undefined) {
       query.isReopened = isReopened === 'true';
     }
 

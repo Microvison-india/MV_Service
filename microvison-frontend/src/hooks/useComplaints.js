@@ -29,7 +29,13 @@ export default function useComplaints(filters) {
         const params = new URLSearchParams();
         Object.entries(filters).forEach(([k, v]) => {
           if (v !== undefined && v !== null && v !== '') {
-            params.append(k, v);
+            if (k === 'status' && Array.isArray(v)) {
+              if (v.length > 0) {
+                params.append(k, v.join(','));
+              }
+            } else {
+              params.append(k, v);
+            }
           }
         });
 

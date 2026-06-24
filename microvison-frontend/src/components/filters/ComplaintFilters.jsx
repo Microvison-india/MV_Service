@@ -17,7 +17,7 @@ const WARRANTY_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'new', label: 'New' },
+  { value: 'unassigned', label: 'Unassigned' },
   { value: 'assigned', label: 'Assigned' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'rejected_by_sc', label: 'Rejected by SC' },
@@ -25,7 +25,7 @@ const STATUS_OPTIONS = [
   { value: 'done', label: 'Done' },
   { value: 'not_done', label: 'Not Done' },
   { value: 'part_pending', label: 'Part Pending' },
-  { value: 'replacement', label: 'Replacement' },
+  { value: 'part_received', label: 'Part Received' },
   { value: 'reopened', label: 'Reopened' },
   { value: 'closed', label: 'Closed' },
 ];
@@ -45,8 +45,10 @@ const labelCls = 'text-xs font-semibold text-muted-foreground uppercase tracking
 export default function ComplaintFilters({ filters, onChange }) {
   const [cities, setCities] = useState([]);
   const [scs, setScs] = useState([]);
-  const [searchInput, setSearchInput] = useState(filters.search || '');
+  const [qInput, setQInput] = useState(filters.q || '');
   const [showAdvanceFilters, setShowAdvanceFilters] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [activeDateShortcut, setActiveDateShortcut] = useState('');
 
   // Load cities and active service centres
   useEffect(() => {
@@ -59,10 +61,52 @@ export default function ComplaintFilters({ filters, onChange }) {
   // Debounce search input (300ms)
   useEffect(() => {
     const timer = setTimeout(() => {
-      onChange({ ...filters, search: searchInput, page: 1 });
+      onChange({ ...filters, q: qInput, page: 1 });
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchInput]);
+  }, [qInput]);
+
+  // Keep input in sync with external changes (like Reset)
+  useEffect(() => {
+    setQInput(filters.q || '');
+  }, [filters.q]);
+
+  // Format date helper (YYYY-MM-DD)
+  const getLocalYYYYMMDD = (date) => {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60 * 1000);
+    return localDate.toISOString().split('T')[0];
+  };
+
+  // Sync date shortcuts with actual date filters
+  useEffect(() => {
+    if (!filters.dateFrom && !filters.dateTo) {
+      setActiveDateShortcut('');
+      return;
+    }
+    const today = getLocalYYYYMMDD(new Date());
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = getLocalYYYYMMDD(yesterday);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = getLocalYYYYMMDD(sevenDaysAgo);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = getLocalYYYYMMDD(thirtyDaysAgo);
+
+    if (filters.dateFrom === today && filters.dateTo === today) {
+      setActiveDateShortcut('today');
+    } else if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) {
+      setActiveDateShortcut('yesterday');
+    } else if (filters.dateFrom === sevenDaysAgoStr && filters.dateTo === today) {
+      setActiveDateShortcut('7days');
+    } else if (filters.dateFrom === thirtyDaysAgoStr && filters.dateTo === today) {
+      setActiveDateShortcut('30days');
+    } else {
+      setActiveDateShortcut('custom');
+    }
+  }, [filters.dateFrom, filters.dateTo]);
 
   // Derived location arrays
   const uniqueStates = [...new Set(cities.map((c) => c.state))].sort();
@@ -115,11 +159,55 @@ export default function ComplaintFilters({ filters, onChange }) {
     }
   };
 
+  const handleStatusToggle = (val) => {
+    const current = filters.status || [];
+    let next;
+    if (current.includes(val)) {
+      next = current.filter((x) => x !== val);
+    } else {
+      next = [...current, val];
+    }
+    onChange({ ...filters, status: next, page: 1 });
+  };
+
+  const handleDateShortcut = (shortcut) => {
+    if (activeDateShortcut === shortcut) {
+      setActiveDateShortcut('');
+      onChange({ ...filters, dateFrom: '', dateTo: '', page: 1 });
+      return;
+    }
+
+    setActiveDateShortcut(shortcut);
+    const today = new Date();
+    
+    if (shortcut === 'today') {
+      const todayStr = getLocalYYYYMMDD(today);
+      onChange({ ...filters, dateFrom: todayStr, dateTo: todayStr, page: 1 });
+    } else if (shortcut === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      const yesterdayStr = getLocalYYYYMMDD(yesterday);
+      onChange({ ...filters, dateFrom: yesterdayStr, dateTo: yesterdayStr, page: 1 });
+    } else if (shortcut === '7days') {
+      const prev = new Date();
+      prev.setDate(today.getDate() - 7);
+      onChange({ ...filters, dateFrom: getLocalYYYYMMDD(prev), dateTo: getLocalYYYYMMDD(today), page: 1 });
+    } else if (shortcut === '30days') {
+      const prev = new Date();
+      prev.setDate(today.getDate() - 30);
+      onChange({ ...filters, dateFrom: getLocalYYYYMMDD(prev), dateTo: getLocalYYYYMMDD(today), page: 1 });
+    } else if (shortcut === 'custom') {
+      // Keep values as custom
+    } else {
+      onChange({ ...filters, dateFrom: '', dateTo: '', page: 1 });
+    }
+  };
+
   const handleReset = () => {
-    setSearchInput('');
+    setQInput('');
     onChange({
-      search: '',
-      status: '',
+      q: '',
+      status: [],
       product: '',
       complaintType: '',
       warrantyStatus: '',
@@ -130,12 +218,32 @@ export default function ComplaintFilters({ filters, onChange }) {
       scCapability: '',
       dateFrom: '',
       dateTo: '',
-      isReopened: '',
+      reopenedOnly: '',
+      originalOnly: '',
       trackingId: '',
       serialNumber: '',
       page: 1,
+      limit: 10,
     });
   };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (filters.state) count++;
+    if (filters.district) count++;
+    if (filters.trackingId) count++;
+    if (filters.serialNumber) count++;
+    if (filters.city) count++;
+    if (filters.complaintType) count++;
+    if (filters.warrantyStatus) count++;
+    if (filters.scCapability) count++;
+    if (filters.assignedCentreId) count++;
+    if (filters.reopenedOnly || filters.originalOnly) count++;
+    if (filters.dateFrom || filters.dateTo) count++;
+    return count;
+  };
+
+  const activeFiltersCount = getActiveFiltersCount();
 
   return (
     <div className="bg-card border border-border rounded-xl p-5 mb-6 shadow-sm">
@@ -146,27 +254,57 @@ export default function ComplaintFilters({ filters, onChange }) {
           <label className={labelCls}>Search Complaints</label>
           <input
             type="text"
-            placeholder="Name, phone, or complaint ID..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name, phone, complaint ID, serial no, product ID..."
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
             className={inputCls}
           />
         </div>
 
-        {/* Status */}
+        {/* Status Dropdown (Multi-Select Checkboxes) */}
         <div className="md:col-span-3 space-y-1.5">
           <label className={labelCls}>Status</label>
-          <select
-            name="status"
-            value={filters.status || ''}
-            onChange={handleSelect}
-            className={selectCls}
-          >
-            <option value="">All Statuses</option>
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              className={`${selectCls} flex items-center justify-between text-left`}
+            >
+              <span>
+                {filters.status?.length > 0
+                  ? `Status (${filters.status.length} selected)`
+                  : 'All Statuses'}
+              </span>
+              <span className="text-xs text-muted-foreground">▾</span>
+            </button>
+            {statusDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setStatusDropdownOpen(false)}
+                />
+                <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-md z-20 p-2 space-y-1">
+                  {STATUS_OPTIONS.map((o) => {
+                    const checked = filters.status?.includes(o.value);
+                    return (
+                      <label
+                        key={o.value}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted text-sm cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleStatusToggle(o.value)}
+                          className="rounded border-input text-primary focus:ring-ring"
+                        />
+                        <span>{o.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Product */}
@@ -192,14 +330,16 @@ export default function ComplaintFilters({ filters, onChange }) {
             onClick={() => setShowAdvanceFilters(!showAdvanceFilters)}
             className="flex-1 py-2 text-sm font-semibold rounded-lg border border-border hover:bg-muted transition text-foreground"
           >
-            {showAdvanceFilters ? 'Hide Filters ▴' : 'More Filters ▾'}
+            {showAdvanceFilters
+              ? 'Hide Filters ▴'
+              : `More Filters ${activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''} ▾`}
           </button>
           <button
             type="button"
             onClick={handleReset}
             className="px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground transition underline"
           >
-            Reset
+            Reset All
           </button>
         </div>
       </div>
@@ -245,7 +385,7 @@ export default function ComplaintFilters({ filters, onChange }) {
             <input
               type="text"
               name="trackingId"
-              placeholder="e.g. PL000001 / PT-000001"
+              placeholder="e.g. PL000001"
               value={filters.trackingId || ''}
               onChange={handleSelect}
               className={inputCls}
@@ -349,39 +489,73 @@ export default function ComplaintFilters({ filters, onChange }) {
           <div className="space-y-1.5">
             <label className={labelCls}>Reopen Status</label>
             <select
-              name="isReopened"
-              value={filters.isReopened || ''}
-              onChange={handleSelect}
+              name="reopenStatus"
+              value={filters.reopenedOnly === 'true' ? 'reopened' : filters.originalOnly === 'true' ? 'original' : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'reopened') {
+                  onChange({ ...filters, reopenedOnly: 'true', originalOnly: '', page: 1 });
+                } else if (val === 'original') {
+                  onChange({ ...filters, reopenedOnly: '', originalOnly: 'true', page: 1 });
+                } else {
+                  onChange({ ...filters, reopenedOnly: '', originalOnly: '', page: 1 });
+                }
+              }}
               className={selectCls}
             >
               <option value="">All Complaints</option>
-              <option value="true">Reopened Only</option>
-              <option value="false">New Complaints Only</option>
+              <option value="reopened">Reopened Only</option>
+              <option value="original">Original Only</option>
             </select>
           </div>
 
-          {/* Date From */}
-          <div className="space-y-1.5">
-            <label className={labelCls}>From Date</label>
-            <input
-              type="date"
-              name="dateFrom"
-              value={filters.dateFrom || ''}
-              onChange={handleSelect}
-              className={inputCls}
-            />
-          </div>
-
-          {/* Date To */}
-          <div className="space-y-1.5">
-            <label className={labelCls}>To Date</label>
-            <input
-              type="date"
-              name="dateTo"
-              value={filters.dateTo || ''}
-              onChange={handleSelect}
-              className={inputCls}
-            />
+          {/* Date Range & Shortcut Buttons */}
+          <div className="space-y-1.5 col-span-1 sm:col-span-2">
+            <label className={labelCls}>Date Range</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {[
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: '7days', label: 'Last 7 Days' },
+                { id: '30days', label: 'Last 30 Days' },
+                { id: 'custom', label: 'Custom' },
+              ].map((btn) => {
+                const isActive = activeDateShortcut === btn.id;
+                return (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => handleDateShortcut(btn.id)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md border transition ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                        : 'bg-background text-muted-foreground border-input hover:bg-muted'
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                );
+              })}
+            </div>
+            {activeDateShortcut === 'custom' && (
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  name="dateFrom"
+                  value={filters.dateFrom || ''}
+                  onChange={handleSelect}
+                  className={inputCls}
+                />
+                <span className="self-center text-muted-foreground text-xs font-medium">to</span>
+                <input
+                  type="date"
+                  name="dateTo"
+                  value={filters.dateTo || ''}
+                  onChange={handleSelect}
+                  className={inputCls}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -82,6 +82,7 @@ const complaintSchema = new mongoose.Schema(
       type: String,
       enum: [
         'new',
+        'unassigned',
         'assigned',
         'accepted',
         'rejected_by_sc',

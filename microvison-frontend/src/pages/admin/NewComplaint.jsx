@@ -14,7 +14,7 @@ const STEPS = [
 ];
 
 // Validate current step before allowing Next
-const validateStep = (step, formData, reopenData) => {
+const validateStep = (step, formData) => {
   if (step === 1) {
     if (!formData.customerName?.trim()) return 'Customer name is required.';
     if (!formData.phone1?.trim()) return 'Phone number 1 is required.';
@@ -102,7 +102,7 @@ export default function NewComplaint() {
   });
 
   const goNext = () => {
-    const error = validateStep(currentStep, formData, reopenData);
+    const error = validateStep(currentStep, formData);
     if (error) {
       setStepError(error);
       return;
@@ -116,9 +116,9 @@ export default function NewComplaint() {
     setCurrentStep((prev) => prev - 1);
   };
 
-  // Final submit: create complaint then immediately assign it
-  const handleSubmit = async () => {
-    if (!formData.selectedSCId) {
+  // Final submit: create complaint and optionally assign it
+  const handleSubmit = async (skipAssign = false) => {
+    if (!skipAssign && !formData.selectedSCId) {
       setSubmitError('Please select a service centre.');
       return;
     }
@@ -162,19 +162,24 @@ export default function NewComplaint() {
         reopenPhotos: reopenData.reopenPhotos,
       };
 
-      // Step A: Create the complaint (status = 'new')
+      // Step A: Create the complaint (status = 'unassigned')
       const { data: createData } = await api.post('/api/complaints', payload);
       const complaintDbId = createData.complaint._id;
       const complaintId = createData.complaint.complaintId;
 
-      // Step B: Immediately assign to selected SC (status = 'assigned')
-      await api.patch(`/api/complaints/${complaintDbId}/assign`, {
-        serviceCentreId: formData.selectedSCId,
-      });
+      if (!skipAssign && formData.selectedSCId) {
+        // Step B: Immediately assign to selected SC (status = 'assigned')
+        await api.patch(`/api/complaints/${complaintDbId}/assign`, {
+          serviceCentreId: formData.selectedSCId,
+        });
+      }
 
-      // Success — redirect to complaints list (to be built in a future route)
-      // For now, go back to Admin dashboard with a success param
-      navigate('/admin', { state: { successMessage: `Complaint ${complaintId} created and assigned successfully!` } });
+      // Success message varies depending on whether SC was assigned
+      const successMessage = !skipAssign && formData.selectedSCId
+        ? `Complaint ${complaintId} created and assigned successfully!`
+        : `Complaint ${complaintId} created as Unassigned. Assign an SC from the Action Centre.`;
+
+      navigate('/admin', { state: { successMessage } });
 
     } catch (err) {
       setSubmitError(err.response?.data?.message || 'Failed to create complaint. Please try again.');

@@ -315,25 +315,25 @@
 
 ---
 
-- [ ] **Phase 19 — Skip SC Assignment + Advanced Complaint Search (v1.3 Change 1)**
+- [x] **Phase 19 — Skip SC Assignment + Advanced Complaint Search (v1.3 Change 1)**
   > Source: `Microvison_System_Changes_v1.3.md` — Change 1A and 1B. The complaint form gains a "Skip — Assign Later" path, creating a new `unassigned` status. The All Complaints search is rebuilt as a unified 5-field top bar + multi-filter system with AND logic.
 
   **A. Backend — New `unassigned` Status & Skip Assignment Flow**
-  - [ ] `models/Complaint.js` — Add `unassigned` to the status enum (before `assigned` in the list). New status lifecycle: `unassigned` → `assigned` → existing flow.
-  - [ ] `controllers/complaint.controller.js` — Update `createComplaint`: if no `assignedCentreId` is provided in request body, set `status = 'unassigned'` and skip SC assignment and WA-01. Complaint is created and saved normally with no SC linked.
-  - [ ] `controllers/complaint.controller.js` — Update `assignComplaint` (currently `PATCH /:id/assign`): allow assigning from `unassigned` status (in addition to `new`). When assigning from `unassigned`, status moves to `assigned`, `assignedCentreId` and `assignedAt` are set, ComplaintUpdate log entry created, and WA-01 fires immediately (same as normal assignment). No change needed for re-assignment from `rejected_by_sc`.
-  - [ ] `controllers/complaint.controller.js` — Update `getActionItems`: add a new section that counts and surfaces `unassigned` complaints. Admin Action Centre must show these as a separate group requiring attention.
-  - [ ] `routes/complaint.routes.js` — No new routes needed; existing `POST /complaints` and `PATCH /:id/assign` are updated to handle the new flow.
+  - [x] `models/Complaint.js` — Add `unassigned` to the status enum (before `assigned` in the list). New status lifecycle: `unassigned` → `assigned` → existing flow.
+  - [x] `controllers/complaint.controller.js` — Update `createComplaint`: if no `assignedCentreId` is provided in request body, set `status = 'unassigned'` and skip SC assignment and WA-01. Complaint is created and saved normally with no SC linked.
+  - [x] `controllers/complaint.controller.js` — Update `assignComplaint` (currently `PATCH /:id/assign`): allow assigning from `unassigned` status (in addition to `new`). When assigning from `unassigned`, status moves to `assigned`, `assignedCentreId` and `assignedAt` are set, ComplaintUpdate log entry created, and WA-01 fires immediately (same as normal assignment). No change needed for re-assignment from `rejected_by_sc`.
+  - [x] `controllers/complaint.controller.js` — Update `getActionItems`: add a new section that counts and surfaces `unassigned` complaints. Admin Action Centre must show these as a separate group requiring attention.
+  - [x] `routes/complaint.routes.js` — No new routes needed; existing `POST /complaints` and `PATCH /:id/assign` are updated to handle the new flow.
 
   **B. Backend — Advanced Search & Filter Expansion**
-  - [ ] `controllers/complaint.controller.js` — Update `getAll` to support unified search across 5 fields simultaneously via a single `q=` query parameter:
+  - [x] `controllers/complaint.controller.js` — Update `getAll` to support unified search across 5 fields simultaneously via a single `q=` query parameter:
     - Search `customerName` (regex, case-insensitive, partial)
     - Search `phone1` OR `phone2` (partial match)
     - Search `complaintId` (partial match via loose alphanumeric regex — handles new and legacy ID formats)
     - Search `serialNumber` on the linked `Product` record (join via `trackingId`)
     - Search `trackingId` on the linked `Product` record
     - Build a single `$or` clause combining all 5 conditions and apply it as part of the existing AND-filter chain.
-  - [ ] `controllers/complaint.controller.js` — Ensure `getAll` already supports all filter params listed in v1.3 Change 1B. Add any missing ones:
+  - [x] `controllers/complaint.controller.js` — Ensure `getAll` already supports all filter params listed in v1.3 Change 1B. Add any missing ones:
     - `status` — already exists but must now support **comma-separated multi-status** (e.g. `status=done,not_done` → `{$in: ['done','not_done']}`)
     - `unassigned` status must be included as a valid status option in filter
     - `state=` filter (currently only `city` and `district` may exist — add `state=` param)
@@ -342,18 +342,18 @@
     - `originalOnly=true` — filter `isReopened: false` (or not set)
     - `dateFrom=` and `dateTo=` — already exists, verify it uses `createdAt` range correctly
     - Confirm: `product=`, `complaintType=`, `warrantyStatus=`, `assignedCentreId=`, `serialNumber=`, `trackingId=` — all already exist from Phases 7C and 10
-  - [ ] `routes/complaint.routes.js` — No new routes needed; `GET /complaints` passes all params through.
+  - [x] `routes/complaint.routes.js` — No new routes needed; `GET /complaints` passes all params through.
 
   **C. Frontend — Step 4 (now Step 5 after Phase 21) — Skip SC Assignment**
   > Note: After Phase 21 inserts a new Step 2, what was Step 4 (SC Assignment) becomes Step 5. Build this as Step 4 now; Step numbering is updated in Phase 21.
-  - [ ] `components/forms/Step4AssignSC.jsx` — Add a second path at the bottom of the step: a clearly styled `Skip — Assign Later` button (secondary/outline style, with a note: "You can assign an SC from the complaint detail view"). If clicked, no SC is selected, and the wizard submits without SC data.
-  - [ ] `pages/admin/NewComplaint.jsx` — Update the wizard submit logic: if `assignedCentreId` is null (skip was chosen), call only `POST /complaints` (no `PATCH /:id/assign`). Show success message indicating complaint is created as "Unassigned".
-  - [ ] `pages/admin/AllComplaints.jsx` — Add an `Unassigned` badge (amber/yellow) for complaints with `status = 'unassigned'`. Ensure `unassigned` is included as a selectable status in the filter list.
-  - [ ] `components/complaint/AdminComplaintDetail.jsx` — When complaint `status = 'unassigned'`: show an "Assign Service Centre" action button prominently at the top of the action panel. Clicking opens the SC picker (same component as Step4AssignSC). On confirmation, call `PATCH /:id/assign`. After successful assignment, the complaint moves to `assigned` and the WA-01 message fires.
-  - [ ] `pages/admin/ActionCentre.jsx` — Add a new dedicated section: "Unassigned Complaints" — shows complaints with `status = 'unassigned'`, each with an `Assign` button that opens the SC picker inline.
+  - [x] `components/forms/Step4AssignSC.jsx` — Add a second path at the bottom of the step: a clearly styled `Skip — Assign Later` button (secondary/outline style, with a note: "You can assign an SC from the complaint detail view"). If clicked, no SC is selected, and the wizard submits without SC data.
+  - [x] `pages/admin/NewComplaint.jsx` — Update the wizard submit logic: if `assignedCentreId` is null (skip was chosen), call only `POST /complaints` (no `PATCH /:id/assign`). Show success message indicating complaint is created as "Unassigned".
+  - [x] `pages/admin/AllComplaints.jsx` — Add an `Unassigned` badge (amber/yellow) for complaints with `status = 'unassigned'`. Ensure `unassigned` is included as a selectable status in the filter list.
+  - [x] `components/complaint/AdminComplaintDetail.jsx` — When complaint `status = 'unassigned'`: show an "Assign Service Centre" action button prominently at the top of the action panel. Clicking opens the SC picker (same component as Step4AssignSC). On confirmation, call `PATCH /:id/assign`. After successful assignment, the complaint moves to `assigned` and the WA-01 message fires.
+  - [x] `pages/admin/ActionCentre.jsx` — Add a new dedicated section: "Unassigned Complaints" — shows complaints with `status = 'unassigned'`, each with an `Assign` button that opens the SC picker inline.
 
   **D. Frontend — Advanced Search & Filter UI Rebuild**
-  - [ ] `components/filters/ComplaintFilters.jsx` — Full rebuild of the filter bar:
+  - [x] `components/filters/ComplaintFilters.jsx` — Full rebuild of the filter bar:
     - **Top search bar:** Single `<input>` that maps to the `q=` query param. Debounced 300ms. Placeholder: "Search by name, phone, complaint ID, serial no, product ID..."
     - **Status filter:** Replace single-select with multi-select dropdown (checkboxes inside a dropdown). Include `unassigned` as the first option. Shows selected count badge on the dropdown trigger.
     - **Date Range:** Replace any existing `dateFrom`/`dateTo` inputs with a date range picker offering quick shortcuts: `Today`, `Yesterday`, `Last 7 days`, `Last 30 days`, `Custom` (opens two date pickers).
@@ -364,11 +364,11 @@
     - Retain all existing filters: Product, Complaint Type, Warranty, Tracking ID, Serial Number.
     - **Active filter count badge:** Count of non-default filter values shown on the "Show/Hide Filters" toggle button.
     - **Reset All button:** Clears `q`, all filters, and date range back to defaults.
-  - [ ] `hooks/useComplaints.js` — Update to pass `q=`, multi-status array (joined as comma-separated string), `state=`, `scCapability=`, `reopenedOnly=`, and all new filter params to the API. Ensure debounce logic is applied only to `q` field.
+  - [x] `hooks/useComplaints.js` — Update to pass `q=`, multi-status array (joined as comma-separated string), `state=`, `scCapability=`, `reopenedOnly=`, and all new filter params to the API. Ensure debounce logic is applied only to `q` field.
 
   **E. Status Flow Map Update (for dev reference)**
-  - [ ] Updated lifecycle: `unassigned` → `assigned` → `accepted` or `rejected_by_sc` → ... (rest unchanged)
-  - [ ] `unassigned` → `assigned`: admin assigns from detail view or Action Centre. WA-01 fires on this transition (same as any assignment).
+  - [x] Updated lifecycle: `unassigned` → `assigned` → `accepted` or `rejected_by_sc` → ... (rest unchanged)
+  - [x] `unassigned` → `assigned`: admin assigns from detail view or Action Centre. WA-01 fires on this transition (same as any assignment).
 
 ---
 

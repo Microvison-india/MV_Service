@@ -154,22 +154,39 @@ export default function Step4AssignSC({ formData, setFormData, onSubmit, submitt
         </div>
       )}
 
-      {/* Submit Button */}
-      <div className="pt-4">
+      {/* Submit Button & Skip option */}
+      <div className="pt-4 space-y-3">
         <button
           id="step4-submit"
           type="button"
           disabled={!formData.selectedSCId || submitting}
-          onClick={onSubmit}
+          onClick={() => onSubmit(false)}
           className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           {submitting ? 'Submitting...' : 'Create & Assign Complaint'}
         </button>
         {!formData.selectedSCId && !loading && (
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            Select a service centre to enable submission.
+          <p className="text-xs text-muted-foreground text-center">
+            Select a service centre to enable assignment.
           </p>
         )}
+
+        <button
+          id="step4-skip"
+          type="button"
+          disabled={submitting}
+          onClick={() => {
+            setFormData((prev) => ({ ...prev, selectedSCId: null }));
+            onSubmit(true);
+          }}
+          className="w-full py-3 rounded-xl border border-input bg-background hover:bg-accent hover:text-accent-foreground font-semibold text-sm transition"
+        >
+          Skip — Assign Later
+        </button>
+        
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          You can assign an SC from the complaint detail view or Action Centre.
+        </p>
       </div>
     </div>
   );

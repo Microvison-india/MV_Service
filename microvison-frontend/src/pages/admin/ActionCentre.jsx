@@ -278,12 +278,62 @@ export default function ActionCentre() {
               </section>
             )}
 
+            {/* 5. Unassigned Complaints */}
+            {data.unassignedComplaints && data.unassignedComplaints.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-base font-semibold text-foreground">Unassigned Complaints</h2>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-500 text-white text-xs font-bold">
+                    {data.counts.unassignedComplaints}
+                  </span>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {data.unassignedComplaints.map((c) => (
+                    <div
+                      key={c._id}
+                      onClick={() => setSelectedComplaintId(c._id)}
+                      className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between gap-3 cursor-pointer hover:border-yellow-500/50 transition relative overflow-hidden group"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-bl-full pointer-events-none transition-colors group-hover:bg-yellow-500/10" />
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-mono text-muted-foreground">{c.complaintId}</span>
+                          <span className="bg-yellow-100 text-yellow-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                            Unassigned
+                          </span>
+                        </div>
+                        <p className="font-semibold text-foreground text-sm">{c.customerName} · {c.city}</p>
+                        <div className="flex gap-2 mt-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-medium border border-blue-100">
+                            {c.product === 'cooler' ? 'Cooler' : 'LED TV'}
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[10px] font-medium border border-gray-100">
+                            {c.complaintType === 'installation' ? 'Installation' : 'Complaint'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-border mt-1">
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          Created: {new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <span className="text-xs font-bold text-yellow-600 group-hover:text-yellow-700 transition flex items-center gap-1">
+                          Assign &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Empty State if absolutely nothing requires attention */}
             {data.counts.pendingSCRegistrations === 0 &&
              data.counts.pendingConfirmations === 0 &&
              data.counts.rejectedBySC === 0 &&
              data.counts.pendingExtraApprovals === 0 &&
-             (!data.counts.partPendingComplaints || data.counts.partPendingComplaints === 0) && (
+             (!data.counts.partPendingComplaints || data.counts.partPendingComplaints === 0) &&
+             (!data.counts.unassignedComplaints || data.counts.unassignedComplaints === 0) && (
               <div className="bg-card border border-border rounded-xl px-6 py-12 text-center">
                 <span className="text-4xl">🎉</span>
                 <h3 className="text-lg font-bold text-foreground mt-4">Inbox Zero!</h3>

@@ -127,7 +127,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   // Fetch candidate Service Centres for reassignment
   useEffect(() => {
     let active = true;
-    if (c && ['new', 'assigned', 'rejected_by_sc'].includes(c.status)) {
+    if (c && ['unassigned', 'new', 'assigned', 'rejected_by_sc'].includes(c.status)) {
       Promise.resolve().then(() => {
         if (active) setLoadingCandidates(true);
       });
@@ -1139,9 +1139,16 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 </div>
               )}
             </div>
-          ) : ['new', 'assigned', 'rejected_by_sc'].includes(c?.status) ? (
+          ) : ['unassigned', 'new', 'assigned', 'rejected_by_sc'].includes(c?.status) ? (
             <div className="space-y-3">
-              <p className="text-sm font-bold text-foreground uppercase tracking-wider">Assign Service Centre (Current Job)</p>
+              <p className="text-sm font-bold text-foreground uppercase tracking-wider">
+                {c?.status === 'unassigned' ? 'Assign Service Centre' : 'Assign Service Centre (Current Job)'}
+              </p>
+              {c?.status === 'unassigned' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3.5 text-yellow-800 text-sm font-medium flex items-center gap-2">
+                  <span>⚠ This complaint has no Service Centre assigned yet.</span>
+                </div>
+              )}
               {loadingCandidates ? (
                 <p className="text-sm text-muted-foreground animate-pulse">Loading matching service centres...</p>
               ) : candidates.length === 0 ? (
