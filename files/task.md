@@ -182,9 +182,10 @@
   - [x] `confirmDone` controller should only accept complaints in `done` status (not `not_done`, `part_pending`, or `replacement` — remove those from allowed statuses in the current controller)
 
   **I. Refine SC Assignment Logic & Locations**
-  - [ ] Refine SC Assignment Logic (Filter/limit "To whom we can assign" during complaint creation Step 4)
-  - [ ] Support custom/new cities/locations not in the pre-seeded master database list, allowing them to be added and marked active
-  - [ ] Add an optional `location` text field in Complaint creation Step 1 (Customer Info) and Product schemas, and display it in the customer profile
+  > ⚠ Items below are now fully superseded or expanded by Phase 19 (Skip SC), Phase 20 (Unregistered SC), and Phase 21 (New Step 2). See those phases for the definitive implementation spec.
+  - [ ] Refine SC Assignment Logic — now handled in Phase 19 (Step 5 of new 5-step form, with Skip option and capability filtering)
+  - [ ] Support custom/new cities/locations — now handled in Phase 20 (Section 2D, inline "Create new" from any city field)
+  - [x] Add optional `location` text field — addressed in Phase 21 (Section 3C, `locationText` field added to Step 1 `Step1CustomerInfo.jsx` and `Complaint` model)
 
 - [x] **Phase 9 — Admin Action Centre (Day 12-13)**
   - [x] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
@@ -272,6 +273,12 @@
   - No WhatsApp on admin Confirm Done or bill generation
   - No reminder to SC if admin marks Delivered but SC has not yet marked Received
 
+  **v1.3 Additions — Must be applied when building Phase 14**
+  > Source: `Microvison_System_Changes_v1.3.md` — Changes 1A, 2, and 3. These items modify or restrict existing WA triggers. Build them alongside the triggers they affect.
+  - [ ] **WA-01 content update (v1.3 Change 3 — Phase 21 dependency):** When implementing WA-01 in `assignComplaint`, include `Serial Number` and `Model Number` (if filled on the complaint/Product record) and `locationText` (if filled on the complaint) in the message body. These help the SC identify the physical unit and navigate to the customer. Admin-only fields (`billDate`, `billPhoto`, `shopName`) must NOT be included in WA-01 — they are internal records, never sent to the SC.
+  - [ ] **WA-01 suppression for Unregistered SC (v1.3 Change 2 — Phase 20 dependency):** Before firing WA-01 in `assignComplaint`, check if `assignedCentre.isUnregistered === true`. If yes: skip WA-01 entirely (admin contacts the SC manually). Same suppression applies to all SC-directed triggers: WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X. Only WA-04 to customer is exempt — it fires regardless of SC type.
+  - [ ] **Cron scheduler skip rule for Unregistered SC (v1.3 Change 2 — Phase 20 dependency):** In `utils/whatsappReminder.js` (the cron job), all DB queries that find complaints to send reminders to must add a filter: `assignedCentre.isUnregistered !== true`. This prevents reminder cycles from ever running on complaints assigned to unregistered SCs. Add this as a base `$match` condition on all cron reminder queries.
+
 - [ ] **Phase 15 — UI/UX Polish & Final Testing**
   - [ ] Improve overall UI flow and UX consistency
   - [ ] Comprehensive end-to-end testing
@@ -299,4 +306,322 @@
   - [x] Redeploy frontend and backend services
   - [x] Refactor CORS middleware in backend `server.js` to support both www and non-www origins dynamically
   - [x] Verify successful deployment and user login under custom domain
+
+---
+
+## System Changes v1.3 — New Phases
+
+> ⚠ Source document: `files/Microvison_System_Changes_v1.3.md`. These 4 changes introduce new statuses, a new complaint form step, an unregistered SC system, and a full billing payment tracker. They affect the backend models, controllers, routes, and multiple frontend pages and components. Build in order: Phase 19 → 20 → 21 → 22.
+
+---
+
+- [ ] **Phase 19 — Skip SC Assignment + Advanced Complaint Search (v1.3 Change 1)**
+  > Source: `Microvison_System_Changes_v1.3.md` — Change 1A and 1B. The complaint form gains a "Skip — Assign Later" path, creating a new `unassigned` status. The All Complaints search is rebuilt as a unified 5-field top bar + multi-filter system with AND logic.
+
+  **A. Backend — New `unassigned` Status & Skip Assignment Flow**
+  - [ ] `models/Complaint.js` — Add `unassigned` to the status enum (before `assigned` in the list). New status lifecycle: `unassigned` → `assigned` → existing flow.
+  - [ ] `controllers/complaint.controller.js` — Update `createComplaint`: if no `assignedCentreId` is provided in request body, set `status = 'unassigned'` and skip SC assignment and WA-01. Complaint is created and saved normally with no SC linked.
+  - [ ] `controllers/complaint.controller.js` — Update `assignComplaint` (currently `PATCH /:id/assign`): allow assigning from `unassigned` status (in addition to `new`). When assigning from `unassigned`, status moves to `assigned`, `assignedCentreId` and `assignedAt` are set, ComplaintUpdate log entry created, and WA-01 fires immediately (same as normal assignment). No change needed for re-assignment from `rejected_by_sc`.
+  - [ ] `controllers/complaint.controller.js` — Update `getActionItems`: add a new section that counts and surfaces `unassigned` complaints. Admin Action Centre must show these as a separate group requiring attention.
+  - [ ] `routes/complaint.routes.js` — No new routes needed; existing `POST /complaints` and `PATCH /:id/assign` are updated to handle the new flow.
+
+  **B. Backend — Advanced Search & Filter Expansion**
+  - [ ] `controllers/complaint.controller.js` — Update `getAll` to support unified search across 5 fields simultaneously via a single `q=` query parameter:
+    - Search `customerName` (regex, case-insensitive, partial)
+    - Search `phone1` OR `phone2` (partial match)
+    - Search `complaintId` (partial match via loose alphanumeric regex — handles new and legacy ID formats)
+    - Search `serialNumber` on the linked `Product` record (join via `trackingId`)
+    - Search `trackingId` on the linked `Product` record
+    - Build a single `$or` clause combining all 5 conditions and apply it as part of the existing AND-filter chain.
+  - [ ] `controllers/complaint.controller.js` — Ensure `getAll` already supports all filter params listed in v1.3 Change 1B. Add any missing ones:
+    - `status` — already exists but must now support **comma-separated multi-status** (e.g. `status=done,not_done` → `{$in: ['done','not_done']}`)
+    - `unassigned` status must be included as a valid status option in filter
+    - `state=` filter (currently only `city` and `district` may exist — add `state=` param)
+    - `scCapability=` — filter complaints where `assignedCentre.productCapability` equals given value (join on SC record)
+    - `reopenedOnly=true` — filter `isReopened: true`
+    - `originalOnly=true` — filter `isReopened: false` (or not set)
+    - `dateFrom=` and `dateTo=` — already exists, verify it uses `createdAt` range correctly
+    - Confirm: `product=`, `complaintType=`, `warrantyStatus=`, `assignedCentreId=`, `serialNumber=`, `trackingId=` — all already exist from Phases 7C and 10
+  - [ ] `routes/complaint.routes.js` — No new routes needed; `GET /complaints` passes all params through.
+
+  **C. Frontend — Step 4 (now Step 5 after Phase 21) — Skip SC Assignment**
+  > Note: After Phase 21 inserts a new Step 2, what was Step 4 (SC Assignment) becomes Step 5. Build this as Step 4 now; Step numbering is updated in Phase 21.
+  - [ ] `components/forms/Step4AssignSC.jsx` — Add a second path at the bottom of the step: a clearly styled `Skip — Assign Later` button (secondary/outline style, with a note: "You can assign an SC from the complaint detail view"). If clicked, no SC is selected, and the wizard submits without SC data.
+  - [ ] `pages/admin/NewComplaint.jsx` — Update the wizard submit logic: if `assignedCentreId` is null (skip was chosen), call only `POST /complaints` (no `PATCH /:id/assign`). Show success message indicating complaint is created as "Unassigned".
+  - [ ] `pages/admin/AllComplaints.jsx` — Add an `Unassigned` badge (amber/yellow) for complaints with `status = 'unassigned'`. Ensure `unassigned` is included as a selectable status in the filter list.
+  - [ ] `components/complaint/AdminComplaintDetail.jsx` — When complaint `status = 'unassigned'`: show an "Assign Service Centre" action button prominently at the top of the action panel. Clicking opens the SC picker (same component as Step4AssignSC). On confirmation, call `PATCH /:id/assign`. After successful assignment, the complaint moves to `assigned` and the WA-01 message fires.
+  - [ ] `pages/admin/ActionCentre.jsx` — Add a new dedicated section: "Unassigned Complaints" — shows complaints with `status = 'unassigned'`, each with an `Assign` button that opens the SC picker inline.
+
+  **D. Frontend — Advanced Search & Filter UI Rebuild**
+  - [ ] `components/filters/ComplaintFilters.jsx` — Full rebuild of the filter bar:
+    - **Top search bar:** Single `<input>` that maps to the `q=` query param. Debounced 300ms. Placeholder: "Search by name, phone, complaint ID, serial no, product ID..."
+    - **Status filter:** Replace single-select with multi-select dropdown (checkboxes inside a dropdown). Include `unassigned` as the first option. Shows selected count badge on the dropdown trigger.
+    - **Date Range:** Replace any existing `dateFrom`/`dateTo` inputs with a date range picker offering quick shortcuts: `Today`, `Yesterday`, `Last 7 days`, `Last 30 days`, `Custom` (opens two date pickers).
+    - **Cascading Location filter:** State → District → City selects (same 3-way cascade pattern used in forms; source data from cities API).
+    - **Assigned SC filter:** Dropdown of all SC names (registered + unregistered). Maps to `assignedCentreId=`.
+    - **SC Capability filter:** Single select `All / LED Only / Cooler Only / Both`. Maps to `scCapability=`.
+    - **Reopen Status filter:** Single select `All / Reopened Only / Original Only`. Maps to `reopenedOnly=true/false`.
+    - Retain all existing filters: Product, Complaint Type, Warranty, Tracking ID, Serial Number.
+    - **Active filter count badge:** Count of non-default filter values shown on the "Show/Hide Filters" toggle button.
+    - **Reset All button:** Clears `q`, all filters, and date range back to defaults.
+  - [ ] `hooks/useComplaints.js` — Update to pass `q=`, multi-status array (joined as comma-separated string), `state=`, `scCapability=`, `reopenedOnly=`, and all new filter params to the API. Ensure debounce logic is applied only to `q` field.
+
+  **E. Status Flow Map Update (for dev reference)**
+  - [ ] Updated lifecycle: `unassigned` → `assigned` → `accepted` or `rejected_by_sc` → ... (rest unchanged)
+  - [ ] `unassigned` → `assigned`: admin assigns from detail view or Action Centre. WA-01 fires on this transition (same as any assignment).
+
+---
+
+- [ ] **Phase 20 — Unregistered (Admin-Maintained) SC System (v1.3 Change 2)**
+  > Source: `Microvison_System_Changes_v1.3.md` — Change 2A through 2F. Introduces a new type of SC record with `isUnregistered: true`. These SCs have no portal login, no WhatsApp reminders sent to them, and all complaint updates are performed by the admin on their behalf. Includes inline city creation and an upgrade/linking flow when they later register formally.
+
+  **A. Backend — New Fields on ServiceCentre Model**
+  - [ ] `models/ServiceCentre.js` — Add new fields:
+    - `isUnregistered` (Boolean, default: `false`) — marks if this is an admin-created unregistered SC
+    - `linkedRegisteredSCId` (ref: ServiceCentre, optional) — populated when the unregistered SC is linked to a newly registered account during upgrade (Section 2F)
+    - `archivedAt` (Date, optional) — set when an unregistered SC is archived after upgrade (audit record)
+    - `isArchived` (Boolean, default: `false`) — hides the SC from active lists after upgrade
+  - [ ] `models/ServiceCentre.js` — The `status` field on unregistered SCs is always `active` by default (they skip the approval flow entirely). The `userId` field is `null` (no User/login record).
+
+  **B. Backend — Unregistered SC Creation Controller**
+  - [ ] `controllers/serviceCentre.controller.js` — Add `createUnregistered` handler:
+    - Accepts: `name` (businessName), `phone1` (required), `phone2` (optional), `city` (required), `district` (auto-filled or provided), `fullAddress` (optional), `productCapability` (optional, defaults to `both`)
+    - Creates a new `ServiceCentre` document with `isUnregistered: true`, `status: 'active'`, `userId: null`
+    - Does NOT create a `User` record — no login credentials
+    - Returns the new SC `_id` so the caller can immediately assign the complaint to it
+    - If `city` does not exist in the `cities` collection, create it on the spot (see Section 2D — inline city creation)
+  - [ ] `controllers/serviceCentre.controller.js` — Update `getAll` handler:
+    - Add `isUnregistered=true/false` query param filter. If not provided, return both registered and unregistered.
+    - Add a `registrationType=unregistered` filter option for the SC list page.
+  - [ ] `controllers/serviceCentre.controller.js` — Add `linkToRegistered` handler (Section 2F upgrade flow):
+    - Called by admin during SC registration approval
+    - Accepts: `unregisteredSCId` (the old record) and `newRegisteredSCId` (the newly created registered SC)
+    - Reassigns all `Complaint` records from `assignedCentreId = unregisteredSCId` → `assignedCentreId = newRegisteredSCId`
+    - Sets `unregisteredSC.isArchived = true`, `unregisteredSC.archivedAt = now`, `unregisteredSC.linkedRegisteredSCId = newRegisteredSCId`
+    - Removes `isUnregistered` flag from new SC (it's registered now)
+    - Does NOT delete old record — archived in place for audit
+  - [ ] `routes/serviceCentre.routes.js` — Add routes:
+    - `POST /service-centres/unregistered` → `createUnregistered` (admin only)
+    - `PATCH /service-centres/:id/link-to-registered` → `linkToRegistered` (admin only)
+
+  **C. Backend — Inline City / District / State Creation**
+  - [ ] `controllers/city.controller.js` — Add `createCity` handler:
+    - Accepts: `city` (name), `district`, `state` (all required)
+    - Checks if the city already exists (case-insensitive) — if yes, returns existing record (no duplicate)
+    - If new: creates a `City` document and returns it
+    - Accessible from admin only
+  - [ ] `routes/city.routes.js` — Add route: `POST /cities` → `createCity` (admin only)
+
+  **D. Backend — WhatsApp Logic for Unregistered SC**
+  - [ ] `controllers/complaint.controller.js` — Update `assignComplaint`:
+    - After assignment, check if `assignedCentre.isUnregistered === true`
+    - If `true`: skip WA-01 (do NOT send WhatsApp to SC). Log in ComplaintUpdate: "Assigned to Unregistered SC — WA-01 not sent. Admin to contact SC manually."
+    - WA-04 to customer still fires on SC acceptance (but since unregistered SC has no portal, admin marks `accepted` on their behalf — see frontend section)
+  - [ ] `controllers/complaint.controller.js` — Update `updateStatus`, `markGoing`, `accept`, `reject`, `markPartDelivered`, `markPartReceived`:
+    - When action is performed for a complaint assigned to an unregistered SC, suppress ALL SC-directed WhatsApp triggers (WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X). Only WA-04 to customer fires (on acceptance).
+    - Add a helper: `isUnregisteredSCComplaint(complaint)` — checks `complaint → assignedCentre.isUnregistered`. Use this before every WA trigger.
+  - [ ] `utils/whatsappReminder.js` (Phase 14 cron) — When built, ensure the cron queries skip complaints where `assignedCentre.isUnregistered === true` for all SC-directed reminder triggers.
+
+  **E. Frontend — SC Picker + Unregistered SC Creation Form**
+  - [ ] `components/forms/Step4AssignSC.jsx` (becomes Step5 after Phase 21) — Add a `+ Create Unregistered SC` button/link below the normal SC list. Clicking opens an inline modal/form with:
+    - Business Name / Name (required)
+    - Phone 1 (required), Phone 2 (optional)
+    - City (cascading dropdown with inline "Create new" option — see below), District (auto-filled), Full Address (optional)
+    - On submit: `POST /api/service-centres/unregistered` → get back new SC `_id` → set as `selectedSCId` → proceed to assign.
+  - [ ] `components/forms/Step4AssignSC.jsx` — SC list cards: show `UNREGISTERED` badge (amber) on any card where `isUnregistered: true`. Admin can select an existing unregistered SC from the list (for reuse — Section 2E).
+  - [ ] `components/complaint/AdminComplaintDetail.jsx` — Show `UNREGISTERED SC` badge prominently in the Assigned SC section header when the complaint is assigned to an unregistered SC. Add a persistent banner in the action panel: "This complaint is assigned to an Unregistered SC. All status updates must be made manually by admin."
+  - [ ] `components/complaint/AdminComplaintDetail.jsx` — For complaints assigned to unregistered SCs: unlock all status actions for the admin (Going, Done, Not Done, Part Pending, Mark Received). The admin can perform all these actions directly — they are normally SC-only actions. All actions go through the same backend endpoints as SC actions but are performed by the admin user.
+
+  **F. Frontend — Inline City Creation**
+  - [ ] All city dropdowns in the admin interface (SC creation, unregistered SC form, complaint registration Step 1) — when admin types a name that doesn't match any existing city, show an inline option: `'Create "[typed name]" as a new city'`. Clicking opens a small inline form: City Name (pre-filled), District Name, State Name. On confirm: `POST /api/cities` → new city returned → automatically selected in the dropdown. Instant system-wide availability.
+
+  **G. Frontend — SC List Page (Service Centres Tab)**
+  - [ ] `pages/admin/ServiceCentres.jsx` — Add filter: `Registration Type: All / Registered / Unregistered` (maps to `isUnregistered=true/false`). Ensure existing search (name, phone, city, district) also searches unregistered SC records.
+  - [ ] `pages/admin/ServiceCentres.jsx` — Show `UNREGISTERED` badge (amber) on SC cards/rows for `isUnregistered: true` SCs.
+
+  **H. Frontend — SC Registration Approval + Upgrade/Link Flow (Section 2F)**
+  - [ ] `pages/admin/ActionCentre.jsx` — In the "Pending SC Registrations" section, when the admin opens a new SC registration for approval:
+    - System checks if any unregistered SC records have a phone number match — if found, shows a suggestion banner: "An unregistered SC with phone [X] already exists — [Name], [City]. Would you like to link this registration to that record?" with `[Link]` and `[Skip]` buttons.
+    - `[Link]` button: triggers a search/picker allowing admin to find the correct unregistered SC by name, city, district, phone, or address (not phone-match only). Admin selects and confirms.
+    - On link confirm: call `PATCH /api/service-centres/:id/link-to-registered` with the unregistered SC ID and the new registration ID.
+    - On `[Skip]` or no match: approve normally — a brand new registered SC account is created with no link to any unregistered record.
+  - [ ] `pages/admin/ActionCentre.jsx` — Show the historical `UNREGISTERED SC` badge and admin-maintained markers in the complaint timeline even after upgrade (audit trail, read-only).
+
+---
+
+- [ ] **Phase 21 — New Step 2 (Product Info) + Warranty Logic Overhaul (v1.3 Change 3)**
+  > Source: `Microvison_System_Changes_v1.3.md` — Change 3A through 3G. Inserts a brand new Step 2 into the complaint registration form, shifting old Step 2 → Step 3, Step 3 → Step 4, Step 4 → Step 5. Step 2 collects Bill Date, Bill Photo, Shop Name, Serial Number, and Model Number. Warranty logic is completely overhauled with 4 priority rules. SC Done form gets demanded fields for missing product info.
+
+  **A. Backend — New Fields on Product Model**
+  - [ ] `models/Product.js` — Add new fields:
+    - `shopName` (String, optional) — name of shop/dealer where product was purchased
+    - `modelNumber` (String, optional) — product model/variant identifier
+    - `warrantyForceReason` (String, optional) — reason text when admin forces warranty override
+    - `missingFieldsWarning` (Array of String, optional) — list of Step 2 field names that were bypassed at closing without being filled (e.g. `['billDate', 'billPhoto', 'shopName']`). Used for persistent missing-field indicator.
+
+  **B. Backend — New Fields on Complaint Model**
+  - [ ] `models/Complaint.js` — Add new snapshot fields:
+    - `shopName` (String, optional) — snapshot of Product's shopName at time of this complaint
+    - `modelNumber` (String, optional) — snapshot of Product's modelNumber at time of this complaint
+    - `locationText` (String, optional) — paste-friendly Google Maps link or location description. Stored on Complaint (not Product — location can differ per visit). Sent to SC in WA-01.
+    - `warrantyForceReason` (String, optional) — snapshot of force override reason at time of this complaint (admin only)
+    - `scBillPhotoUrl` (String, optional) — URL of bill photo uploaded by SC in Done form (stored separately from Product's `billPhoto`)
+    - `scSerialSlipPhotoUrl` (String, optional) — URL of serial/model number sticker photo uploaded by SC in Done form (stored separately for admin to transcribe)
+    - `missingFieldsBypassed` (Array of String, optional) — list of fields the admin explicitly bypassed at closing time without filling
+
+  **C. Backend — Warranty Logic Overhaul in `warrantyCalculator.js`**
+  - [ ] `utils/warrantyCalculator.js` — Completely rewrite to implement 4 priority rules from v1.3 Section 3G:
+    - **Rule 1 (Bill Date present):** `warrantyExpiryDate = billDate + 3 years`. `warrantyStatus = 'in_warranty'` if `today <= warrantyExpiryDate`, else `'out_of_warranty'`. `warrantySource = 'auto_calculated'`. `forceReason = null`.
+    - **Rule 2 (No bill date, manual selection):** Accept `manualSelection` (`'in_warranty'` or `'out_of_warranty'`) and `manualReason` (required text). `warrantyStatus = manualSelection`. `warrantyExpiryDate = null`. `warrantySource = 'manual'`. `forceReason = null`.
+    - **Rule 3 (LED Installation, nothing provided):** `warrantyStatus = 'in_warranty'`. `warrantyExpiryDate = null`. `warrantySource = 'manual'`. (Safe default for new installs.)
+    - **Rule 4 (Force override):** Admin passes `forceOverride = true` + `forceReason` (required text). `warrantyStatus = forced value` (opposite of auto-calculated or whatever admin chose). `warrantySource = 'forced'`. `forceReason = admin's text`. This takes precedence over all other rules.
+    - Return shape: `{ warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }`.
+  - [ ] `utils/warrantyCalculator.js` — Ensure fresh calculation at complaint creation time even if `billDate` was previously stored: always re-evaluate `today vs warrantyExpiryDate` so expired products auto-show as `out_of_warranty` even if they were `in_warranty` last year.
+
+  **D. Backend — Update Product Controller for New Fields**
+  - [ ] `controllers/product.controller.js` — Update `createProduct` and `updateProduct` to accept and save `shopName`, `modelNumber`, `warrantyForceReason`, and `missingFieldsWarning` fields.
+  - [ ] `controllers/product.controller.js` — After saving/updating, run fresh `warrantyCalculator` with the latest `billDate` (if present) or manual values to update the Product record's warranty fields.
+
+  **E. Backend — Update Complaint Controller for New Fields + Step 2 Data**
+  - [ ] `controllers/complaint.controller.js` — Update `createComplaint`:
+    - Accept new Step 2 fields from request body: `shopName`, `modelNumber`, `locationText`, `warrantyForceReason`, and `forceOverride` flag.
+    - Pass all these to `warrantyCalculator` to determine final warranty values.
+    - Snapshot `shopName`, `modelNumber`, `locationText`, `warrantyForceReason` onto the Complaint document.
+    - Write `shopName`, `modelNumber` back to the Product record (update or create).
+    - If `locationText` is filled, include it in WA-01 message content (see Phase 14 note).
+  - [ ] `controllers/complaint.controller.js` — Update `confirmDone`:
+    - Before closing, check Product record's 5 Step 2 fields: `billDate`, `billPhoto`, `shopName`, `serialNumber`, `modelNumber`.
+    - If any are empty: if request contains `missingFieldsBypassed` array (admin confirmed bypass): save bypassed fields to `complaint.missingFieldsBypassed` AND add to `product.missingFieldsWarning[]` (append, don't overwrite). Then close normally.
+    - If `missingFieldsBypassed` is NOT provided and fields are missing: return a 400-level warning response with the list of missing fields — the frontend must show the warning dialog before re-submitting.
+  - [ ] `controllers/complaint.controller.js` — Update `updateStatus` (SC Done path):
+    - When `status = 'done'` is submitted by SC: check which of `billDate`, `billPhoto`, `shopName`, `serialNumber`, `modelNumber` are empty on the linked Product record.
+    - If `billDate`/`billPhoto`/`shopName` are missing: check if request body contains `scBillPhotoUrl` — if yes, save to `complaint.scBillPhotoUrl` AND update `product.billPhoto` with the new URL. Re-run warranty calculation for the Product record.
+    - If `serialNumber`/`modelNumber` are missing: check if request body contains `scSerialSlipPhotoUrl` — save to `complaint.scSerialSlipPhotoUrl` (stored on complaint for admin to view and transcribe).
+    - Store `bypassed` field names from SC request as `complaint.scMissingBypass[]` (records that SC intentionally skipped).
+
+  **F. Frontend — Insert New Step 2 (Product Info) into the Wizard**
+  - [ ] `pages/admin/NewComplaint.jsx` — Update step wizard to have 5 steps:
+    - Step 1: Customer Info (unchanged)
+    - **Step 2: Product Info (NEW)**
+    - Step 3: Product & Type (was Step 2)
+    - Step 4: Charges & Media (was Step 3)
+    - Step 5: SC Assignment (was Step 4)
+    - Update step indicator UI to show 5 steps. Update `currentStep` state logic to go 1→2→3→4→5.
+  - [ ] Create `components/forms/Step2ProductInfo.jsx` — NEW FILE:
+    - **Bill Date:** Date picker input. Inline label: "Date of purchase / installation bill". On value change: run client-side warranty preview using `warrantyCalculator` logic and show the calculated status to the admin instantly (e.g. "Warranty: In Warranty — expires 15 Mar 2028").
+    - **Bill Photo:** `ImageUploader` (max 1 image). Admin uploads the physical bill/receipt photo.
+    - **Shop Name:** Text input. Label: "Shop / dealer name".
+    - **Serial Number:** Text input. (Also present in Step 1 — this is the pre-fill sync; if filled in Step 1, auto-populate here. If filled here, sync back to formData.)
+    - **Model Number:** Text input. Label: "Model number / variant".
+    - If the product was linked in Step 1, all 5 fields come pre-filled from the Product record.
+    - **Change warning:** If admin modifies any pre-filled value, show an inline alert under that field: "Previously saved as: [X]. You are changing it to: [Y]. Confirm?" with `[Keep New]` / `[Revert]` buttons.
+    - **All fields are optional** — no validation blocks submission. Admin can proceed with all blank.
+    - At bottom: show current warranty preview card (if bill date is filled). Show "Warranty will be set manually" notice if bill date is blank.
+  - [ ] `components/forms/Step2ProductInfo.jsx` — Warranty section (at the bottom of the step):
+    - **If bill date is filled:** Show read-only computed warranty info. Show `[Force Override]` button. If clicked, opens a text input for `forceReason` and a toggle to choose forced status.
+    - **If bill date is NOT filled:** Show manual selector: `In Warranty` / `Out of Warranty` radio. Show required `manualReason` text input below the selector. For LED Installation: pre-select `In Warranty` but allow change.
+    - All warranty values (computed or manual) are stored in `formData` and passed through to the create API.
+  - [ ] `components/forms/Step1CustomerInfo.jsx` — Add `Location / Action Text` field:
+    - A large `<textarea>` (paste-friendly) below the address section.
+    - Label: "Location / Maps Link (optional)". Placeholder: "Paste a Google Maps link, coordinates, or any navigation notes here. This will be sent to the SC."
+    - No validation. Any text accepted. Stored in `formData.locationText`.
+  - [ ] `components/forms/Step3ProductType.jsx` (was Step2) — The warranty section in this step is REMOVED or simplified. Warranty is now fully handled in Step 2. Step 3 now only shows Product type (LED/Cooler) and Complaint type (Installation/Complaint). No warranty toggle or bill date fields here.
+
+  **G. Frontend — SC Done Form — Demanded Fields for Missing Product Info**
+  - [ ] `components/complaint/SCComplaintDetail.jsx` — In the **Done form slide-out**:
+    - Before rendering the Done form, fetch the complaint's linked Product record to check which of the 5 Step 2 fields are empty on the Product.
+    - **Missing Bill Date / Bill Photo / Shop Name:** Show a sub-section at the top of the Done form: "Product Bill Info Required — The bill information for this product was not provided at registration. Please ask the customer for their purchase bill and upload a photo here." Add an `ImageUploader` (max 1) for the bill photo. Add a note: "This will be used to update the product's warranty information."
+    - **Missing Serial Number / Model Number:** Show a sub-section: "Product Serial Info Required — Please photograph the serial number / model sticker on the product." Add an `ImageUploader` (max 1) for the serial/model sticker photo.
+    - **Bypass:** Each sub-section has a `[Skip for now]` checkbox/link. If SC skips without uploading, a warning badge shows: "Missing: Bill Photo" or "Missing: Serial Photo". SC must explicitly check `[Skip for now]` per item before Submit is allowed.
+    - Both uploaded files go into the Done form `formData` as `scBillPhotoUrl` and `scSerialSlipPhotoUrl`. These are sent with the `PATCH /:id/status` (Done) API call.
+
+  **H. Frontend — Admin Closing Check (Missing Product Fields Warning)**
+  - [ ] `components/complaint/AdminComplaintDetail.jsx` — In the **Confirm Done** action:
+    - Before showing the Confirm Done dialog, call `GET /complaints/:id` to get latest Product info and check which of the 5 Step 2 fields are empty.
+    - If any are missing: show a warning dialog listing the empty fields: "The following product fields are still empty: [Bill Date, Bill Photo, Shop Name]. Please fill them before closing or bypass each field."
+    - For each missing field: show an inline input/picker to fill it right there in the dialog. Or a `[Bypass this field]` toggle per field (requires individual confirmation).
+    - After admin resolves all fields (filled or bypassed): submit `confirmDone` with the `missingFieldsBypassed` array in the request body.
+    - If admin bypasses: a persistent yellow warning icon appears on the Product record card in all future complaints for this product (showing which fields were bypassed and when). This persists until the fields are eventually filled.
+  - [ ] `components/complaint/AdminComplaintDetail.jsx` — Show the SC-uploaded bill photo (`scBillPhotoUrl`) and serial slip photo (`scSerialSlipPhotoUrl`) in the product info subsection of the complaint detail view. Admin can:
+    - **Bill photo:** Accept it (auto-fill bill date from photo context), replace with another image, or remove it.
+    - **Serial slip photo:** View it and manually type the serial/model number into the Product record fields. This is a manual transcription step — the system does not auto-read the photo.
+
+  **I. Step Renaming — Update All References**
+  - [ ] `pages/admin/NewComplaint.jsx` — Rename step component imports: old `Step2ProductType` → `Step3ProductType`, old `Step3Charges` → `Step4Charges`, old `Step4AssignSC` → `Step5AssignSC`. Update all `currentStep` conditionals.
+  - [ ] Rename files to match new step numbers (or keep filenames as-is and update imports — choose consistency):
+    - `Step2ProductType.jsx` → `Step3ProductType.jsx`
+    - `Step3Charges.jsx` → `Step4Charges.jsx`
+    - `Step4AssignSC.jsx` → `Step5AssignSC.jsx`
+  - [ ] Update all internal references in `NewComplaint.jsx`, `App.jsx` imports, and any documentation references.
+
+  **J. WA-01 Content Update (Phase 14 dependency)**
+  - [ ] When Phase 14 is built: `WA-01` message must include `Serial Number` and `Model Number` (if filled) and `locationText` (if filled). These are sent to the SC for navigation and product identification. Admin-only fields (`billDate`, `billPhoto`, `shopName`) are NOT included in WA-01.
+
+---
+
+- [ ] **Phase 22 — Advanced Billing Filters + Mark as Paid System (v1.3 Change 4)**
+  > Source: `Microvison_System_Changes_v1.3.md` — Change 4A, 4B, 4C. The billing dashboard gets a new exact date range filter (replacing Month+Year), a Payment Status filter, a full Mark as Paid / Mark as Unpaid system with 3 bulk methods and individual selection, and two running totals below the billing table.
+
+  **A. Backend — New Payment Fields on Complaint Model**
+  - [ ] `models/Complaint.js` — Add new fields:
+    - `paymentStatus` (Enum: `unpaid` / `paid`, default: `'unpaid'`) — only relevant when `billGenerated = true`. Default is `unpaid` on bill generation.
+    - `paidAt` (Date, optional) — timestamp of when the bill was last marked as paid. Set to `null` when marked as unpaid (reversal). Updated each time "Mark as Paid" is clicked.
+    - `paidBy` (ref: User, optional) — the admin user who last marked the bill as paid. For audit. Set to `null` on unpaid reversal.
+
+  **B. Backend — Billing Controller Updates**
+  - [ ] `controllers/billing.controller.js` — Update `getComplaintBills`:
+    - Replace `month=` and `year=` params with `dateFrom=` and `dateTo=` (ISO date strings). If not provided: default to first day of current month to today.
+    - Add `paymentStatus=paid/unpaid` filter param — `{paymentStatus: value}` on the Complaint query.
+    - Include `unregistered` SCs in results (existing query already filters by `assignedCentreId` — just ensure unregistered SC records are included in the SC lookup population).
+    - Return `paymentStatus`, `paidAt`, `paidBy` fields in each bill result.
+  - [ ] `controllers/billing.controller.js` — Add `markAsPaid` handler:
+    - Accepts: `complaintIds` (array of Complaint `_id`s), `markAs` (`'paid'` or `'unpaid'`).
+    - Updates all matching Complaint records: `paymentStatus = markAs`. If `'paid'`: set `paidAt = Date.now()`, `paidBy = req.user.id`. If `'unpaid'`: set `paidAt = null`, `paidBy = null`.
+    - Validates: all provided `complaintIds` must have `billGenerated = true`. Rejects any that don't.
+    - Returns count of updated records.
+  - [ ] `controllers/billing.controller.js` — Add `getRunningTotals` handler (or include in `getComplaintBills` response):
+    - Returns two sums for the current filtered view:
+      - `totalAll`: sum of all bill totals in the current filter (paid + unpaid combined)
+      - `totalUnpaid`: sum of only unpaid bill totals in the current filter
+    - Calculated server-side using MongoDB `$group` aggregation for accuracy.
+  - [ ] `controllers/billing.controller.js` — Update `getMonthlyInvoice`:
+    - Accept `dateFrom=` and `dateTo=` instead of `month=` and `year=`. Filter `closedAt` (or `billLockedAt`) within the given range.
+    - Include `paymentStatus` and `paidAt` in response so the Monthly Invoice view can show payment state.
+  - [ ] `routes/billing.routes.js` — Add route:
+    - `PATCH /billing/mark-paid` → `markAsPaid` (admin only)
+    - Update existing `GET /billing/complaints` and `GET /billing/invoice/:scId` to accept new date params.
+
+  **C. Frontend — Billing Dashboard Filter Rebuild**
+  - [ ] `pages/admin/Billing.jsx` — Replace the existing Month + Year dropdowns with:
+    - **From Date:** Date picker input. Default: first day of current month.
+    - **To Date:** Date picker input. Default: today.
+    - Quick shortcuts row: `This Month` / `Last Month` / `Last 7 Days` / `Last 30 Days` / `Custom` (manual date pickers appear when Custom is selected).
+  - [ ] `pages/admin/Billing.jsx` — Add **Payment Status** filter:
+    - Single select: `All Payment Status` / `Paid Only` / `Unpaid Only`.
+    - Maps to `paymentStatus=paid/unpaid` in the API request.
+  - [ ] `pages/admin/Billing.jsx` — Ensure **Service Centre** filter includes unregistered SCs in the dropdown list (they should appear with `[UNREGISTERED]` tag after their name).
+  - [ ] `pages/admin/Billing.jsx` — Add **Reset Filters** button: resets to defaults (All SCs, current month, all products, all warranty, all payment status).
+  - [ ] `hooks/useBilling.js` — Update to pass `dateFrom`, `dateTo`, `paymentStatus` params. Remove `month` and `year` params. Add `markAsPaid(ids, markAs)` function that calls `PATCH /billing/mark-paid`.
+
+  **D. Frontend — Mark as Paid System UI**
+  - [ ] `components/billing/BillingTable.jsx` — Full rebuild:
+    - **Row checkboxes:** Add a checkbox column at the far left of each row. Only rows with `billGenerated = true` are selectable.
+    - **Payment Status column:** New column showing `PAID` (green badge) or `UNPAID` (amber badge).
+    - **Paid On column:** New column showing formatted `paidAt` timestamp if paid, or `—` if unpaid.
+    - **Action bar (appears on checkbox selection):** Fixed bar at the top/bottom of the table. Shows: "X bills selected" + `[Mark Selected as Paid]` + `[Mark Selected as Unpaid]` buttons. Appears only when at least one checkbox is checked.
+    - **Bulk "Mark All as Paid" button:** A primary button above the table (always visible, greyed if no unpaid bills in view). Text: "Mark All as Paid ([N] unpaid)". Clicking marks ALL unpaid bills in the CURRENT FILTERED VIEW as paid (not just the visible page — the full filtered result set).
+    - **Reversal warning:** When `[Mark Selected as Unpaid]` or bulk unpaid is clicked: show a confirmation dialog: "This will mark [N] paid bill(s) as unpaid. This action is reversible but will affect payment records. Continue?" Admin confirms before proceeding.
+  - [ ] `components/billing/BillingTable.jsx` — Running totals section (below the table):
+    - Two summary cards side by side:
+      - **Total Billed:** "₹[totalAll]" — sum of all bills in the current filtered view (paid + unpaid).
+      - **Unpaid Total:** "₹[totalUnpaid]" — sum of only unpaid bills. This is what Microvison owes the SC(s).
+    - Both update live when filters change.
+    - If a specific SC is selected: totals reflect that SC only. If "All SCs": totals reflect all SCs combined.
+  - [ ] `pages/admin/Billing.jsx` — **At Confirm Done time** (in Admin Complaint Detail): when admin clicks Confirm Done and the bill is generated, show an optional checkbox/toggle: "Mark as Paid immediately". If checked: after calling `confirmDone`, immediately call `PATCH /billing/mark-paid` with the new complaint `_id` and `markAs: 'paid'`. If unchecked: complaint closes as `paymentStatus: 'unpaid'` (default).
+  - [ ] `components/billing/MonthlyInvoice.jsx` — Show payment summary per month card:
+    - Add: "Paid: ₹[paid amount] | Unpaid: ₹[unpaid amount]" under the total.
+    - If fully paid: show a green `FULLY PAID` badge on the card. If partially paid: `PARTIAL`. If nothing paid: `UNPAID`.
+
+  **E. SC Billing Page (Read-only)**
+  - [ ] `pages/sc/SCBilling.jsx` — Update filters to use `dateFrom`/`dateTo` (date pickers) instead of month/year dropdowns. SCs only see their own billing data — payment status and paidAt are shown as read-only columns (so SC can see which bills Microvison has marked as paid).
 

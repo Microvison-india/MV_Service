@@ -356,5 +356,231 @@ Each entry follows this structure:
 
 ---
 
+## System Changes v1.3 — Phases 19–22
+
+> Source document: `files/Microvison_System_Changes_v1.3.md`
+> These entries document every technical deviation from TBP v1.1 introduced by the four new v1.3 features. They specify exact file changes, new fields, new controllers, and new frontend components.
+
+---
+
+## Phase 19 — Skip SC Assignment + Advanced Search (v1.3 Change 1)
+
+### DEV-TBP-046
+- **Phase:** 19
+- **TBP Section / File:** `models/Complaint.js` — status enum
+- **Type:** CHANGED
+- **Summary:** The Complaint model status enum gains a new first value: `unassigned`. Position in enum: before `assigned`. This is the initial status when a complaint is created without an SC. The status transitions: `unassigned` → `assigned` → existing flow. All other status values are unchanged. The existing `new` status may now be retired (it was never a real lifecycle state in the current implementation — `assigned` was effectively the initial status post-Phase 7A). Verify usages of `status: 'new'` across controllers and clean up.
+
+### DEV-TBP-047
+- **Phase:** 19
+- **TBP Section / File:** `controllers/complaint.controller.js` — `createComplaint`, `assignComplaint`, `getActionItems`
+- **Type:** CHANGED
+- **Summary:** Three controller handlers are updated:
+  1. **`createComplaint`:** If no `assignedCentreId` in request body, set `status = 'unassigned'`, skip the assign step and skip WA-01. All other fields are saved normally. This is a zero-footprint change to the happy path — existing creates with an SC ID are unaffected.
+  2. **`assignComplaint`:** Now accepts complaints in both `unassigned` AND `new` status (previously only `new`). When called for an `unassigned` complaint, sets `status = 'assigned'`, sets `assignedCentreId`, `assignedAt`, logs a ComplaintUpdate, and fires WA-01 (same as any assignment).
+  3. **`getActionItems`:** New `unassigned` section added — counts and returns complaints with `status = 'unassigned'` for the admin Action Centre "Unassigned Complaints" card.
+
+### DEV-TBP-048
+- **Phase:** 19
+- **TBP Section / File:** `controllers/complaint.controller.js` — `getAll` (unified search + filter expansion)
+- **Type:** CHANGED
+- **Summary:** `getAll` is updated to support:
+  1. **Unified search via `q=` param:** Builds a MongoDB `$or` clause searching `customerName` (regex, case-insensitive), `phone1`, `phone2`, `complaintId` (loose alphanumeric regex), plus populated `serialNumber` and `trackingId` from the linked `Product` record (via a `$lookup` or populate, with `$match` on the `$or`).
+  2. **Multi-status via comma-separated `status=`:** Parses `status=done,not_done` → `{ status: { $in: ['done', 'not_done'] } }`. The existing single-value status filter is updated to handle comma-split arrays.
+  3. **New filter params added:** `state=` (matches `state` field on complaint or linked product), `scCapability=` (filters complaints where linked SC's `productCapability` matches), `reopenedOnly=true` → `{ isReopened: true }`, `originalOnly=true` → `{ isReopened: { $ne: true } }`.
+  4. All other existing params (`product=`, `complaintType=`, `warrantyStatus=`, `assignedCentreId=`, `serialNumber=`, `trackingId=`, `dateFrom=`, `dateTo=`) are retained.
+
+### DEV-TBP-049
+- **Phase:** 19
+- **TBP Section / File:** `components/forms/Step4AssignSC.jsx` → becomes `Step5AssignSC.jsx` after Phase 21
+- **Type:** CHANGED
+- **Summary:** A "Skip — Assign Later" button is added as a second call-to-action at the bottom of the SC Assignment step. It is styled as a secondary/outline button with a helper note: "You can assign an SC from the complaint detail view later." Clicking it sets `selectedSCId = null` in wizard state and calls the wizard's submit function with no SC data. The wizard submit in `NewComplaint.jsx` handles this by calling only `POST /complaints` (no subsequent `PATCH /:id/assign`).
+
+### DEV-TBP-050
+- **Phase:** 19
+- **TBP Section / File:** `components/filters/ComplaintFilters.jsx` — full rebuild
+- **Type:** CHANGED
+- **Summary:** The filter bar component is rebuilt from scratch to support the new unified search and expanded filters. Key implementation details:
+  - A single `<input>` search field at the top maps to `q=` param with a 300ms `useDebounce` hook. The old separate `serialNumber=` and `trackingId=` inputs are removed (subsumed by `q=`).
+  - Status filter changes from a plain `<select>` to a custom multi-select dropdown (checkboxes in a popover). Selected statuses are joined as comma-separated string.
+  - Date range: Shadcn date pickers or HTML `<input type="date">` for From/To. Quick shortcuts (`Today`, `Yesterday`, `Last 7 days`, `Last 30 days`, `Custom`) are rendered as pill buttons that programmatically set the date values.
+  - State → District → City: 3-way cascading selects (same client-side filtering approach as forms, sourced from a single `GET /cities` call).
+  - `assignedCentreId=`: new SC dropdown populated from `GET /service-centres?includeUnregistered=true`.
+  - `scCapability=`: new single select.
+  - `reopenedOnly=`: new single select `All / Reopened Only / Original Only`.
+  - Active filter count badge shown on the Show/Hide Filters toggle button.
+  - Reset All button clears all state to defaults and re-fetches.
+  - `hooks/useComplaints.js` updated to pass all new params and serialize multi-status as comma-joined string.
+
+---
+
+## Phase 20 — Unregistered SC System (v1.3 Change 2)
+
+### DEV-TBP-051
+- **Phase:** 20
+- **TBP Section / File:** `models/ServiceCentre.js` — new fields
+- **Type:** CHANGED
+- **Summary:** Four new fields added to the `ServiceCentre` model:
+  - `isUnregistered` (Boolean, default: `false`) — set to `true` on admin-created unregistered SC records.
+  - `linkedRegisteredSCId` (ObjectId ref: ServiceCentre, optional) — set when an unregistered SC is linked to a newly registered account.
+  - `archivedAt` (Date, optional) — timestamp of archival after upgrade.
+  - `isArchived` (Boolean, default: `false`) — hides the record from active SC lists after upgrade.
+  - Unregistered SCs always have `status: 'active'` and `userId: null`. They skip the approval flow entirely.
+
+### DEV-TBP-052
+- **Phase:** 20
+- **TBP Section / File:** `controllers/serviceCentre.controller.js` — 3 new/modified handlers
+- **Type:** CHANGED + ADDED
+- **Summary:**
+  1. **`createUnregistered` (NEW):** Accepts `businessName`, `phone1`, `phone2` (optional), `city`, `district` (optional — auto-resolved from city), `fullAddress` (optional), `productCapability` (optional, default: `both`). Creates a `ServiceCentre` document with `isUnregistered: true`, `status: 'active'`, `userId: null`. Does NOT create a `User` record. If the city does not exist in the `cities` collection, calls `createCity` logic inline. Returns the new SC `_id` immediately.
+  2. **`getAll` (MODIFIED):** Added `isUnregistered=true/false` query param filter. If omitted, returns both registered and unregistered. Ensures unregistered SCs are populated correctly in all SC list queries (including the billing dashboard SC dropdown and the Step 5 SC picker).
+  3. **`linkToRegistered` (NEW):** Accepts `unregisteredSCId` and `newRegisteredSCId`. Bulk-updates all `Complaint` records where `assignedCentreId === unregisteredSCId` → sets `assignedCentreId = newRegisteredSCId`. Sets `unregisteredSC.isArchived = true`, `archivedAt = now`, `linkedRegisteredSCId = newRegisteredSCId`. Does NOT delete the old unregistered record. Old record remains as read-only audit.
+
+### DEV-TBP-053
+- **Phase:** 20
+- **TBP Section / File:** `routes/serviceCentre.routes.js` + `controllers/city.controller.js` + `routes/city.routes.js`
+- **Type:** ADDED
+- **Summary:** New routes:
+  - `POST /api/service-centres/unregistered` → `createUnregistered` (admin only, auth + rbac('admin'))
+  - `PATCH /api/service-centres/:id/link-to-registered` → `linkToRegistered` (admin only)
+  - `POST /api/cities` → `createCity` (admin only): accepts `city`, `district`, `state`; checks for case-insensitive duplicate before creating; returns new or existing record.
+
+### DEV-TBP-054
+- **Phase:** 20
+- **TBP Section / File:** `controllers/complaint.controller.js` — WhatsApp suppression for unregistered SCs
+- **Type:** CHANGED
+- **Summary:** A helper function `isUnregisteredSC(complaint)` (or inline check) is added to the complaint controller. It checks `complaint.assignedCentre?.isUnregistered === true`. This check is run in `assignComplaint`, `updateStatus`, `markGoing`, `accept`, `markPartDelivered`, and `markPartReceived`. If `true`: all SC-directed WhatsApp triggers (WA-01, WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X) are suppressed. WA-04 to the customer (on SC acceptance) still fires regardless. The ComplaintUpdate log entry for assignment to an unregistered SC includes the note: "Assigned to Unregistered SC — WA-01 not sent. Admin to contact SC manually."
+
+### DEV-TBP-055
+- **Phase:** 20
+- **TBP Section / File:** `components/forms/Step4AssignSC.jsx` (Step5 after Phase 21) + `pages/admin/ActionCentre.jsx` + `pages/admin/ServiceCentres.jsx` + `components/complaint/AdminComplaintDetail.jsx`
+- **Type:** CHANGED + ADDED
+- **Summary:** Frontend changes across 4 files:
+  1. **`Step4AssignSC.jsx`:** Add `+ Create Unregistered SC` button below the SC list. Opens an inline `<dialog>` or slide-in form with the minimal SC fields. On submit, calls `POST /api/service-centres/unregistered` → sets returned `_id` as `selectedSCId`. SC list cards gain an amber `UNREGISTERED` badge for `isUnregistered: true` SCs.
+  2. **All city dropdowns (Step4AssignSC form, complaint Step1, SC registration):** Enhanced with an "inline create" option — when typed text doesn't match any city, show `'Create "[typed name]" as new city'` option. Clicking opens a small form for city/district/state. On save: `POST /api/cities` → select new city.
+  3. **`AdminComplaintDetail.jsx`:** Shows `UNREGISTERED SC` amber badge in the Assigned SC header. A persistent banner in the action panel warns admin: "This complaint is assigned to an Unregistered SC. All status updates must be made manually." Unlocks all SC-only action buttons (Going, Done, Not Done, Part Pending, Mark Received) for the admin when the SC is unregistered.
+  4. **`ServiceCentres.jsx`:** New filter dropdown `Registration Type: All / Registered / Unregistered` maps to `isUnregistered=` param. `UNREGISTERED` badge on cards/rows.
+  5. **`ActionCentre.jsx`:** Upgrade linking flow in the Pending Registrations section — phone-match suggestion banner + manual unregistered SC search/picker. `PATCH /:id/link-to-registered` called on confirm.
+
+---
+
+## Phase 21 — New Step 2 (Product Info) + Warranty Overhaul (v1.3 Change 3)
+
+### DEV-TBP-056
+- **Phase:** 21
+- **TBP Section / File:** `models/Product.js` — new fields
+- **Type:** CHANGED
+- **Summary:** Four new fields added to the `Product` model:
+  - `shopName` (String, optional) — shop/dealer name where product was purchased.
+  - `modelNumber` (String, optional) — product model/variant identifier (e.g. "CL-50W", "LS-18" etc.).
+  - `warrantyForceReason` (String, optional) — stores the admin's reason text when a force override is applied.
+  - `missingFieldsWarning` (Array of String, default: `[]`) — accumulates names of Step 2 fields that were bypassed by the admin at closing without being filled. e.g. `['billDate', 'billPhoto']`. A non-empty array means the product has the persistent warning indicator active.
+
+### DEV-TBP-057
+- **Phase:** 21
+- **TBP Section / File:** `models/Complaint.js` — new snapshot fields
+- **Type:** CHANGED
+- **Summary:** Seven new snapshot fields added to the `Complaint` model:
+  - `shopName` (String, optional) — snapshot of Product's shopName at complaint creation time.
+  - `modelNumber` (String, optional) — snapshot of Product's modelNumber at complaint creation time.
+  - `locationText` (String, optional) — Maps link or navigation text from Step 1. Stored on Complaint (not Product). Sent in WA-01.
+  - `warrantyForceReason` (String, optional) — snapshot of force override reason at complaint creation. Admin-only visibility.
+  - `scBillPhotoUrl` (String, optional) — URL of bill photo uploaded by SC in their Done form. Stored on Complaint, not overwriting Product.billPhoto directly (controller writes it to Product separately after admin review).
+  - `scSerialSlipPhotoUrl` (String, optional) — URL of serial/model sticker photo uploaded by SC in Done form. Stored on Complaint only — admin manually transcribes.
+  - `missingFieldsBypassed` (Array of String, default: `[]`) — list of Step 2 field names explicitly bypassed by admin at Confirm Done time.
+
+### DEV-TBP-058
+- **Phase:** 21
+- **TBP Section / File:** `utils/warrantyCalculator.js` — COMPLETE REWRITE
+- **Type:** CHANGED (Supersedes DEV-TBP-022)
+- **Summary:** The existing `warrantyCalculator.js` (from Phase 7C / Addendum v1.2) is completely rewritten to implement the 4-rule priority system from v1.3 Change 3G. New function signature: `calculateWarranty({ billDate, complaintType, manualSelection, manualReason, forceOverride, forceValue, forceReason })`. Returns `{ warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }`.
+  - **Rule 1 (Bill Date present, no force override):** Computes `warrantyExpiryDate = new Date(billDate); warrantyExpiryDate.setFullYear(warrantyExpiryDate.getFullYear() + 3)`. Status: `today <= warrantyExpiryDate ? 'in_warranty' : 'out_of_warranty'`. Source: `'auto_calculated'`. Force reason: `null`. Re-evaluated fresh at every call — a product that was in warranty 3 years ago is now correctly out of warranty.
+  - **Rule 2 (No Bill Date, manual):** Takes `manualSelection` and `manualReason` (required). Source: `'manual'`. No expiry date.
+  - **Rule 3 (LED Installation default):** `warrantyStatus = 'in_warranty'`. Source: `'manual'`. No expiry.
+  - **Rule 4 (Force Override, highest priority if `forceOverride: true`):** Sets `warrantyStatus = forceValue`, source: `'forced'`, `warrantyForceReason = forceReason`. `warrantyExpiryDate = null` (force reason overrides any calculation).
+
+### DEV-TBP-059
+- **Phase:** 21
+- **TBP Section / File:** NEW FILE `components/forms/Step2ProductInfo.jsx` + updates to `NewComplaint.jsx`, `Step1CustomerInfo.jsx`, `Step2ProductType.jsx`→`Step3ProductType.jsx`
+- **Type:** ADDED + CHANGED
+- **Summary:**
+  1. **NEW: `components/forms/Step2ProductInfo.jsx`** — 5-field optional form (Bill Date picker, Bill Photo `ImageUploader`, Shop Name text, Serial Number text, Model Number text). Pre-fills from linked Product record (if Step 1 linked a product). Editing a pre-filled value shows inline change-warning: "Previously saved as [X]. You are changing it to [Y]. [Keep New] / [Revert]". Warranty preview card shown at bottom — live-updates as bill date is entered. If bill date is blank: shows manual In/Out Warranty radio + required reason text. Force Override button always available.
+  2. **MODIFIED: `components/forms/Step1CustomerInfo.jsx`** — New `Location / Action Text` `<textarea>` field added below the address section. Stored in `formData.locationText`.
+  3. **MODIFIED: `Step2ProductType.jsx` (renamed to `Step3ProductType.jsx`)** — Warranty section REMOVED entirely. This step now only renders product type (LED/Cooler) selection and complaint type (Installation/Complaint) selection. All warranty logic has moved to the new Step 2.
+  4. **MODIFIED: `pages/admin/NewComplaint.jsx`** — Step wizard updated to 5 steps. Step component map updated: `currentStep === 2` → `<Step2ProductInfo>`, `=== 3` → `<Step3ProductType>`, `=== 4` → `<Step4Charges>`, `=== 5` → `<Step5AssignSC>`. `formData` shape updated to include all new Step 2 fields. On final submit, new fields passed to `POST /complaints`.
+
+### DEV-TBP-060
+- **Phase:** 21
+- **TBP Section / File:** `controllers/complaint.controller.js` (`createComplaint`, `confirmDone`, `updateStatus`) + `controllers/product.controller.js`
+- **Type:** CHANGED
+- **Summary:** Controller updates for Step 2 data flow:
+  1. **`createComplaint`:** Accepts new fields from request body: `shopName`, `modelNumber`, `locationText`, `warrantyForceReason`, `forceOverride`, `forceValue`, `forceReason`, `manualSelection`, `manualReason`. Calls the rewritten `warrantyCalculator` with all relevant inputs. Snapshots `shopName`, `modelNumber`, `locationText`, `warrantyForceReason` onto the Complaint document. Writes `shopName`, `modelNumber` back to the linked Product record.
+  2. **`confirmDone`:** Before closing, checks `Product` for missing fields in `['billDate', 'billPhoto', 'shopName', 'serialNumber', 'modelNumber']`. If missing and `missingFieldsBypassed` array is NOT in request body: returns HTTP 422 with `{ missingFields: [...] }` for the frontend to show the warning dialog. If `missingFieldsBypassed` is provided: saves bypassed field names to `complaint.missingFieldsBypassed[]` AND appends them to `product.missingFieldsWarning[]` (concat, deduplicate). Proceeds to close normally.
+  3. **`updateStatus` (SC Done path):** When SC submits Done status: if request includes `scBillPhotoUrl`, saves to `complaint.scBillPhotoUrl` AND updates `product.billPhoto` with that URL, then re-runs `warrantyCalculator` on the Product record. If request includes `scSerialSlipPhotoUrl`, saves to `complaint.scSerialSlipPhotoUrl` only (no auto-transcription).
+  4. **`product.controller.js` — `updateProduct`:** Updated to accept and save `shopName`, `modelNumber`, `warrantyForceReason`, `missingFieldsWarning`. After any update, re-runs `warrantyCalculator` using the latest Product `billDate` (if present) to keep the Product record's warranty fresh.
+
+---
+
+## Phase 22 — Advanced Billing Filters + Mark as Paid (v1.3 Change 4)
+
+### DEV-TBP-061
+- **Phase:** 22
+- **TBP Section / File:** `models/Complaint.js` — new payment fields
+- **Type:** CHANGED
+- **Summary:** Three new fields added to the `Complaint` model for payment tracking (relevant only when `billGenerated = true`):
+  - `paymentStatus` (String enum: `'unpaid'` / `'paid'`, default: `'unpaid'`) — tracks payment state of the generated bill.
+  - `paidAt` (Date, optional, default: `null`) — timestamp of when the bill was last marked paid. Cleared to `null` on unpaid reversal.
+  - `paidBy` (ObjectId ref: User, optional, default: `null`) — admin user who last marked the bill paid. Cleared to `null` on unpaid reversal.
+
+### DEV-TBP-062
+- **Phase:** 22
+- **TBP Section / File:** `controllers/billing.controller.js` — 3 handler updates + 1 new handler
+- **Type:** CHANGED + ADDED
+- **Summary:**
+  1. **`getComplaintBills` (CHANGED):** `month=` and `year=` params replaced with `dateFrom=` (ISO date string) and `dateTo=` (ISO date string). Default when not provided: `dateFrom = first day of current month`, `dateTo = today`. Added `paymentStatus=paid/unpaid` filter param. `paymentStatus`, `paidAt`, `paidBy` now included in each returned bill object. Unregistered SCs included in SC lookups.
+  2. **`getMonthlyInvoice` (CHANGED):** Updated to use `dateFrom`/`dateTo` range instead of `month`/`year`. Returns `paymentStatus` and `paidAt` per invoice.
+  3. **`getRunningTotals` (ADDED or included in `getComplaintBills`):** Returns `{ totalAll: Number, totalUnpaid: Number }` — aggregated sums using MongoDB `$group` over the same filter set as `getComplaintBills`. Calculated server-side for accuracy with large datasets.
+  4. **`markAsPaid` (NEW handler):** Accepts `{ complaintIds: [ObjectId], markAs: 'paid' | 'unpaid' }`. Validates all IDs have `billGenerated = true`. Bulk-updates: if `paid` → `{ paymentStatus: 'paid', paidAt: Date.now(), paidBy: req.user._id }`. If `unpaid` → `{ paymentStatus: 'unpaid', paidAt: null, paidBy: null }`. Returns `{ updated: N }`.
+
+### DEV-TBP-063
+- **Phase:** 22
+- **TBP Section / File:** `routes/billing.routes.js`
+- **Type:** CHANGED
+- **Summary:** New route added:
+  - `PATCH /api/billing/mark-paid` → `markAsPaid` (admin only, auth + rbac('admin'))
+  - `GET /api/billing/complaints` — updated to accept `dateFrom=`/`dateTo=`/`paymentStatus=` params (replacing `month=`/`year=`)
+  - `GET /api/billing/invoice/:scId` — updated to accept `dateFrom=`/`dateTo=` params
+
+### DEV-TBP-064
+- **Phase:** 22
+- **TBP Section / File:** `pages/admin/Billing.jsx` + `components/billing/BillingTable.jsx` + `components/billing/MonthlyInvoice.jsx` + `hooks/useBilling.js`
+- **Type:** CHANGED
+- **Summary:** Full billing UI rebuild across 4 files:
+  1. **`Billing.jsx`:** Month+Year dropdowns replaced with From/To date pickers + quick shortcuts (`This Month`, `Last Month`, `Last 7 Days`, `Last 30 Days`, `Custom` pill buttons). Payment Status filter added (`All / Paid Only / Unpaid Only`). SC dropdown includes unregistered SCs with `[UNREGISTERED]` tag. Reset Filters button added.
+  2. **`BillingTable.jsx`:** Full rebuild with:
+     - Checkbox column (leftmost, selectable only for `billGenerated = true` rows).
+     - New `Payment Status` column: `PAID` (green badge) or `UNPAID` (amber badge).
+     - New `Paid On` column: formatted `paidAt` timestamp or `—`.
+     - Floating action bar (appears when ≥1 checkbox selected): "X bills selected" + `[Mark Selected as Paid]` + `[Mark Selected as Unpaid]`.
+     - "Mark All as Paid ([N] unpaid)" button above table — marks ALL unpaid in current full filtered result (not just visible page).
+     - Reversal confirmation dialog before any "unpaid" action.
+     - Running totals section below table: two summary cards `Total Billed: ₹[totalAll]` and `Unpaid Total: ₹[totalUnpaid]`. Both update on filter changes.
+  3. **`MonthlyInvoice.jsx`:** Added payment summary line: "Paid: ₹[X] | Unpaid: ₹[Y]". Card badge: `FULLY PAID` (green) / `PARTIAL` (amber) / `UNPAID` (red) based on payment ratios.
+  4. **`hooks/useBilling.js`:** Updated to pass `dateFrom`, `dateTo`, `paymentStatus` params. Removed `month` and `year`. New `markAsPaid(ids, markAs)` function calling `PATCH /api/billing/mark-paid`. Running totals fetched alongside bill data.
+
+### DEV-TBP-065
+- **Phase:** 22
+- **TBP Section / File:** `components/complaint/AdminComplaintDetail.jsx` — Confirm Done flow
+- **Type:** CHANGED
+- **Summary:** The Confirm Done dialog gains an optional "Mark as Paid immediately" checkbox. If checked at closing time: after `confirmDone` returns success, immediately calls `PATCH /api/billing/mark-paid` with the new complaint `_id` and `markAs: 'paid'`. The checkbox is unchecked by default — default behavior is `paymentStatus: 'unpaid'` on bill generation. This allows the admin to mark payment in one action without visiting the Billing Dashboard.
+
+### DEV-TBP-066
+- **Phase:** 22
+- **TBP Section / File:** `pages/sc/SCBilling.jsx`
+- **Type:** CHANGED
+- **Summary:** SC Billing page filter updated: Month/Year dropdowns replaced with From/To date pickers (same UI as admin billing but scoped to the SC's own data). The SC billing view shows `paymentStatus` and `paidAt` as **read-only** columns — SC can see which bills Microvison has marked as paid, but cannot modify payment status themselves. No `[Mark as Paid]` controls appear on the SC's billing page.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

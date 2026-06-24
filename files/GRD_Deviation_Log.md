@@ -321,5 +321,203 @@ graph TD
 
 ---
 
+## System Changes v1.3 — Phases 19–22
+
+> Source document: `files/Microvison_System_Changes_v1.3.md`
+> These entries document every departure from GRD v1.1 introduced by the four new features: Skip SC Assignment, Unregistered SC, New Step 2 (Product Info), and Billing Paid System. They supersede and extend GRD v1.1 Sections 6.1–6.4, 7.1–7.3, 9, 11.1, and 11.3. Addendum v1.2 remains in force for all Product Tracking sections not overridden below.
+
+---
+
+## Phase 19 — Skip SC Assignment + Advanced Search (v1.3 Change 1)
+
+### DEV-GRD-030
+- **Phase:** 19
+- **GRD Section:** 6.4 (Assign Service Centre) / 7.2 (Status Flow)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 Section 6.4 defined SC assignment as a mandatory final step of complaint registration. **System Changes v1.3 Change 1A** makes assignment optional — the admin can now click "Skip — Assign Later" at Step 5 (formerly Step 4, shifted by insertion of new Step 2 in Change 3). The complaint is then created with a new `unassigned` status (see DEV-GRD-031). Assignment can be performed at any later time from the complaint detail view or the Action Centre.
+
+### DEV-GRD-031
+- **Phase:** 19
+- **GRD Section:** 7.2 (Status Flow) / 7.3 (Status Transition Rules)
+- **Type:** ADDED
+- **Summary:** A new status `unassigned` is added to the complaint lifecycle, appearing before `assigned` as the very first status. GRD v1.1 previously had no such status — complaints were always born as `assigned`. The new lifecycle is:
+  - `unassigned` — complaint created, no SC linked, no WhatsApp sent. Admin holds it pending SC selection.
+  - `unassigned` → `assigned` — admin later assigns an SC from the detail view or Action Centre. WA-01 fires at this point (same as normal assignment).
+  - From `assigned` onwards: lifecycle is completely identical to the existing flow.
+  - The updated Mermaid flowchart (DEV-GRD-015) must be updated to show the `unassigned` entry node.
+
+### DEV-GRD-032
+- **Phase:** 19
+- **GRD Section:** 11.1 (Action Centre) / 6.4 (Assignment)
+- **Type:** ADDED
+- **Summary:** GRD v1.1 Action Centre did not include an "Unassigned Complaints" section. This is now a new dedicated section in the Action Centre, listing all complaints with `status = 'unassigned'`. Each card has an `Assign` button that opens the SC picker directly. This ensures unassigned complaints do not fall through the cracks — they are prominently surfaced for admin follow-up.
+
+### DEV-GRD-033
+- **Phase:** 19
+- **GRD Section:** 11.3 (All Complaints Tab) / 7.2 (Status Filter)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 Section 11.3 described a simple search by Complaint ID and phone number with basic status filters. **System Changes v1.3 Change 1B** replaces this with a unified top search bar querying 5 fields simultaneously: `customerName`, `phone1/2`, `complaintId`, `serialNumber` (on Product record), and `trackingId` (on Product record). A single `q=` query param is passed; the backend builds a `$or` clause across all 5. Results update with 300ms debounce. Previously two separate filter fields (`serialNumber=` and `trackingId=`) existed — these are now subsumed by the unified `q=` search.
+
+### DEV-GRD-034
+- **Phase:** 19
+- **GRD Section:** 11.3 (All Complaints Tab) — Filters
+- **Type:** ADDED
+- **Summary:** The filter panel on the All Complaints tab is significantly expanded beyond what GRD v1.1 specified. New additions from v1.3 Change 1B:
+  - **Status filter:** Upgraded from single-select to **multi-select** (multiple statuses checkable simultaneously). `unassigned` added as first option.
+  - **Date Range:** Replaces any existing date field with quick shortcuts: `Today`, `Yesterday`, `Last 7 days`, `Last 30 days`, `Custom` (opens two date pickers).
+  - **State → District → City:** Cascading location filter (same 3-way cascade as forms). Adds `state=` filter that did not previously exist.
+  - **Assigned SC filter:** Dropdown of all SC names (registered + unregistered).
+  - **SC Capability filter:** `All / LED Only / Cooler Only / Both`.
+  - **Reopen Status:** `All / Reopened Only / Original Only` (`reopenedOnly=true/false`).
+  - **Active filter count badge:** Number of non-default active filters shown on the Show/Hide toggle.
+  - **Reset All button:** Clears all filters, search, and date range instantly.
+  - Existing filters retained: Product, Complaint Type, Warranty, Tracking ID, Serial Number.
+
+---
+
+## Phase 20 — Unregistered SC System (v1.3 Change 2)
+
+### DEV-GRD-035
+- **Phase:** 20
+- **GRD Section:** 3.2 (SC Registration) / 6.4 (Assign Service Centre)
+- **Type:** ADDED
+- **Summary:** GRD v1.1 only defined fully registered SCs (with portal login, credentials, and approval flow). **System Changes v1.3 Change 2** introduces a new type: the **Unregistered SC**. The admin can create a minimal SC record on the spot (name, phone, city — no login credentials) during complaint assignment. Key properties:
+  - `isUnregistered: true` on the `ServiceCentre` record.
+  - No `User` record is created — no portal login, no credentials.
+  - Skips the approval flow entirely — status is `active` on creation.
+  - Appears in the SC list with an `UNREGISTERED` badge everywhere.
+
+### DEV-GRD-036
+- **Phase:** 20
+- **GRD Section:** 6.4 (Assignment) / WhatsApp (Section 6.4 / Phase 14)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 assumed that SC assignment always triggers WA-01 to the SC. For unregistered SCs: **WA-01 is NOT sent** — the SC has no WhatsApp number associated in the system's messaging flow, and the admin contacts them manually. All other SC-directed WhatsApp messages (WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X) are also suppressed. The only WhatsApp that still fires is **WA-04 to the customer** (on acceptance), since the customer-side experience is identical regardless of whether the SC is registered or not.
+
+### DEV-GRD-037
+- **Phase:** 20
+- **GRD Section:** 10 (SC Portal) / 7.3 (Status Transitions)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 Section 10 assumed all status updates come from the SC's own portal. For unregistered SC complaints, the SC has no portal access. All status updates (`Going`, `Done`, `Not Done`, `Part Pending`, `Mark as Received`) are performed **by the admin** on the SC's behalf. The admin effectively acts as a proxy for the unregistered SC. The `UNREGISTERED SC` badge on the complaint detail panel serves as a permanent reminder to the admin that manual intervention is required at every stage.
+
+### DEV-GRD-038
+- **Phase:** 20
+- **GRD Section:** 11.2 (Service Centres Tab)
+- **Type:** ADDED
+- **Summary:** The admin SC list tab (GRD 11.2) now shows both registered and unregistered SCs. A new filter `Registration Type: All / Registered / Unregistered` is added to the SC list. Unregistered SCs appear with an amber `UNREGISTERED` badge. They are searchable by name, phone, city, and district — the same as registered SCs. They maintain full complaint and billing history.
+
+### DEV-GRD-039
+- **Phase:** 20
+- **GRD Section:** 4.1 (City Selection) / 3.2 (SC Registration)
+- **Type:** ADDED
+- **Summary:** GRD v1.1 Section 4.1 assumed the city list is static (pre-seeded). **System Changes v1.3 Change 2D** adds inline city creation: if an admin types a city name not in the master list in any city dropdown, a "Create [typed name] as a new city" option appears. The admin fills city name, district, and state — the city is saved to the `cities` collection immediately and is available system-wide across all dropdowns and filters. This capability is accessible from the Unregistered SC form, SC registration screen, and complaint registration Step 1.
+
+### DEV-GRD-040
+- **Phase:** 20
+- **GRD Section:** 3.2 (SC Registration Approval) / 11.1 (Action Centre)
+- **Type:** ADDED
+- **Summary:** GRD v1.1 did not define any linking between an existing SC record and a newly registered one. **System Changes v1.3 Change 2F** introduces an upgrade flow: when an unregistered SC submits a standard registration form, the admin is prompted during approval to check for existing unregistered SC records. If a match is found (by phone or manual search), the admin can link the new account to the existing unregistered record. On confirm: all complaints, billing, product tracking, and timeline history transfer to the registered account. The `isUnregistered` flag is removed. The old unregistered record is archived (not deleted) for audit. The complaint timeline retains the `UNREGISTERED SC` badge and admin-maintained markers as historical audit trail — they are never erased.
+
+---
+
+## Phase 21 — New Step 2 (Product Info) + Warranty Overhaul (v1.3 Change 3)
+
+### DEV-GRD-041
+- **Phase:** 21
+- **GRD Section:** 6 (Complaint Registration Steps / Form Order)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 defined 4 complaint registration steps: Step 1 (Customer Info), Step 2 (Product & Type), Step 3 (Charges & Media), Step 4 (Assign SC). **System Changes v1.3 Change 3** inserts a new **Step 2 — Product Info** between Step 1 and the old Step 2. All old steps shift by 1:
+  - Step 1 — Customer Info (unchanged)
+  - **Step 2 — Product Info (NEW)**
+  - Step 3 — Product & Type (was Step 2)
+  - Step 4 — Charges & Media (was Step 3)
+  - Step 5 — SC Assignment (was Step 4)
+
+### DEV-GRD-042
+- **Phase:** 21
+- **GRD Section:** 6.1 (Step 1 — Customer Info)
+- **Type:** ADDED
+- **Summary:** A new optional field `Location / Action Text` is added to Step 1 (Customer Info). This is a paste-friendly free-text area where the admin can paste a Google Maps link, coordinates, or any navigation notes. No validation — any text is accepted. This value is stored on the **Complaint** record (not the Product record — location may differ per visit). It is sent to the SC in the `WA-01` message so they can navigate directly to the customer's location.
+
+### DEV-GRD-043
+- **Phase:** 21
+- **GRD Section:** N/A — New Step
+- **Type:** ADDED
+- **Summary:** The new **Step 2 — Product Info** collects 5 fields, all optional but recommended:
+
+  | Field | Stored On | Visible to SC? | Purpose |
+  | :--- | :--- | :--- | :--- |
+  | **Bill Date** | Product record | No — admin only | Auto-calculates `warrantyExpiryDate = billDate + 3 years` |
+  | **Bill Photo** | Product record | No — admin only | Photo of purchase receipt |
+  | **Shop Name** | Product record | No — admin only | Dealer/shop name |
+  | **Serial Number** | Product record | Yes — in WA-01 | Unique physical unit identifier |
+  | **Model Number** | Product record | Yes — in WA-01 | Product model/variant |
+
+  - All 5 are saved to the `Product` record and persist for all future complaints on the same product.
+  - If a linked product already has these values, they come pre-filled. Editing a pre-filled value shows a change warning.
+  - Warranty preview is shown live in this step as values are entered.
+
+### DEV-GRD-044
+- **Phase:** 21
+- **GRD Section:** 6.2 (Step 2 → now Step 3 — Product & Type) — Warranty Logic
+- **Type:** CHANGED (Supersedes DEV-GRD-018, DEV-GRD-020 from Addendum v1.2)
+- **Summary:** Warranty logic is fully consolidated and moved from Step 3 (formerly Step 2) into the new **Step 2 — Product Info**. Step 3 (Product & Type) now only handles product type (LED/Cooler) and complaint type (Installation/Complaint) — no warranty fields. The warranty rules in v1.3 Change 3G (4 priority rules) supersede the simpler rules in Addendum v1.2. Updated warranty rule priority order:
+  1. **Rule 1 — Bill Date present:** `warrantyExpiryDate = billDate + 3 years`. Auto-calculated status. `warrantySource = 'auto_calculated'`.
+  2. **Rule 2 — No Bill Date:** Admin manually selects In/Out Warranty and provides a required reason text. `warrantySource = 'manual'`.
+  3. **Rule 3 — LED Installation, no data:** Defaults to `in_warranty`. `warrantySource = 'manual'`.
+  4. **Rule 4 — Force Override:** Admin can always override any auto-calculated or manual value. Requires a reason text. `warrantySource = 'forced'`. Force reason is **admin-only** — SC sees only the final In/Out status.
+
+### DEV-GRD-045
+- **Phase:** 21
+- **GRD Section:** 10.2 (SC Done Form) / 7.3 (Status Transitions)
+- **Type:** ADDED
+- **Summary:** When the SC submits their Done form, the system checks which Step 2 fields are missing on the linked Product record and demands them from the SC:
+  - **Missing Bill Date / Bill Photo / Shop Name:** SC is asked to upload a bill/receipt photo. Bypassable with explicit "Skip for now" per item.
+  - **Missing Serial Number / Model Number:** SC is asked to photograph the serial/model sticker on the product. Bypassable with explicit "Skip for now" per item.
+  - SC-uploaded bill photo auto-saves to the `Product.billPhoto` field and triggers a warranty recalculation.
+  - SC-uploaded serial sticker photo is stored on the `Complaint` record for the admin to view and manually transcribe — it does NOT auto-fill the serial/model fields.
+  - Neither upload is visible to the SC after submission — both go to the admin's product info view only.
+
+### DEV-GRD-046
+- **Phase:** 21
+- **GRD Section:** 11.1 (Admin Confirm Done / Closing Flow)
+- **Type:** ADDED
+- **Summary:** Before the admin can confirm Done and close a complaint, the system checks all 5 Step 2 fields on the linked Product record. Missing fields trigger a warning dialog listing what is empty. Admin must either fill them (using SC-uploaded photos if available) or explicitly bypass each field individually (no single "skip all"). If bypassed:
+  - Missing field names are stored on the `Complaint.missingFieldsBypassed[]` array.
+  - Missing field names are appended to `Product.missingFieldsWarning[]` for future visibility.
+  - A **persistent yellow warning indicator** appears on the Product record card in ALL future complaints for this product, visible to every admin handling that product — until the fields are eventually filled. This cannot be dismissed — only filling the field removes the warning.
+
+---
+
+## Phase 22 — Advanced Billing Filters + Mark as Paid (v1.3 Change 4)
+
+### DEV-GRD-047
+- **Phase:** 22
+- **GRD Section:** 9 (Billing Logic) / 11.4 (Billing Dashboard)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 Section 11.4 specified Month + Year dropdowns as the primary billing filter. **System Changes v1.3 Change 4A** replaces these with an exact **From Date → To Date** range picker, giving the admin precision control over any billing period. Default on load: first day of current month → today. Quick shortcuts available: `This Month`, `Last Month`, `Last 7 Days`, `Last 30 Days`, `Custom`. Both the *Per Complaint Bills* tab and the *Monthly Invoice Summaries* tab respect this date range.
+
+### DEV-GRD-048
+- **Phase:** 22
+- **GRD Section:** 9 (Billing Logic) / 11.4 (Billing Dashboard)
+- **Type:** ADDED
+- **Summary:** A **Payment Status** system is added to the billing layer. GRD v1.1 had no concept of marking bills as paid — bills were generated and shown, but there was no tracking of whether Microvison had actually paid the SC. New fields added to each bill record: `paymentStatus` (enum: `unpaid`/`paid`, default `unpaid`), `paidAt` (timestamp of last payment mark), `paidBy` (admin user who marked it). Three methods to mark bills as paid from the dashboard:
+  1. **Bulk — selected SC + date range:** A "Mark All as Paid" button marks all unpaid bills in the current filtered view.
+  2. **Bulk — all SCs in date range:** Same button with "All Service Centres" selected — marks all unpaid bills across all SCs.
+  3. **Manual selection:** Checkboxes on each row → "Mark Selected as Paid" action bar button.
+  Reversals to unpaid are allowed with a confirmation warning. `paidAt` always reflects the most recent payment timestamp only (full reversal history is not stored).
+
+### DEV-GRD-049
+- **Phase:** 22
+- **GRD Section:** 9 (Billing Logic) / 11.4 (Billing Dashboard)
+- **Type:** ADDED
+- **Summary:** Two **running totals** are now shown below the Per Complaint Bills table, both live-updating as filters change:
+  - **Total (all bills in view):** Sum of all bills (paid + unpaid combined) in the current filtered view.
+  - **Unpaid Total:** Sum of only unpaid bills — representing what Microvison currently owes the SC(s) in the selected period.
+  - If a specific SC is selected, totals reflect that SC only. If "All Service Centres" is selected, totals reflect all SCs combined.
+  - Default view on opening the Billing Dashboard (no filters changed): current month, all SCs — giving an instant financial overview.
+  - An optional **"Mark as Paid immediately"** checkbox/toggle is also added to the Confirm Done flow: when the admin closes a complaint and generates the bill, they can optionally mark it paid in the same action rather than visiting the Billing Dashboard separately.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
