@@ -43,6 +43,29 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
   });
   const [creatingSC, setCreatingSC] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [cities, setCities] = useState([]);
+
+  useEffect(() => {
+    if (showCreateModal) {
+      api.get('/api/cities').then(({ data }) => setCities(data)).catch(() => setCities([]));
+    }
+  }, [showCreateModal]);
+
+  const uniqueStates = [...new Set(cities.map(c => c.state))].sort();
+  const filteredDistricts = [...new Set(
+    cities
+      .filter((c) => (modalData.state ? c.state === modalData.state : true))
+      .map((c) => c.district)
+  )].sort();
+  const filteredCities = [...new Set(
+    cities
+      .filter((c) => {
+        if (modalData.state && c.state !== modalData.state) return false;
+        if (modalData.district && c.district !== modalData.district) return false;
+        return true;
+      })
+      .map((c) => c.name)
+  )].sort();
 
   const [prevCity, setPrevCity] = useState(formData.city);
   const [prevDistrict, setPrevDistrict] = useState(formData.district);
@@ -329,18 +352,20 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
 
               <div>
                 <label className="text-xs font-semibold block mb-1">City <span className="text-red-500">*</span></label>
-                <InlineCitySelect
+                <input
+                  type="text"
+                  list="unreg-cities"
                   value={modalData.city}
-                  onChange={({ city, district, state }) => {
-                    setModalData(prev => ({
-                      ...prev,
-                      city,
-                      district,
-                      state,
-                    }));
-                  }}
+                  onChange={(e) => setModalData(prev => ({ ...prev, city: e.target.value }))}
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="Enter city"
                   required
                 />
+                <datalist id="unreg-cities">
+                  {filteredCities.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -348,21 +373,43 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
                   <label className="text-xs font-semibold block mb-1">District</label>
                   <input
                     type="text"
+                    list="unreg-districts"
                     value={modalData.district}
-                    readOnly
-                    className="flex h-9 w-full rounded-lg border border-input bg-muted px-3 py-1 text-sm shadow-sm cursor-not-allowed"
-                    placeholder="Auto-filled from city"
+                    onChange={(e) => {
+                      const newDistrict = e.target.value;
+                      const match = cities.find(c => c.district === newDistrict);
+                      setModalData(prev => ({ 
+                        ...prev, 
+                        district: newDistrict,
+                        state: match ? match.state : prev.state
+                      }));
+                    }}
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Enter district"
+                    required
                   />
+                  <datalist id="unreg-districts">
+                    {filteredDistricts.map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="text-xs font-semibold block mb-1">State</label>
                   <input
                     type="text"
+                    list="unreg-states"
                     value={modalData.state}
-                    readOnly
-                    className="flex h-9 w-full rounded-lg border border-input bg-muted px-3 py-1 text-sm shadow-sm cursor-not-allowed"
-                    placeholder="Auto-filled from city"
+                    onChange={(e) => setModalData(prev => ({ ...prev, state: e.target.value, district: '', city: '' }))}
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Enter state"
+                    required
                   />
+                  <datalist id="unreg-states">
+                    {uniqueStates.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
 

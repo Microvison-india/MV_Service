@@ -58,13 +58,15 @@ const createCity = async (req, res, next) => {
       state: { $regex: new RegExp(`^${normalizedState}$`, 'i') }
     });
 
-    if (!city) {
-      city = await City.create({
-        name: normalizedName,
-        district: normalizedDistrict,
-        state: normalizedState
-      });
+    if (city) {
+      return res.status(409).json({ message: 'This exact city, district, and state combination already exists in our list.' });
     }
+
+    city = await City.create({
+      name: normalizedName,
+      district: normalizedDistrict,
+      state: normalizedState
+    });
 
     res.status(201).json(city);
   } catch (error) {

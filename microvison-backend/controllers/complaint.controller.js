@@ -621,15 +621,20 @@ const getMyComplaints = async (req, res) => {
 // @access  Private (SC only)
 // ─────────────────────────────────────────────────────────────
 const acceptComplaint = async (req, res) => {
-  const sc = await ServiceCentre.findOne({ userId: req.user.id });
-  if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
-
+  // Admin proxy: allowed to act on behalf of unregistered SCs
   const complaint = await Complaint.findById(req.params.id);
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
-  // Security: make sure this SC owns this complaint
-  if (String(complaint.assignedCentreId) !== String(sc._id)) {
-    return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+  let sc;
+  if (req.user.role === 'admin') {
+    sc = await ServiceCentre.findById(complaint.assignedCentreId);
+    if (!sc) return res.status(404).json({ message: 'Assigned Service Centre not found.' });
+  } else {
+    sc = await ServiceCentre.findOne({ userId: req.user.id });
+    if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
+    if (String(complaint.assignedCentreId) !== String(sc._id)) {
+      return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+    }
   }
 
   if (complaint.status !== 'assigned') {
@@ -682,14 +687,20 @@ const acceptComplaint = async (req, res) => {
 const rejectComplaint = async (req, res) => {
   const { note } = req.body;
 
-  const sc = await ServiceCentre.findOne({ userId: req.user.id });
-  if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
-
+  // Admin proxy: allowed to act on behalf of unregistered SCs
   const complaint = await Complaint.findById(req.params.id);
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
-  if (String(complaint.assignedCentreId) !== String(sc._id)) {
-    return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+  let sc;
+  if (req.user.role === 'admin') {
+    sc = await ServiceCentre.findById(complaint.assignedCentreId);
+    if (!sc) return res.status(404).json({ message: 'Assigned Service Centre not found.' });
+  } else {
+    sc = await ServiceCentre.findOne({ userId: req.user.id });
+    if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
+    if (String(complaint.assignedCentreId) !== String(sc._id)) {
+      return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+    }
   }
 
   if (complaint.status !== 'assigned') {
@@ -717,14 +728,20 @@ const rejectComplaint = async (req, res) => {
 // @access  Private (SC only)
 // ─────────────────────────────────────────────────────────────
 const markGoing = async (req, res) => {
-  const sc = await ServiceCentre.findOne({ userId: req.user.id });
-  if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
-
+  // Admin proxy: allowed to act on behalf of unregistered SCs
   const complaint = await Complaint.findById(req.params.id);
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
-  if (String(complaint.assignedCentreId) !== String(sc._id)) {
-    return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+  let sc;
+  if (req.user.role === 'admin') {
+    sc = await ServiceCentre.findById(complaint.assignedCentreId);
+    if (!sc) return res.status(404).json({ message: 'Assigned Service Centre not found.' });
+  } else {
+    sc = await ServiceCentre.findOne({ userId: req.user.id });
+    if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
+    if (String(complaint.assignedCentreId) !== String(sc._id)) {
+      return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+    }
   }
 
   if (complaint.status !== 'accepted') {
@@ -784,14 +801,20 @@ const updateStatus = async (req, res) => {
     });
   }
 
-  const sc = await ServiceCentre.findOne({ userId: req.user.id });
-  if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
-
+  // Admin proxy: allowed to act on behalf of unregistered SCs
   const complaint = await Complaint.findById(req.params.id);
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
-  if (String(complaint.assignedCentreId) !== String(sc._id)) {
-    return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+  let sc;
+  if (req.user.role === 'admin') {
+    sc = await ServiceCentre.findById(complaint.assignedCentreId);
+    if (!sc) return res.status(404).json({ message: 'Assigned Service Centre not found.' });
+  } else {
+    sc = await ServiceCentre.findOne({ userId: req.user.id });
+    if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
+    if (String(complaint.assignedCentreId) !== String(sc._id)) {
+      return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+    }
   }
 
   // Must be in accepted, going, part_received, or not_done state to submit final result (SC Flow v1.1)
@@ -859,8 +882,8 @@ const updateStatus = async (req, res) => {
           updatedCharges.push({
             label: item.label.trim(),
             amount: Number(item.amount),
-            requestedBy: 'sc',
-            status: 'pending',
+            requestedBy: item.requestedBy || 'sc',
+            status: item.requestedBy === 'admin' ? 'approved' : 'pending',
           });
         }
       }
@@ -922,6 +945,7 @@ const updateStatus = async (req, res) => {
         await product.save();
       }
     }
+
     timelineNote = scNotes ? scNotes.trim() : 'SC marked as done.';
     timelineVoiceUrl = doneVoiceUrl || '';
   }
@@ -951,11 +975,16 @@ const updateStatus = async (req, res) => {
     if (!partDetails || partDetails.trim() === '') {
       return res.status(400).json({ message: 'Parts detail description is compulsory before marking as part pending.' });
     }
+    // Voice note not required for admin proxy
     if (!partPendingVoiceUrl || partPendingVoiceUrl.trim() === '') {
-      return res.status(400).json({ message: 'A voice note explanation is compulsory before marking as part pending.' });
+      if (req.user.role !== 'admin') {
+        return res.status(400).json({ message: 'A voice note explanation is compulsory before marking as part pending.' });
+      }
     }
     if (!scNotes || scNotes.trim() === '') {
-      return res.status(400).json({ message: 'Text notes are compulsory before marking as part pending.' });
+      if (req.user.role !== 'admin') {
+        return res.status(400).json({ message: 'Text notes are compulsory before marking as part pending.' });
+      }
     }
 
     // Reset delivery details to trigger a new cycle
@@ -965,8 +994,9 @@ const updateStatus = async (req, res) => {
     complaint.partDeliveredNote = '';
     complaint.partReceivedAt = null;
 
-    complaint.scNotes = scNotes.trim();
-    timelineNote = `Part Pending: Sourcing requested for "${partDetails.trim()}". ${scNotes.trim()}`;
+    const trimmedNotes = scNotes ? scNotes.trim() : '';
+    complaint.scNotes = trimmedNotes;
+    timelineNote = `Part Pending: Sourcing requested for "${partDetails.trim()}".${trimmedNotes ? ' ' + trimmedNotes : ''}`;
     timelineVoiceUrl = partPendingVoiceUrl;
   }
 
@@ -1232,7 +1262,7 @@ const rejectExtra = (req, res) => handleExtraCharge(req, res, 'rejected');
 const getComplaintById = async (req, res) => {
   const { id } = req.params;
   const complaint = await Complaint.findById(id)
-    .populate('assignedCentreId', 'ownerName businessName phone1 email1')
+    .populate('assignedCentreId', 'ownerName businessName phone1 email1 isUnregistered')
     .populate({
       path: 'trackingId',
       populate: {
@@ -1292,12 +1322,12 @@ const getActionItems = async (req, res) => {
   const pendingConfirmations = await Complaint.find({
     status: 'done'
   })
-    .populate('assignedCentreId', 'ownerName businessName phone1')
+    .populate('assignedCentreId', 'ownerName businessName phone1 isUnregistered')
     .sort({ updatedAt: -1 });
 
   // 3. Rejected by SC
   const rejectedBySC = await Complaint.find({ status: 'rejected_by_sc' })
-    .populate('assignedCentreId', 'ownerName businessName phone1')
+    .populate('assignedCentreId', 'ownerName businessName phone1 isUnregistered')
     .sort({ updatedAt: -1 });
 
   // 4. Pending Extra Approvals (Any complaint containing an extra charge with status='pending')
@@ -1416,14 +1446,20 @@ const markPartDelivered = async (req, res) => {
 const markPartReceived = async (req, res) => {
   const { id } = req.params;
 
-  const sc = await ServiceCentre.findOne({ userId: req.user.id });
-  if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
-
+  // Admin proxy: allowed to act on behalf of unregistered SCs
   const complaint = await Complaint.findById(id);
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
-  if (String(complaint.assignedCentreId) !== String(sc._id)) {
-    return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+  let sc;
+  if (req.user.role === 'admin') {
+    sc = await ServiceCentre.findById(complaint.assignedCentreId);
+    if (!sc) return res.status(404).json({ message: 'Assigned Service Centre not found.' });
+  } else {
+    sc = await ServiceCentre.findOne({ userId: req.user.id });
+    if (!sc) return res.status(404).json({ message: 'Service Centre profile not found.' });
+    if (String(complaint.assignedCentreId) !== String(sc._id)) {
+      return res.status(403).json({ message: 'Not authorised to act on this complaint.' });
+    }
   }
 
   if (complaint.status !== 'part_pending') {
@@ -1597,7 +1633,7 @@ const getAllComplaints = async (req, res) => {
 
     // Execute query
     const complaints = await Complaint.find(query)
-      .populate('assignedCentreId', 'businessName ownerName phone1')
+      .populate('assignedCentreId', 'businessName ownerName phone1 isUnregistered')
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 })
       .skip(skipNum)

@@ -124,9 +124,9 @@ export default function BillingTable({
                       <td className="px-4 py-3 text-xs font-medium">
                         {PRODUCT_LABELS[b.product] || b.product}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${
                             isWarranty
                               ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/40'
                               : 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/40'

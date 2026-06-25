@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
+import { X } from 'lucide-react';
 
 const CAPABILITY_LABELS = {
   led_only: 'LED Only',
@@ -25,6 +26,14 @@ export default function SCDetail() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState('info');
+
+  // Unregistered link flow states
+  const [unregisteredSCs, setUnregisteredSCs] = useState([]);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [selectedUnregSCId, setSelectedUnregSCId] = useState('');
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [linkingLoading, setLinkingLoading] = useState(false);
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -61,6 +70,20 @@ export default function SCDetail() {
     return () => { active = false; };
   }, [id]);
 
+  useEffect(() => {
+    let active = true;
+    const fetchUnreg = async () => {
+      try {
+        const { data } = await api.get('/api/service-centres?isUnregistered=true&limit=1000');
+        if (active) setUnregisteredSCs(data.serviceCentres || []);
+      } catch {
+        // fail silently
+      }
+    };
+    fetchUnreg();
+    return () => { active = false; };
+  }, []);
+
   const performAction = async (action) => {
     setActionLoading(true);
     setError('');
@@ -73,6 +96,31 @@ export default function SCDetail() {
       setError(err.response?.data?.message || `Failed to ${action} service centre.`);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleLinkConfirm = async () => {
+    if (!selectedUnregSCId || !sc) return;
+    setLinkingLoading(true);
+    setLinkError('');
+    try {
+      const newSCId = sc._id;
+      // 1. Approve
+      await api.patch(`/api/service-centres/${newSCId}/approve`);
+      // 2. Link
+      await api.patch(`/api/service-centres/${newSCId}/link-to-registered`, {
+        unregisteredSCId: selectedUnregSCId
+      });
+
+      setSuccessMsg('Successfully approved registration and linked to existing unregistered SC.');
+      setShowLinkModal(false);
+      
+      // Reload page to reflect updated active status/details
+      window.location.reload();
+    } catch (err) {
+      setLinkError(err.response?.data?.message || 'Failed to link service centres.');
+    } finally {
+      setLinkingLoading(false);
     }
   };
 
@@ -149,6 +197,18 @@ export default function SCDetail() {
             <div className="flex flex-wrap gap-2">
               {sc.status === 'pending' && (
                 <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnregSCId('');
+                      setLinkSearch('');
+                      setLinkError('');
+                      setShowLinkModal(true);
+                    }}
+                    className="px-3.5 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-semibold transition flex items-center gap-1.5"
+                  >
+                    🔗 Link Unregistered
+                  </button>
                   <button
                     id="sc-approve-btn"
                     disabled={actionLoading}
@@ -337,6 +397,92 @@ export default function SCDetail() {
           </div>
         )}
       </div>
+
+      {/* Link to Unregistered SC Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 border border-border shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowLinkModal(false)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold mb-1 text-foreground">Link to Unregistered SC</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Select the unregistered service centre record to merge with this new registration. All past complaints will be migrated.
+            </p>
+
+            <div className="space-y-4">
+              {/* Search unregistered SCs */}
+              <div>
+                <label className="text-xs font-semibold block mb-1 text-foreground">Search Unregistered SCs</label>
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, city..."
+                  value={linkSearch}
+                  onChange={(e) => setLinkSearch(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring text-foreground"
+                />
+              </div>
+
+              {/* Candidates List */}
+              <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2 bg-muted/10">
+                {unregisteredSCs
+                  .filter((unreg) => {
+                    const s = linkSearch.toLowerCase();
+                    return (
+                      unreg.businessName.toLowerCase().includes(s) ||
+                      unreg.phone1.includes(s) ||
+                      (unreg.city && unreg.city.toLowerCase().includes(s)) ||
+                      (unreg.district && unreg.district.toLowerCase().includes(s))
+                    );
+                  })
+                  .map((unreg) => {
+                    const isSelected = selectedUnregSCId === unreg._id;
+                    return (
+                      <div
+                        key={unreg._id}
+                        onClick={() => setSelectedUnregSCId(unreg._id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition ${
+                          isSelected
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:border-ring'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm text-foreground">{unreg.businessName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {unreg.city}, {unreg.district} · Phone: {unreg.phone1}
+                        </p>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {linkError && <p className="text-xs text-destructive">{linkError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLinkModal(false)}
+                  className="px-4 py-2 rounded-lg border border-border text-foreground text-sm font-medium hover:bg-muted transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={linkingLoading || !selectedUnregSCId}
+                  onClick={handleLinkConfirm}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/95 disabled:opacity-50 transition"
+                >
+                  {linkingLoading ? 'Linking...' : 'Confirm & Link'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

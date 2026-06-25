@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Check, ChevronsUpDown, Loader2, X } from 'lucide-react';
 import api from '../../api/axios';
 
-export default function InlineCitySelect({ value, onChange, placeholder = 'Search or select city...', required = false, className = '' }) {
+export default function InlineCitySelect({ value, onChange, onCityCreated, placeholder = 'Search or select city...', required = false, className = '', filterState = '', filterDistrict = '' }) {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -19,6 +19,17 @@ export default function InlineCitySelect({ value, onChange, placeholder = 'Searc
   const [error, setError] = useState('');
 
   const containerRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Sync state with props during render, avoiding useEffect cascading render trigger
   if (value !== prevValue) {
@@ -47,13 +58,17 @@ export default function InlineCitySelect({ value, onChange, placeholder = 'Searc
     };
   }, []);
 
-  const filteredCities = search
-    ? cities.filter(c => 
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.district.toLowerCase().includes(search.toLowerCase()) ||
-        c.state.toLowerCase().includes(search.toLowerCase())
-      )
-    : cities;
+  const filteredCities = cities.filter(c => {
+    if (filterState && c.state !== filterState) return false;
+    if (filterDistrict && c.district !== filterDistrict) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      return c.name.toLowerCase().includes(s) ||
+             c.district.toLowerCase().includes(s) ||
+             c.state.toLowerCase().includes(s);
+    }
+    return true;
+  });
 
   const handleSelect = (cityObj) => {
     onChange({
@@ -68,8 +83,8 @@ export default function InlineCitySelect({ value, onChange, placeholder = 'Searc
   const handleStartCreate = (e) => {
     e.stopPropagation();
     setNewCityName(search);
-    setNewDistrict('');
-    setNewState('');
+    setNewDistrict(filterDistrict || '');
+    setNewState(filterState || '');
     setIsCreating(true);
     setError('');
   };
@@ -94,6 +109,7 @@ export default function InlineCitySelect({ value, onChange, placeholder = 'Searc
       // Select the new city
       handleSelect(data);
       setIsCreating(false);
+      if (onCityCreated) onCityCreated(data);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create city.');
     } finally {
@@ -153,7 +169,7 @@ export default function InlineCitySelect({ value, onChange, placeholder = 'Searc
               </div>
 
               {/* Create new option */}
-              {search.trim().length > 0 && !cities.some(c => c.name.toLowerCase() === search.trim().toLowerCase()) && (
+              {search.trim().length > 0 && !filteredCities.some(c => c.name.toLowerCase() === search.trim().toLowerCase()) && (
                 <div
                   onClick={handleStartCreate}
                   className="mt-1 border-t pt-1 flex w-full cursor-pointer select-none items-center rounded-sm py-2 pl-2 pr-8 text-sm outline-none text-primary hover:bg-accent font-semibold"

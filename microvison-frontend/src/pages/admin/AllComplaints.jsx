@@ -135,9 +135,9 @@ export default function AllComplaints() {
                       <td className="px-4 py-3 capitalize">
                         {c.complaintType}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
                             c.warrantyStatus === 'in_warranty'
                               ? 'bg-green-50 text-green-700 border border-green-200'
                               : 'bg-orange-50 text-orange-700 border border-orange-200'

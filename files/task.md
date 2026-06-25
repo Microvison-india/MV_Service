@@ -186,6 +186,8 @@
   - [ ] Refine SC Assignment Logic — now handled in Phase 19 (Step 5 of new 5-step form, with Skip option and capability filtering)
   - [ ] Support custom/new cities/locations — now handled in Phase 20 (Section 2D, inline "Create new" from any city field)
   - [x] Add optional `location` text field — addressed in Phase 21 (Section 3C, `locationText` field added to Step 1 `Step1CustomerInfo.jsx` and `Complaint` model)
+  - [ ] Advanced pagination
+  - [ ] SC specific complaint and stats
 
 - [x] **Phase 9 — Admin Action Centre (Day 12-13)**
   - [x] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
@@ -624,4 +626,15 @@
 
   **E. SC Billing Page (Read-only)**
   - [x] `pages/sc/SCBilling.jsx` — Update filters to use `dateFrom`/`dateTo` (date pickers) instead of month/year dropdowns. SCs only see their own billing data — payment status and paidAt are shown as read-only columns (so SC can see which bills Microvison has marked as paid).
+
+- [x] **Phase 20 — Post-Implementation Refinement & UI Consistency Bugs**
+  - [x] **J. Done Form Simplification & Realignment**
+    - [x] Simplify unregistered SC Done form to only request photos, Out-of-Warranty client payments, and notes (keep money/petrol/extras at final close).
+    - [x] Revert `markAsPaidImmediately` handler logic inside updateStatus done path in backend.
+  - [x] **K. Explicit Linking Expansion**
+    - [x] Add explicit `🔗 Link Unregistered` action button on pending registrations in Action Centre dashboard.
+    - [x] Add explicit `🔗 Link Unregistered` action button and search modal inside the Service Centre details view (`SCDetail.jsx`).
+  - [x] **L. Layout & Backend Bug Fixes**
+    - [x] Resolve text-wrapping issue in tables by adding `whitespace-nowrap` to the Warranty status badges.
+    - [x] Fix potential crash in backend `part_pending` updates when `scNotes` is empty for admin proxy.
 

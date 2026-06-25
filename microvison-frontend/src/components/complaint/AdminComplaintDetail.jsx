@@ -6,6 +6,7 @@ import ImageUploader from '../forms/ImageUploader';
 import StatusTimeline from './StatusTimeline';
 import PetrolEditField from './PetrolEditField';
 import BillSummary from './BillSummary';
+import SCComplaintDetail from './SCComplaintDetail';
 
 // GRD Section 11.1 / TBP Phase 9
 // Admin slide-out review panel for a complaint.
@@ -53,6 +54,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [unregPartDetails, setUnregPartDetails] = useState('');
   const [unregReason, setUnregReason] = useState('');
   const [unregPhotos, setUnregPhotos] = useState([]);
+
+
+  // Unregistered SC Proxy Mode
+  const [showProxyMode, setShowProxyMode] = useState(false);
 
   // Phase 21: Closing Check States
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -1390,7 +1395,8 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
                     {/* Done Form */}
                     {unregActionForm === 'done' && (
-                      <div className="space-y-3 pt-2">
+                      <div className="space-y-4 pt-2">
+                        {/* Proof Photos */}
                         <div>
                           <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Min 1) <span className="text-red-500">*</span></label>
                           <ImageUploader
@@ -1400,6 +1406,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           />
                         </div>
 
+                        {/* Out-of-warranty: Amount collected */}
                         {!isInWarranty && (
                           <div>
                             <label className="text-[10px] font-bold uppercase block mb-1">Amount Collected from Customer (₹) <span className="text-red-500">*</span></label>
@@ -1415,6 +1422,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           </div>
                         )}
 
+                        {/* SC Notes */}
                         <div>
                           <label className="text-[10px] font-bold uppercase block mb-1">SC Notes / Report</label>
                           <textarea
@@ -1430,9 +1438,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           type="button"
                           onClick={() => handleUnregSubmitFinal('done')}
                           disabled={actionLoading === 'unreg_status'}
-                          className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition"
+                          className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition"
                         >
-                          Submit Done Status
+                          {actionLoading === 'unreg_status' ? 'Submitting...' : 'Submit Done Status'}
                         </button>
                       </div>
                     )}
@@ -1805,6 +1813,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 </div>
               )}
             </div>
+          ) : c?.status === 'assigned' && c?.assignedCentreId?.isUnregistered ? (
+            /* Unregistered SC action is handled by the panel above — show nothing extra here */
+            null
           ) : ['unassigned', 'new', 'assigned', 'rejected_by_sc'].includes(c?.status) ? (
             <div className="space-y-3">
               <p className="text-sm font-bold text-foreground uppercase tracking-wider">
@@ -2007,6 +2018,19 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             </div>
           </div>
         </>
+      )}
+
+      {/* Admin Proxy Modal for Unregistered SCs */}
+      {showProxyMode && (
+        <SCComplaintDetail
+          complaint={c}
+          onClose={() => setShowProxyMode(false)}
+          onUpdated={() => {
+            setShowProxyMode(false);
+            setRefreshTick(prev => prev + 1);
+            if (onUpdated) onUpdated();
+          }}
+        />
       )}
     </>
   );

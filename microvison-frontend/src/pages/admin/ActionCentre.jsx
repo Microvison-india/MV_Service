@@ -230,6 +230,13 @@ export default function ActionCentre() {
                           </div>
                           <div className="flex gap-2 shrink-0">
                             <button
+                              type="button"
+                              onClick={() => handleOpenLinkModal(sc)}
+                              className="px-3.5 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium transition flex items-center gap-1.5"
+                            >
+                              🔗 Link Unregistered
+                            </button>
+                            <button
                               disabled={!!actionLoading[sc._id]}
                               onClick={() => performSCAction(sc._id, 'approve')}
                               className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"

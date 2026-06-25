@@ -344,35 +344,39 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
           {/* State */}
           <div>
             <label className={labelCls}>State <span className="text-red-500">*</span></label>
-            <select
+            <input
               id="step1-state"
+              list="states-list"
               value={formData.state || ''}
               onChange={handleStateChange}
+              placeholder="Select or enter new state"
               className={inputCls}
               required
-            >
-              <option value="">Select State</option>
+            />
+            <datalist id="states-list">
               {uniqueStates.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s} />
               ))}
-            </select>
+            </datalist>
           </div>
 
           {/* District */}
           <div>
             <label className={labelCls}>District <span className="text-red-500">*</span></label>
-            <select
+            <input
               id="step1-district"
+              list="districts-list"
               value={formData.district || ''}
               onChange={handleDistrictChange}
+              placeholder="Select or enter new district"
               className={inputCls}
               required
-            >
-              <option value="">Select District</option>
+            />
+            <datalist id="districts-list">
               {filteredDistricts.map((d) => (
-                <option key={d} value={d}>{d}</option>
+                <option key={d} value={d} />
               ))}
-            </select>
+            </datalist>
           </div>
 
           {/* City */}
@@ -380,6 +384,8 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
             <label className={labelCls}>City <span className="text-red-500">*</span></label>
             <InlineCitySelect
               value={formData.city || ''}
+              filterState={formData.state || ''}
+              filterDistrict={formData.district || ''}
               onChange={({ city, district, state }) => {
                 setFormData((prev) => ({
                   ...prev,
@@ -387,6 +393,9 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
                   district,
                   state
                 }));
+              }}
+              onCityCreated={(newCity) => {
+                setCities(prev => [...prev, newCity]);
               }}
               required
             />
