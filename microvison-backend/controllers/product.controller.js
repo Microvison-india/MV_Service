@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const Complaint = require('../models/Complaint');
 const ComplaintUpdate = require('../models/ComplaintUpdate');
 const generateTrackingId = require('../utils/generateTrackingId');
 const { calculateWarranty } = require('../utils/warrantyCalculator');
@@ -277,6 +278,32 @@ const updateProduct = async (req, res) => {
     }
 
     await product.save();
+
+    // Sync warranty & bill info to any active (non-closed) complaint linked to this product
+    if (
+      billDate !== undefined ||
+      warrantyStatus !== undefined ||
+      forceOverride !== undefined ||
+      warrantyForceReason !== undefined
+    ) {
+      await Complaint.updateMany(
+        {
+          trackingId: product._id,
+          status: { $nin: ['closed'] },
+        },
+        {
+          $set: {
+            billDate: product.billDate,
+            billPhoto: product.billPhoto,
+            warrantyStatus: product.warrantyStatus,
+            warrantyExpiryDate: product.warrantyExpiryDate,
+            warrantySource: product.warrantySource,
+            warrantyForceReason: product.warrantyForceReason,
+          },
+        }
+      );
+    }
+
     res.status(200).json({ message: 'Product updated', product });
   } catch (error) {
     console.error('Error updating product:', error);

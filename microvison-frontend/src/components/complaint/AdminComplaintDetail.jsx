@@ -30,6 +30,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [petrolSC, setPetrolSC] = useState('');
   const [adminExtraCharges, setAdminExtraCharges] = useState([]);
   const [isEditingExtraCharges, setIsEditingExtraCharges] = useState(false);
+  const [adminMadeEdits, setAdminMadeEdits] = useState(false);
   const [savingExtraCharges, setSavingExtraCharges] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -137,9 +138,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             setEditBillPhoto(prod.billPhoto || '');
 
             isFirst = false;
-          } else if (!isEditingExtraCharges && data.complaint.status !== 'done') {
+          } else if (!isEditingExtraCharges && !adminMadeEdits) {
             setPetrolAdmin(data.complaint.petrolAdmin ?? '');
             setPetrolSC(data.complaint.petrolSC ?? '');
+            setPetrolFinal(data.complaint.petrolFinal ?? '');
             setAdminExtraCharges(data.complaint.extraCharges || []);
 
             if (!showProductEditor) {
@@ -168,7 +170,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       active = false;
       clearInterval(intervalId);
     };
-  }, [complaintId, refreshTick, isEditingExtraCharges]);
+  }, [complaintId, refreshTick, isEditingExtraCharges, adminMadeEdits]);
 
   // Fetch candidate Service Centres for reassignment
   useEffect(() => {
@@ -439,10 +441,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         serialNumber: editSerialNumber,
         modelNumber: editModelNumber,
         shopName: editShopName,
-        billDate: editBillDate,
+        billDate: editBillDate || null,        // null clears the date (triggers manual warranty)
         billPhoto: editBillPhoto,
+        complaintType: c?.complaintType || 'complaint', // context for warranty calc
       });
-      setSuccess('Product registry details updated successfully!');
+      setSuccess('Product registry details updated. Warranty status has been recalculated and synced.');
       setShowProductEditor(false);
       setRefreshTick(t => t + 1); // trigger reload
     } catch (err) {
@@ -849,7 +852,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         </div>
 
         {/* Scrollable drawer body */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6 pb-40">
+        <div className="flex-1 overflow-y-auto p-8 space-y-6 pb-10">
           
           {/* Customer & Product Profile (Static Card) */}
           <div className="border border-border/80 rounded-xl bg-card p-6 space-y-4 shadow-sm">
@@ -1187,26 +1190,40 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               ➕ Register New Complaint for this Product
             </button>
           </div>
-        </div>
 
-        {/* Sticky Bottom Actions Strip */}
-        <div className="sticky bottom-0 bg-background border-t border-border p-6 shadow-2xl z-20 space-y-4">
+          {/* ── Admin Action Section ─────────────────────────────── */}
+          <div className="border-t border-border pt-6 space-y-5">
           {canConfirmOrDispute ? (
-            <div className="space-y-4">
-              <p className="text-sm font-bold text-foreground uppercase tracking-wider">Admin Decision (Current Job: {c.complaintId})</p>
+            <div className="space-y-5">
+              {/* Section heading */}
+              <div className="flex items-center gap-3 pb-1">
+                <span className="text-sm font-extrabold text-foreground uppercase tracking-wider flex items-center gap-2">
+                  🛡️ Admin Decision
+                </span>
+                <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-bold">
+                  Job: {c.complaintId}
+                </span>
+              </div>
               
               {/* Petrol Verification Section (Warranty only) */}
               {isInWarranty && !c.petrolLocked && (
-                <div className="bg-muted/40 border border-border p-4 rounded-xl space-y-3">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Petrol Allowance Verification</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3.5 hover:border-primary/20 transition-all">
+                  <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                    <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      ⛽ Petrol Allowance Verification
+                    </span>
+                    <span className="text-[10px] bg-amber-500/10 text-amber-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
+                      3-Round Verification
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div>
                       <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">1st: Admin Estimate (₹)</label>
                       <input
                         type="number"
                         min="0"
                         value={petrolAdmin}
-                        onChange={(e) => setPetrolAdmin(e.target.value)}
+                        onChange={(e) => { setPetrolAdmin(e.target.value); setAdminMadeEdits(true); }}
                         className={inputCls}
                         placeholder="Admin Estimate"
                       />
@@ -1217,7 +1234,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                         type="number"
                         min="0"
                         value={petrolSC}
-                        onChange={(e) => setPetrolSC(e.target.value)}
+                        onChange={(e) => { setPetrolSC(e.target.value); setAdminMadeEdits(true); }}
                         className={inputCls}
                         placeholder="SC Claim"
                       />
@@ -1228,7 +1245,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                         type="number"
                         min="0"
                         value={petrolFinal}
-                        onChange={(e) => setPetrolFinal(e.target.value)}
+                        onChange={(e) => { setPetrolFinal(e.target.value); setAdminMadeEdits(true); }}
                         className={inputCls}
                         placeholder={petrolSC ? `Accept SC: ₹${petrolSC}` : petrolAdmin ? `Accept Admin: ₹${petrolAdmin}` : "Final Approved"}
                       />
@@ -1236,34 +1253,41 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   </div>
                   
                   {/* Quick Action buttons */}
-                  <div className="flex gap-2 text-xs">
+                  <div className="flex flex-wrap gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => setPetrolFinal(petrolAdmin)}
-                      className="px-2.5 py-1.5 rounded bg-primary/10 text-primary font-semibold hover:bg-primary/20 transition"
+                      onClick={() => { setPetrolFinal(petrolAdmin); setAdminMadeEdits(true); }}
+                      className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-bold text-xs hover:bg-primary/20 transition shadow-sm flex items-center gap-1"
                     >
-                      Accept 1st (Admin: ₹{petrolAdmin || 0})
+                      ✓ Accept 1st (Admin: ₹{petrolAdmin || 0})
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPetrolFinal(petrolSC)}
-                      className="px-2.5 py-1.5 rounded bg-primary/10 text-primary font-semibold hover:bg-primary/20 transition"
+                      onClick={() => { setPetrolFinal(petrolSC); setAdminMadeEdits(true); }}
+                      className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-bold text-xs hover:bg-primary/20 transition shadow-sm flex items-center gap-1"
                     >
-                      Accept 2nd (SC: ₹{petrolSC || 0})
+                      ✓ Accept 2nd (SC: ₹{petrolSC || 0})
                     </button>
                   </div>
                 </div>
               )}
 
               {/* Extra Charges Verification Section */}
-              <div className="bg-muted/40 border border-border p-4 rounded-xl space-y-3">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Extra Charges Verification & Adjustment</p>
+              <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3.5 hover:border-primary/20 transition-all">
+                <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                  <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    💳 Extra Charges Verification & Adjustment
+                  </span>
+                  <span className="text-[10px] bg-blue-500/10 text-blue-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
+                    {adminExtraCharges.length} item{adminExtraCharges.length === 1 ? '' : 's'}
+                  </span>
+                </div>
                 
                 {/* List of Extra charges */}
                 {adminExtraCharges.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                     {adminExtraCharges.map((item, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-background p-2.5 rounded-lg border border-border gap-2 text-xs">
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-background p-2.5 rounded-lg border border-border gap-2 text-xs hover:border-border/80 transition">
                         <div className="flex items-center gap-2 flex-grow">
                           <input
                             type="text"
@@ -1271,8 +1295,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             onChange={(e) => {
                               const newLabel = e.target.value;
                               setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, label: newLabel } : ec));
+                              setAdminMadeEdits(true);
                             }}
-                            className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
+                            className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
                             placeholder="Description"
                           />
                           <input
@@ -1281,12 +1306,13 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             onChange={(e) => {
                               const newAmount = e.target.value === '' ? '' : Number(e.target.value);
                               setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, amount: newAmount } : ec));
+                              setAdminMadeEdits(true);
                             }}
-                            className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-20 shrink-0"
+                            className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
                             placeholder="Amount"
                           />
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase ${
-                            item.requestedBy === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                          <span className={`px-2 py-1 rounded text-[9px] font-extrabold uppercase shrink-0 ${
+                            item.requestedBy === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300'
                           }`}>
                             {item.requestedBy}
                           </span>
@@ -1299,8 +1325,13 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             onChange={(e) => {
                               const newStatus = e.target.value;
                               setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, status: newStatus } : ec));
+                              setAdminMadeEdits(true);
                             }}
-                            className="bg-background border border-border text-[10px] rounded px-1.5 py-1 font-bold text-foreground focus:outline-none"
+                            className={`bg-background border border-border text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none ${
+                              item.status === 'approved' ? 'text-green-600 border-green-300 dark:border-green-800' :
+                              item.status === 'rejected' ? 'text-red-600 border-red-300 dark:border-red-800' :
+                              'text-yellow-600 border-yellow-300 dark:border-yellow-800'
+                            }`}
                           >
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
@@ -1310,8 +1341,8 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           {/* Delete button */}
                           <button
                             type="button"
-                            onClick={() => setAdminExtraCharges(prev => prev.filter((_, i) => i !== idx))}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition font-bold"
+                            onClick={() => { setAdminExtraCharges(prev => prev.filter((_, i) => i !== idx)); setAdminMadeEdits(true); }}
+                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition font-bold"
                             title="Delete charge"
                           >
                             ✕
@@ -1321,7 +1352,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic">No extra charges requested.</p>
+                  <p className="text-xs text-muted-foreground italic py-1">No extra charges requested.</p>
                 )}
 
                 {/* Add new extra charge form */}
@@ -1329,18 +1360,18 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   <input
                     type="text"
                     id="admin-confirm-extra-label"
-                    placeholder="Add item label..."
-                    className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
+                    placeholder="Add new charge description..."
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
                   />
                   <input
                     type="number"
                     id="admin-confirm-extra-amount"
-                    placeholder="₹"
-                    className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-20 shrink-0"
+                    placeholder="₹ Amount"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
                   />
                   <select
                     id="admin-confirm-extra-requested-by"
-                    className="bg-background border border-border text-xs rounded-lg px-2 py-1.5 font-semibold text-foreground focus:outline-none"
+                    className="bg-background border border-border text-xs rounded-lg px-2.5 py-2 font-semibold text-foreground focus:outline-none shrink-0"
                   >
                     <option value="admin">Admin</option>
                     <option value="sc">SC</option>
@@ -1358,11 +1389,12 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           requestedBy: reqBy,
                           status: 'approved'
                         }]);
+                        setAdminMadeEdits(true);
                         document.getElementById('admin-confirm-extra-label').value = '';
                         document.getElementById('admin-confirm-extra-amount').value = '';
                       }
                     }}
-                    className="px-3 py-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold whitespace-nowrap"
+                    className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition whitespace-nowrap shrink-0"
                   >
                     + Add Charge
                   </button>
@@ -1370,40 +1402,47 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               </div>
 
               {/* Note and Confirm Trigger */}
-              <div className="flex flex-col sm:flex-row gap-3 items-center w-full pb-2">
-                <input
-                  type="text"
-                  placeholder="Optional confirmation note..."
-                  value={adminNote}
-                  onChange={(e) => setAdminNote(e.target.value)}
-                  className={`${inputCls} text-sm py-2.5 px-4 flex-grow`}
-                />
-                <button
-                  onClick={handleConfirm}
-                  disabled={!!actionLoading}
-                  className="px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-green-700 disabled:opacity-50 transition whitespace-nowrap shrink-0"
-                >
-                  {actionLoading === 'confirm' ? '...' : '✓ Confirm'}
-                </button>
+              <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3">
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                  📝 Confirmation & Closure
+                </span>
+                <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
+                  <input
+                    type="text"
+                    placeholder="Optional confirmation note..."
+                    value={adminNote}
+                    onChange={(e) => setAdminNote(e.target.value)}
+                    className={`${inputCls} text-sm py-2.5 px-4 flex-grow`}
+                  />
+                  <button
+                    onClick={handleConfirm}
+                    disabled={!!actionLoading}
+                    className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-green-700 disabled:opacity-50 transition shadow-md hover:shadow-lg whitespace-nowrap shrink-0 flex items-center gap-2"
+                  >
+                    {actionLoading === 'confirm' ? 'Processing...' : '✓ Confirm & Close Job'}
+                  </button>
+                </div>
               </div>
 
               {/* Separation boundary & Dispute row */}
-              <div className="border-t border-border pt-4">
-                <p className="text-xs font-bold text-red-700 uppercase tracking-wider mb-2">Dispute Job (Return to SC)</p>
-                <div className="flex gap-2.5 w-full">
+              <div className="bg-red-50/50 dark:bg-red-950/10 border border-red-200 dark:border-red-900/40 p-4 rounded-xl shadow-sm space-y-3">
+                <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                  ⚠️ Dispute Job (Return to SC)
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2.5 w-full">
                   <input
                     type="text"
                     placeholder="Reason for dispute (Required)..."
                     value={disputeNote}
                     onChange={(e) => setDisputeNote(e.target.value)}
-                    className={`${inputCls} border-red-200 focus:ring-red-500 text-sm py-2.5 px-4 flex-grow`}
+                    className={`${inputCls} border-red-200 dark:border-red-900/50 focus:ring-red-500 text-sm py-2.5 px-4 flex-grow bg-background`}
                   />
                   <button
                     onClick={handleDispute}
                     disabled={!!actionLoading || !disputeNote.trim()}
-                    className="px-6 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-red-700 disabled:opacity-50 transition whitespace-nowrap shrink-0"
+                    className="px-8 py-2.5 bg-red-600 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-red-700 disabled:opacity-50 transition shadow-md hover:shadow-lg whitespace-nowrap shrink-0 flex items-center gap-2"
                   >
-                    {actionLoading === 'dispute' ? '...' : '✕ Dispute'}
+                    {actionLoading === 'dispute' ? 'Processing...' : '✕ Dispute Job'}
                   </button>
                 </div>
               </div>
@@ -1500,19 +1539,25 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
           {error && <p className="text-xs font-semibold text-red-600 bg-red-50 p-3 rounded-xl border border-red-200 mt-2">{error}</p>}
           {success && <p className="text-xs font-semibold text-green-600 bg-green-50 p-3 rounded-xl border border-green-200 mt-2">{success}</p>}
+          </div>
         </div>
       </div>
 
       {/* Missing Fields Warning Modal */}
       {showWarningModal && (
         <>
-          <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
-            <div className="bg-background border border-border w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-border flex items-center justify-between">
-                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                  ⚠️ Product Information Missing
-                </h3>
-                <button type="button" onClick={() => setShowWarningModal(false)} className="text-muted-foreground hover:text-foreground">✕</button>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-background border border-border w-full max-w-2xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col max-h-[85vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6 border-b border-border flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+                <div>
+                  <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
+                    ⚠️ Product Information Missing (Step 2 Details)
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Please complete or bypass these required Step 2 product tracking fields before closing the job.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setShowWarningModal(false)} className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-muted transition font-bold">✕</button>
               </div>
 
               <div className="p-6 space-y-5 flex-1 text-xs">

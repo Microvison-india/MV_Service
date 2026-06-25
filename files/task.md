@@ -449,18 +449,18 @@
 
 ---
 
-- [ ] **Phase 21 — New Step 2 (Product Info) + Warranty Logic Overhaul (v1.3 Change 3)**
+- [x] **Phase 21 — New Step 2 (Product Info) + Warranty Logic Overhaul (v1.3 Change 3)**
   > Source: `Microvison_System_Changes_v1.3.md` — Change 3A through 3G. Inserts a brand new Step 2 into the complaint registration form, shifting old Step 2 → Step 3, Step 3 → Step 4, Step 4 → Step 5. Step 2 collects Bill Date, Bill Photo, Shop Name, Serial Number, and Model Number. Warranty logic is completely overhauled with 4 priority rules. SC Done form gets demanded fields for missing product info.
 
   **A. Backend — New Fields on Product Model**
-  - [ ] `models/Product.js` — Add new fields:
+  - [x] `models/Product.js` — Add new fields:
     - `shopName` (String, optional) — name of shop/dealer where product was purchased
     - `modelNumber` (String, optional) — product model/variant identifier
     - `warrantyForceReason` (String, optional) — reason text when admin forces warranty override
     - `missingFieldsWarning` (Array of String, optional) — list of Step 2 field names that were bypassed at closing without being filled (e.g. `['billDate', 'billPhoto', 'shopName']`). Used for persistent missing-field indicator.
 
   **B. Backend — New Fields on Complaint Model**
-  - [ ] `models/Complaint.js` — Add new snapshot fields:
+  - [x] `models/Complaint.js` — Add new snapshot fields:
     - `shopName` (String, optional) — snapshot of Product's shopName at time of this complaint
     - `modelNumber` (String, optional) — snapshot of Product's modelNumber at time of this complaint
     - `locationText` (String, optional) — paste-friendly Google Maps link or location description. Stored on Complaint (not Product — location can differ per visit). Sent to SC in WA-01.
@@ -470,44 +470,44 @@
     - `missingFieldsBypassed` (Array of String, optional) — list of fields the admin explicitly bypassed at closing time without filling
 
   **C. Backend — Warranty Logic Overhaul in `warrantyCalculator.js`**
-  - [ ] `utils/warrantyCalculator.js` — Completely rewrite to implement 4 priority rules from v1.3 Section 3G:
+  - [x] `utils/warrantyCalculator.js` — Completely rewrite to implement 4 priority rules from v1.3 Section 3G:
     - **Rule 1 (Bill Date present):** `warrantyExpiryDate = billDate + 3 years`. `warrantyStatus = 'in_warranty'` if `today <= warrantyExpiryDate`, else `'out_of_warranty'`. `warrantySource = 'auto_calculated'`. `forceReason = null`.
     - **Rule 2 (No bill date, manual selection):** Accept `manualSelection` (`'in_warranty'` or `'out_of_warranty'`) and `manualReason` (required text). `warrantyStatus = manualSelection`. `warrantyExpiryDate = null`. `warrantySource = 'manual'`. `forceReason = null`.
     - **Rule 3 (LED Installation, nothing provided):** `warrantyStatus = 'in_warranty'`. `warrantyExpiryDate = null`. `warrantySource = 'manual'`. (Safe default for new installs.)
     - **Rule 4 (Force override):** Admin passes `forceOverride = true` + `forceReason` (required text). `warrantyStatus = forced value` (opposite of auto-calculated or whatever admin chose). `warrantySource = 'forced'`. `forceReason = admin's text`. This takes precedence over all other rules.
     - Return shape: `{ warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }`.
-  - [ ] `utils/warrantyCalculator.js` — Ensure fresh calculation at complaint creation time even if `billDate` was previously stored: always re-evaluate `today vs warrantyExpiryDate` so expired products auto-show as `out_of_warranty` even if they were `in_warranty` last year.
+  - [x] `utils/warrantyCalculator.js` — Ensure fresh calculation at complaint creation time even if `billDate` was previously stored: always re-evaluate `today vs warrantyExpiryDate` so expired products auto-show as `out_of_warranty` even if they were `in_warranty` last year.
 
   **D. Backend — Update Product Controller for New Fields**
-  - [ ] `controllers/product.controller.js` — Update `createProduct` and `updateProduct` to accept and save `shopName`, `modelNumber`, `warrantyForceReason`, and `missingFieldsWarning` fields.
-  - [ ] `controllers/product.controller.js` — After saving/updating, run fresh `warrantyCalculator` with the latest `billDate` (if present) or manual values to update the Product record's warranty fields.
+  - [x] `controllers/product.controller.js` — Update `createProduct` and `updateProduct` to accept and save `shopName`, `modelNumber`, `warrantyForceReason`, and `missingFieldsWarning` fields.
+  - [x] `controllers/product.controller.js` — After saving/updating, run fresh `warrantyCalculator` with the latest `billDate` (if present) or manual values to update the Product record's warranty fields.
 
   **E. Backend — Update Complaint Controller for New Fields + Step 2 Data**
-  - [ ] `controllers/complaint.controller.js` — Update `createComplaint`:
+  - [x] `controllers/complaint.controller.js` — Update `createComplaint`:
     - Accept new Step 2 fields from request body: `shopName`, `modelNumber`, `locationText`, `warrantyForceReason`, and `forceOverride` flag.
     - Pass all these to `warrantyCalculator` to determine final warranty values.
     - Snapshot `shopName`, `modelNumber`, `locationText`, `warrantyForceReason` onto the Complaint document.
     - Write `shopName`, `modelNumber` back to the Product record (update or create).
     - If `locationText` is filled, include it in WA-01 message content (see Phase 14 note).
-  - [ ] `controllers/complaint.controller.js` — Update `confirmDone`:
+  - [x] `controllers/complaint.controller.js` — Update `confirmDone`:
     - Before closing, check Product record's 5 Step 2 fields: `billDate`, `billPhoto`, `shopName`, `serialNumber`, `modelNumber`.
     - If any are empty: if request contains `missingFieldsBypassed` array (admin confirmed bypass): save bypassed fields to `complaint.missingFieldsBypassed` AND add to `product.missingFieldsWarning[]` (append, don't overwrite). Then close normally.
     - If `missingFieldsBypassed` is NOT provided and fields are missing: return a 400-level warning response with the list of missing fields — the frontend must show the warning dialog before re-submitting.
-  - [ ] `controllers/complaint.controller.js` — Update `updateStatus` (SC Done path):
+  - [x] `controllers/complaint.controller.js` — Update `updateStatus` (SC Done path):
     - When `status = 'done'` is submitted by SC: check which of `billDate`, `billPhoto`, `shopName`, `serialNumber`, `modelNumber` are empty on the linked Product record.
     - If `billDate`/`billPhoto`/`shopName` are missing: check if request body contains `scBillPhotoUrl` — if yes, save to `complaint.scBillPhotoUrl` AND update `product.billPhoto` with the new URL. Re-run warranty calculation for the Product record.
     - If `serialNumber`/`modelNumber` are missing: check if request body contains `scSerialSlipPhotoUrl` — save to `complaint.scSerialSlipPhotoUrl` (stored on complaint for admin to view and transcribe).
     - Store `bypassed` field names from SC request as `complaint.scMissingBypass[]` (records that SC intentionally skipped).
 
   **F. Frontend — Insert New Step 2 (Product Info) into the Wizard**
-  - [ ] `pages/admin/NewComplaint.jsx` — Update step wizard to have 5 steps:
+  - [x] `pages/admin/NewComplaint.jsx` — Update step wizard to have 5 steps:
     - Step 1: Customer Info (unchanged)
     - **Step 2: Product Info (NEW)**
     - Step 3: Product & Type (was Step 2)
     - Step 4: Charges & Media (was Step 3)
     - Step 5: SC Assignment (was Step 4)
     - Update step indicator UI to show 5 steps. Update `currentStep` state logic to go 1→2→3→4→5.
-  - [ ] Create `components/forms/Step2ProductInfo.jsx` — NEW FILE:
+  - [x] Create `components/forms/Step2ProductInfo.jsx` — NEW FILE:
     - **Bill Date:** Date picker input. Inline label: "Date of purchase / installation bill". On value change: run client-side warranty preview using `warrantyCalculator` logic and show the calculated status to the admin instantly (e.g. "Warranty: In Warranty — expires 15 Mar 2028").
     - **Bill Photo:** `ImageUploader` (max 1 image). Admin uploads the physical bill/receipt photo.
     - **Shop Name:** Text input. Label: "Shop / dealer name".
@@ -517,18 +517,18 @@
     - **Change warning:** If admin modifies any pre-filled value, show an inline alert under that field: "Previously saved as: [X]. You are changing it to: [Y]. Confirm?" with `[Keep New]` / `[Revert]` buttons.
     - **All fields are optional** — no validation blocks submission. Admin can proceed with all blank.
     - At bottom: show current warranty preview card (if bill date is filled). Show "Warranty will be set manually" notice if bill date is blank.
-  - [ ] `components/forms/Step2ProductInfo.jsx` — Warranty section (at the bottom of the step):
+  - [x] `components/forms/Step2ProductInfo.jsx` — Warranty section (at the bottom of the step):
     - **If bill date is filled:** Show read-only computed warranty info. Show `[Force Override]` button. If clicked, opens a text input for `forceReason` and a toggle to choose forced status.
     - **If bill date is NOT filled:** Show manual selector: `In Warranty` / `Out of Warranty` radio. Show required `manualReason` text input below the selector. For LED Installation: pre-select `In Warranty` but allow change.
     - All warranty values (computed or manual) are stored in `formData` and passed through to the create API.
-  - [ ] `components/forms/Step1CustomerInfo.jsx` — Add `Location / Action Text` field:
+  - [x] `components/forms/Step1CustomerInfo.jsx` — Add `Location / Action Text` field:
     - A large `<textarea>` (paste-friendly) below the address section.
     - Label: "Location / Maps Link (optional)". Placeholder: "Paste a Google Maps link, coordinates, or any navigation notes here. This will be sent to the SC."
     - No validation. Any text accepted. Stored in `formData.locationText`.
-  - [ ] `components/forms/Step3ProductType.jsx` (was Step2) — The warranty section in this step is REMOVED or simplified. Warranty is now fully handled in Step 2. Step 3 now only shows Product type (LED/Cooler) and Complaint type (Installation/Complaint). No warranty toggle or bill date fields here.
+  - [x] `components/forms/Step3ProductType.jsx` (was Step2) — The warranty section in this step is REMOVED or simplified. Warranty is now fully handled in Step 2. Step 3 now only shows Product type (LED/Cooler) and Complaint type (Installation/Complaint). No warranty toggle or bill date fields here.
 
   **G. Frontend — SC Done Form — Demanded Fields for Missing Product Info**
-  - [ ] `components/complaint/SCComplaintDetail.jsx` — In the **Done form slide-out**:
+  - [x] `components/complaint/SCComplaintDetail.jsx` — In the **Done form slide-out**:
     - Before rendering the Done form, fetch the complaint's linked Product record to check which of the 5 Step 2 fields are empty on the Product.
     - **Missing Bill Date / Bill Photo / Shop Name:** Show a sub-section at the top of the Done form: "Product Bill Info Required — The bill information for this product was not provided at registration. Please ask the customer for their purchase bill and upload a photo here." Add an `ImageUploader` (max 1) for the bill photo. Add a note: "This will be used to update the product's warranty information."
     - **Missing Serial Number / Model Number:** Show a sub-section: "Product Serial Info Required — Please photograph the serial number / model sticker on the product." Add an `ImageUploader` (max 1) for the serial/model sticker photo.
@@ -536,26 +536,26 @@
     - Both uploaded files go into the Done form `formData` as `scBillPhotoUrl` and `scSerialSlipPhotoUrl`. These are sent with the `PATCH /:id/status` (Done) API call.
 
   **H. Frontend — Admin Closing Check (Missing Product Fields Warning)**
-  - [ ] `components/complaint/AdminComplaintDetail.jsx` — In the **Confirm Done** action:
+  - [x] `components/complaint/AdminComplaintDetail.jsx` — In the **Confirm Done** action:
     - Before showing the Confirm Done dialog, call `GET /complaints/:id` to get latest Product info and check which of the 5 Step 2 fields are empty.
     - If any are missing: show a warning dialog listing the empty fields: "The following product fields are still empty: [Bill Date, Bill Photo, Shop Name]. Please fill them before closing or bypass each field."
     - For each missing field: show an inline input/picker to fill it right there in the dialog. Or a `[Bypass this field]` toggle per field (requires individual confirmation).
     - After admin resolves all fields (filled or bypassed): submit `confirmDone` with the `missingFieldsBypassed` array in the request body.
     - If admin bypasses: a persistent yellow warning icon appears on the Product record card in all future complaints for this product (showing which fields were bypassed and when). This persists until the fields are eventually filled.
-  - [ ] `components/complaint/AdminComplaintDetail.jsx` — Show the SC-uploaded bill photo (`scBillPhotoUrl`) and serial slip photo (`scSerialSlipPhotoUrl`) in the product info subsection of the complaint detail view. Admin can:
+  - [x] `components/complaint/AdminComplaintDetail.jsx` — Show the SC-uploaded bill photo (`scBillPhotoUrl`) and serial slip photo (`scSerialSlipPhotoUrl`) in the product info subsection of the complaint detail view. Admin can:
     - **Bill photo:** Accept it (auto-fill bill date from photo context), replace with another image, or remove it.
     - **Serial slip photo:** View it and manually type the serial/model number into the Product record fields. This is a manual transcription step — the system does not auto-read the photo.
 
   **I. Step Renaming — Update All References**
-  - [ ] `pages/admin/NewComplaint.jsx` — Rename step component imports: old `Step2ProductType` → `Step3ProductType`, old `Step3Charges` → `Step4Charges`, old `Step4AssignSC` → `Step5AssignSC`. Update all `currentStep` conditionals.
-  - [ ] Rename files to match new step numbers (or keep filenames as-is and update imports — choose consistency):
+  - [x] `pages/admin/NewComplaint.jsx` — Rename step component imports: old `Step2ProductType` → `Step3ProductType`, old `Step3Charges` → `Step4Charges`, old `Step4AssignSC` → `Step5AssignSC`. Update all `currentStep` conditionals.
+  - [x] Rename files to match new step numbers (or keep filenames as-is and update imports — choose consistency):
     - `Step2ProductType.jsx` → `Step3ProductType.jsx`
     - `Step3Charges.jsx` → `Step4Charges.jsx`
     - `Step4AssignSC.jsx` → `Step5AssignSC.jsx`
-  - [ ] Update all internal references in `NewComplaint.jsx`, `App.jsx` imports, and any documentation references.
+  - [x] Update all internal references in `NewComplaint.jsx`, `App.jsx` imports, and any documentation references.
 
   **J. WA-01 Content Update (Phase 14 dependency)**
-  - [ ] When Phase 14 is built: `WA-01` message must include `Serial Number` and `Model Number` (if filled) and `locationText` (if filled). These are sent to the SC for navigation and product identification. Admin-only fields (`billDate`, `billPhoto`, `shopName`) are NOT included in WA-01.
+  - [x] When Phase 14 is built: `WA-01` message must include `Serial Number` and `Model Number` (if filled) and `locationText` (if filled). These are sent to the SC for navigation and product identification. Admin-only fields (`billDate`, `billPhoto`, `shopName`) are NOT included in WA-01.
 
 ---
 

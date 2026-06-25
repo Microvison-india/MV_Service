@@ -817,12 +817,11 @@ const updateStatus = async (req, res) => {
       complaint.doneVoiceUrl = doneVoiceUrl;
     }
 
-    // Petrol Edit 2 — SC's turn only if editCount is 0 or 1 and in-warranty (GRD 6.3)
+    // Petrol Edit 2 — SC's turn as long as admin has not locked it (GRD 6.3)
     if (
       complaint.warrantyStatus === 'in_warranty' &&
       petrolSC != null &&
       petrolSC !== '' &&
-      (complaint.petrolEditCount === 1 || complaint.petrolEditCount === 0) &&
       !complaint.petrolLocked
     ) {
       complaint.petrolSC = Number(petrolSC);
@@ -834,6 +833,8 @@ const updateStatus = async (req, res) => {
     for (const ec of complaint.extraCharges) {
       const foundInFrontend = Array.isArray(extraCharges) && extraCharges.find(item => item._id && String(item._id) === String(ec._id));
       if (foundInFrontend) {
+        ec.label = foundInFrontend.label;
+        ec.amount = Number(foundInFrontend.amount);
         updatedCharges.push(ec);
       } else if (ec.requestedBy === 'admin') {
         updatedCharges.push(ec);
@@ -1036,6 +1037,14 @@ const confirmDone = async (req, res) => {
         product.warrantyExpiryDate = warrantyExpiryDate;
         product.warrantySource = warrantySource;
         await product.save();
+
+        // Sync newly calculated warranty + bill info back to the complaint snapshot
+        complaint.billDate = product.billDate;
+        complaint.billPhoto = product.billPhoto;
+        complaint.warrantyStatus = product.warrantyStatus;
+        complaint.warrantyExpiryDate = product.warrantyExpiryDate;
+        complaint.warrantySource = product.warrantySource;
+        complaint.warrantyForceReason = product.warrantyForceReason;
       }
 
       // Check for missing fields

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../../api/axios';
 import ImageUploader from '../forms/ImageUploader';
 import PetrolEditField from './PetrolEditField';
@@ -63,6 +63,9 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [totalVisits, setTotalVisits] = useState(1);
   const [distanceTravelled, setDistanceTravelled] = useState('');
   const [extraCharges, setExtraCharges] = useState([]);
+  // Ref so the polling interval always reads the latest extraCharges without stale closure
+  const extraChargesRef = useRef([]);
+  useEffect(() => { extraChargesRef.current = extraCharges; }, [extraCharges]);
   const [markingReceived, setMarkingReceived] = useState(false);
 
   // Phase 21 State Variables
@@ -112,6 +115,17 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
               setExtraCharges(data.complaint.extraCharges);
             }
             isFirst = false;
+          } else {
+            if (data.complaint.petrolSC != null && petrolSC === '') {
+              setPetrolSC(String(data.complaint.petrolSC));
+            }
+            // Only sync extra charges from server if the SC has no locally-pending
+            // (unsaved, no _id) items — prevents interval from wiping mid-edit additions
+            const currentCharges = extraChargesRef.current;
+            const hasPendingLocal = currentCharges.some(ec => !ec._id);
+            if (!hasPendingLocal && data.complaint.extraCharges) {
+              setExtraCharges(data.complaint.extraCharges);
+            }
           }
         }
       } catch (err) {
@@ -252,8 +266,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       if (isSerialInfoMissing && skipSerialPhoto) bypassedFields.push('serialPhoto');
       body.scMissingBypass = bypassedFields;
 
-      // Petrol SC (only if in-warranty and SC's turn)
-      if (isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && petrolSC !== '') {
+      // Petrol SC (only if in-warranty and petrol is not locked by admin)
+      if (isInWarranty && !c.petrolLocked && petrolSC !== '') {
         body.petrolSC = Number(petrolSC);
       }
 
@@ -733,7 +747,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                     </div>
 
                     {/* Petrol allowance claim input (SC Side) */}
-                    {isInWarranty && c.petrolSC == null && (c.petrolEditCount === 0 || c.petrolEditCount === 1) && (
+                    {isInWarranty && !c.petrolLocked && (
                       <div>
                         <label className={labelCls}>Petrol Allowance Claim (₹)</label>
                         <input
