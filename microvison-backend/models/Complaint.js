@@ -109,6 +109,11 @@ const complaintSchema = new mongoose.Schema(
     billGenerated: { type: Boolean, default: false },
     billLockedAt: { type: Date, default: null },
 
+    // ── Payment Status ─────────────────────────────────────────
+    paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
+    paidAt:        { type: Date, default: null },   // Last time it was marked paid. Null if unpaid.
+    paidBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Admin who marked it paid
+
     // ── Billing Month/Year (for fast invoice queries) ─────────
     billedMonth: { type: Number, default: null }, // 1-12
     billedYear: { type: Number, default: null },
@@ -134,5 +139,7 @@ complaintSchema.index({ phone1: 1 });
 complaintSchema.index({ assignedCentreId: 1 });
 complaintSchema.index({ status: 1 });
 complaintSchema.index({ createdAt: -1 });
+complaintSchema.index({ paymentStatus: 1 });
+complaintSchema.index({ billLockedAt: -1 });
 
 module.exports = mongoose.model('Complaint', complaintSchema);

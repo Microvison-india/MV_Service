@@ -1086,6 +1086,17 @@ const confirmDone = async (req, res) => {
   complaint.status = 'closed';
   complaint.billGenerated = billGenerated;
   complaint.billLockedAt = new Date();
+
+  // 4B: Optional immediate payment marking at close time
+  if (req.body.markAsPaidImmediately === true) {
+    complaint.paymentStatus = 'paid';
+    complaint.paidAt = new Date();
+    complaint.paidBy = req.user.id;
+  } else {
+    complaint.paymentStatus = 'unpaid';
+    complaint.paidAt = null;
+    complaint.paidBy = null;
+  }
   
   // Update petrol Admin & SC estimates if sent
   if (req.body.petrolAdmin !== undefined && req.body.petrolAdmin !== null && req.body.petrolAdmin !== '') {

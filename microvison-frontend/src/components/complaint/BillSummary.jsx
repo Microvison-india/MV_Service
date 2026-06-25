@@ -84,6 +84,26 @@ export default function BillSummary({ complaint }) {
             <span className="text-base font-bold">₹{complaint.customerPaymentAmount || 0}</span>
           </div>
         )}
+        {/* Payment Status Row */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-3 border-t border-border/80 text-sm">
+          <span className="text-muted-foreground font-semibold">Payment Status:</span>
+          <div className="flex items-center gap-2">
+            {complaint.paymentStatus === 'paid' ? (
+              <>
+                <span className="px-2 py-0.5 bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400 text-xs font-bold rounded-full uppercase">
+                  Paid
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  on {complaint.paidAt ? new Date(complaint.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                </span>
+              </>
+            ) : (
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 text-xs font-bold rounded-full uppercase">
+                Unpaid
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

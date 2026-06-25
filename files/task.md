@@ -559,69 +559,69 @@
 
 ---
 
-- [ ] **Phase 22 — Advanced Billing Filters + Mark as Paid System (v1.3 Change 4)**
+- [x] **Phase 22 — Advanced Billing Filters + Mark as Paid System (v1.3 Change 4)**
   > Source: `Microvison_System_Changes_v1.3.md` — Change 4A, 4B, 4C. The billing dashboard gets a new exact date range filter (replacing Month+Year), a Payment Status filter, a full Mark as Paid / Mark as Unpaid system with 3 bulk methods and individual selection, and two running totals below the billing table.
 
   **A. Backend — New Payment Fields on Complaint Model**
-  - [ ] `models/Complaint.js` — Add new fields:
+  - [x] `models/Complaint.js` — Add new fields:
     - `paymentStatus` (Enum: `unpaid` / `paid`, default: `'unpaid'`) — only relevant when `billGenerated = true`. Default is `unpaid` on bill generation.
     - `paidAt` (Date, optional) — timestamp of when the bill was last marked as paid. Set to `null` when marked as unpaid (reversal). Updated each time "Mark as Paid" is clicked.
     - `paidBy` (ref: User, optional) — the admin user who last marked the bill as paid. For audit. Set to `null` on unpaid reversal.
 
   **B. Backend — Billing Controller Updates**
-  - [ ] `controllers/billing.controller.js` — Update `getComplaintBills`:
+  - [x] `controllers/billing.controller.js` — Update `getComplaintBills`:
     - Replace `month=` and `year=` params with `dateFrom=` and `dateTo=` (ISO date strings). If not provided: default to first day of current month to today.
     - Add `paymentStatus=paid/unpaid` filter param — `{paymentStatus: value}` on the Complaint query.
     - Include `unregistered` SCs in results (existing query already filters by `assignedCentreId` — just ensure unregistered SC records are included in the SC lookup population).
     - Return `paymentStatus`, `paidAt`, `paidBy` fields in each bill result.
-  - [ ] `controllers/billing.controller.js` — Add `markAsPaid` handler:
+  - [x] `controllers/billing.controller.js` — Add `markAsPaid` handler:
     - Accepts: `complaintIds` (array of Complaint `_id`s), `markAs` (`'paid'` or `'unpaid'`).
     - Updates all matching Complaint records: `paymentStatus = markAs`. If `'paid'`: set `paidAt = Date.now()`, `paidBy = req.user.id`. If `'unpaid'`: set `paidAt = null`, `paidBy = null`.
     - Validates: all provided `complaintIds` must have `billGenerated = true`. Rejects any that don't.
     - Returns count of updated records.
-  - [ ] `controllers/billing.controller.js` — Add `getRunningTotals` handler (or include in `getComplaintBills` response):
+  - [x] `controllers/billing.controller.js` — Add `getRunningTotals` handler (or include in `getComplaintBills` response):
     - Returns two sums for the current filtered view:
       - `totalAll`: sum of all bill totals in the current filter (paid + unpaid combined)
       - `totalUnpaid`: sum of only unpaid bill totals in the current filter
     - Calculated server-side using MongoDB `$group` aggregation for accuracy.
-  - [ ] `controllers/billing.controller.js` — Update `getMonthlyInvoice`:
+  - [x] `controllers/billing.controller.js` — Update `getMonthlyInvoice`:
     - Accept `dateFrom=` and `dateTo=` instead of `month=` and `year=`. Filter `closedAt` (or `billLockedAt`) within the given range.
     - Include `paymentStatus` and `paidAt` in response so the Monthly Invoice view can show payment state.
-  - [ ] `routes/billing.routes.js` — Add route:
+  - [x] `routes/billing.routes.js` — Add route:
     - `PATCH /billing/mark-paid` → `markAsPaid` (admin only)
     - Update existing `GET /billing/complaints` and `GET /billing/invoice/:scId` to accept new date params.
 
   **C. Frontend — Billing Dashboard Filter Rebuild**
-  - [ ] `pages/admin/Billing.jsx` — Replace the existing Month + Year dropdowns with:
+  - [x] `pages/admin/Billing.jsx` — Replace the existing Month + Year dropdowns with:
     - **From Date:** Date picker input. Default: first day of current month.
     - **To Date:** Date picker input. Default: today.
     - Quick shortcuts row: `This Month` / `Last Month` / `Last 7 Days` / `Last 30 Days` / `Custom` (manual date pickers appear when Custom is selected).
-  - [ ] `pages/admin/Billing.jsx` — Add **Payment Status** filter:
+  - [x] `pages/admin/Billing.jsx` — Add **Payment Status** filter:
     - Single select: `All Payment Status` / `Paid Only` / `Unpaid Only`.
     - Maps to `paymentStatus=paid/unpaid` in the API request.
-  - [ ] `pages/admin/Billing.jsx` — Ensure **Service Centre** filter includes unregistered SCs in the dropdown list (they should appear with `[UNREGISTERED]` tag after their name).
-  - [ ] `pages/admin/Billing.jsx` — Add **Reset Filters** button: resets to defaults (All SCs, current month, all products, all warranty, all payment status).
-  - [ ] `hooks/useBilling.js` — Update to pass `dateFrom`, `dateTo`, `paymentStatus` params. Remove `month` and `year` params. Add `markAsPaid(ids, markAs)` function that calls `PATCH /billing/mark-paid`.
+  - [x] `pages/admin/Billing.jsx` — Ensure **Service Centre** filter includes unregistered SCs in the dropdown list (they should appear with `[UNREGISTERED]` tag after their name).
+  - [x] `pages/admin/Billing.jsx` — Add **Reset Filters** button: resets to defaults (All SCs, current month, all products, all warranty, all payment status).
+  - [x] `hooks/useBilling.js` — Update to pass `dateFrom`, `dateTo`, `paymentStatus` params. Remove `month` and `year` params. Add `markAsPaid(ids, markAs)` function that calls `PATCH /billing/mark-paid`.
 
   **D. Frontend — Mark as Paid System UI**
-  - [ ] `components/billing/BillingTable.jsx` — Full rebuild:
+  - [x] `components/billing/BillingTable.jsx` — Full rebuild:
     - **Row checkboxes:** Add a checkbox column at the far left of each row. Only rows with `billGenerated = true` are selectable.
     - **Payment Status column:** New column showing `PAID` (green badge) or `UNPAID` (amber badge).
     - **Paid On column:** New column showing formatted `paidAt` timestamp if paid, or `—` if unpaid.
     - **Action bar (appears on checkbox selection):** Fixed bar at the top/bottom of the table. Shows: "X bills selected" + `[Mark Selected as Paid]` + `[Mark Selected as Unpaid]` buttons. Appears only when at least one checkbox is checked.
     - **Bulk "Mark All as Paid" button:** A primary button above the table (always visible, greyed if no unpaid bills in view). Text: "Mark All as Paid ([N] unpaid)". Clicking marks ALL unpaid bills in the CURRENT FILTERED VIEW as paid (not just the visible page — the full filtered result set).
     - **Reversal warning:** When `[Mark Selected as Unpaid]` or bulk unpaid is clicked: show a confirmation dialog: "This will mark [N] paid bill(s) as unpaid. This action is reversible but will affect payment records. Continue?" Admin confirms before proceeding.
-  - [ ] `components/billing/BillingTable.jsx` — Running totals section (below the table):
+  - [x] `components/billing/BillingTable.jsx` — Running totals section (below the table):
     - Two summary cards side by side:
       - **Total Billed:** "₹[totalAll]" — sum of all bills in the current filtered view (paid + unpaid).
       - **Unpaid Total:** "₹[totalUnpaid]" — sum of only unpaid bills. This is what Microvison owes the SC(s).
     - Both update live when filters change.
     - If a specific SC is selected: totals reflect that SC only. If "All SCs": totals reflect all SCs combined.
-  - [ ] `pages/admin/Billing.jsx` — **At Confirm Done time** (in Admin Complaint Detail): when admin clicks Confirm Done and the bill is generated, show an optional checkbox/toggle: "Mark as Paid immediately". If checked: after calling `confirmDone`, immediately call `PATCH /billing/mark-paid` with the new complaint `_id` and `markAs: 'paid'`. If unchecked: complaint closes as `paymentStatus: 'unpaid'` (default).
-  - [ ] `components/billing/MonthlyInvoice.jsx` — Show payment summary per month card:
+  - [x] `pages/admin/Billing.jsx` — **At Confirm Done time** (in Admin Complaint Detail): when admin clicks Confirm Done and the bill is generated, show an optional checkbox/toggle: "Mark as Paid immediately". If checked: after calling `confirmDone`, immediately call `PATCH /billing/mark-paid` with the new complaint `_id` and `markAs: 'paid'`. If unchecked: complaint closes as `paymentStatus: 'unpaid'` (default).
+  - [x] `components/billing/MonthlyInvoice.jsx` — Show payment summary per month card:
     - Add: "Paid: ₹[paid amount] | Unpaid: ₹[unpaid amount]" under the total.
     - If fully paid: show a green `FULLY PAID` badge on the card. If partially paid: `PARTIAL`. If nothing paid: `UNPAID`.
 
   **E. SC Billing Page (Read-only)**
-  - [ ] `pages/sc/SCBilling.jsx` — Update filters to use `dateFrom`/`dateTo` (date pickers) instead of month/year dropdowns. SCs only see their own billing data — payment status and paidAt are shown as read-only columns (so SC can see which bills Microvison has marked as paid).
+  - [x] `pages/sc/SCBilling.jsx` — Update filters to use `dateFrom`/`dateTo` (date pickers) instead of month/year dropdowns. SCs only see their own billing data — payment status and paidAt are shown as read-only columns (so SC can see which bills Microvison has marked as paid).
 

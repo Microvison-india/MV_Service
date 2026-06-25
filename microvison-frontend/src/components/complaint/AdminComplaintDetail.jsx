@@ -48,6 +48,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
   // Phase 21: Closing Check States
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [markAsPaidImmediately, setMarkAsPaidImmediately] = useState(false);
   const [missingFields, setMissingFields] = useState([]);
   const [fillValues, setFillValues] = useState({
     billDate: '',
@@ -300,7 +301,8 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       // Build payload body
       const body = { 
         note: adminNote,
-        extraCharges: adminExtraCharges
+        extraCharges: adminExtraCharges,
+        markAsPaidImmediately: markAsPaidImmediately
       };
       if (isInWarranty && !c.petrolLocked) {
         if (petrolAdmin !== '' && petrolAdmin !== null && petrolAdmin !== undefined) {
@@ -1406,6 +1408,19 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
                   📝 Confirmation & Closure
                 </span>
+                <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
+                  <input
+                    type="checkbox"
+                    checked={markAsPaidImmediately}
+                    onChange={(e) => setMarkAsPaidImmediately(e.target.checked)}
+                    className="w-4 h-4 accent-green-600 rounded cursor-pointer"
+                    id="markAsPaidCheckbox"
+                  />
+                  <span className="text-sm font-semibold text-foreground">Mark as Paid immediately</span>
+                  <span className="text-xs text-muted-foreground">
+                    — Sets payment status to Paid at the moment this bill is generated.
+                  </span>
+                </label>
                 <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
                   <input
                     type="text"

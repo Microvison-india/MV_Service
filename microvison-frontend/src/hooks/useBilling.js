@@ -34,11 +34,19 @@ export default function useBilling(filters) {
           setBills(billsData.bills || []);
         }
 
-        // 2. Fetch monthly invoice rollup if SC ID and month/year are provided
+        // 2. Fetch monthly invoice rollup if SC ID and date range or month/year are provided
         const targetScId = filters.assignedCentreId || filters.scId;
-        if (targetScId && filters.month && filters.year) {
+        const hasDateFilter = filters.dateFrom || filters.dateTo || (filters.month && filters.year);
+        if (targetScId && hasDateFilter) {
+          const invoiceParams = {};
+          if (filters.dateFrom) invoiceParams.dateFrom = filters.dateFrom;
+          if (filters.dateTo) invoiceParams.dateTo = filters.dateTo;
+          if (filters.month) invoiceParams.month = filters.month;
+          if (filters.year) invoiceParams.year = filters.year;
+          if (filters.paymentStatus) invoiceParams.paymentStatus = filters.paymentStatus;
+
           const { data: invoiceData } = await api.get(`/api/billing/invoice/${targetScId}`, {
-            params: { month: filters.month, year: filters.year },
+            params: invoiceParams,
           });
           if (active) {
             setInvoice(invoiceData);
