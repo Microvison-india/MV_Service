@@ -39,10 +39,11 @@ export default function Billing() {
       .catch(() => {});
   }, []);
 
-  // Sync selection state if bills change or load
-  useEffect(() => {
+  const [prevBills, setPrevBills] = useState(bills);
+  if (bills !== prevBills) {
+    setPrevBills(bills);
     setSelectedIds([]);
-  }, [bills]);
+  }
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -92,7 +93,7 @@ export default function Billing() {
   };
 
   // Mark as Unpaid triggers modal warning
-  const handleMarkUnpaid = (ids) => {
+  const handleMarkUnpaid = () => {
     setShowUnpaidWarning(true);
   };
 

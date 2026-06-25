@@ -16,6 +16,14 @@ const isSC = (req, res, next) => {
   }
 };
 
+const isAdminOrSC = (req, res, next) => {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'service_centre')) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Access denied: Admin or Service Centre only' });
+  }
+};
+
 const isActive = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
@@ -34,5 +42,6 @@ const isActive = async (req, res, next) => {
 module.exports = {
   isAdmin,
   isSC,
+  isAdminOrSC,
   isActive,
 };

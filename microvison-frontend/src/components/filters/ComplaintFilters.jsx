@@ -66,10 +66,11 @@ export default function ComplaintFilters({ filters, onChange }) {
     return () => clearTimeout(timer);
   }, [qInput]);
 
-  // Keep input in sync with external changes (like Reset)
-  useEffect(() => {
+  const [prevFilterQ, setPrevFilterQ] = useState(filters.q);
+  if (filters.q !== prevFilterQ) {
+    setPrevFilterQ(filters.q);
     setQInput(filters.q || '');
-  }, [filters.q]);
+  }
 
   // Format date helper (YYYY-MM-DD)
   const getLocalYYYYMMDD = (date) => {
@@ -78,35 +79,39 @@ export default function ComplaintFilters({ filters, onChange }) {
     return localDate.toISOString().split('T')[0];
   };
 
-  // Sync date shortcuts with actual date filters
-  useEffect(() => {
+  const [prevDateFrom, setPrevDateFrom] = useState(filters.dateFrom);
+  const [prevDateTo, setPrevDateTo] = useState(filters.dateTo);
+
+  if (filters.dateFrom !== prevDateFrom || filters.dateTo !== prevDateTo) {
+    setPrevDateFrom(filters.dateFrom);
+    setPrevDateTo(filters.dateTo);
     if (!filters.dateFrom && !filters.dateTo) {
       setActiveDateShortcut('');
-      return;
-    }
-    const today = getLocalYYYYMMDD(new Date());
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = getLocalYYYYMMDD(yesterday);
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = getLocalYYYYMMDD(sevenDaysAgo);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoStr = getLocalYYYYMMDD(thirtyDaysAgo);
-
-    if (filters.dateFrom === today && filters.dateTo === today) {
-      setActiveDateShortcut('today');
-    } else if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) {
-      setActiveDateShortcut('yesterday');
-    } else if (filters.dateFrom === sevenDaysAgoStr && filters.dateTo === today) {
-      setActiveDateShortcut('7days');
-    } else if (filters.dateFrom === thirtyDaysAgoStr && filters.dateTo === today) {
-      setActiveDateShortcut('30days');
     } else {
-      setActiveDateShortcut('custom');
+      const today = getLocalYYYYMMDD(new Date());
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = getLocalYYYYMMDD(yesterday);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoStr = getLocalYYYYMMDD(sevenDaysAgo);
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoStr = getLocalYYYYMMDD(thirtyDaysAgo);
+
+      if (filters.dateFrom === today && filters.dateTo === today) {
+        setActiveDateShortcut('today');
+      } else if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) {
+        setActiveDateShortcut('yesterday');
+      } else if (filters.dateFrom === sevenDaysAgoStr && filters.dateTo === today) {
+        setActiveDateShortcut('7days');
+      } else if (filters.dateFrom === thirtyDaysAgoStr && filters.dateTo === today) {
+        setActiveDateShortcut('30days');
+      } else {
+        setActiveDateShortcut('custom');
+      }
     }
-  }, [filters.dateFrom, filters.dateTo]);
+  }
 
   // Derived location arrays
   const uniqueStates = [...new Set(cities.map((c) => c.state))].sort();

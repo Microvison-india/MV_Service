@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import AdminComplaintDetail from '../../components/complaint/AdminComplaintDetail';
+import { Loader2, X } from 'lucide-react';
 
 // GRD Section 11.1 — Action Centre
 // Tab 1 of the Admin Dashboard. Shows items requiring admin attention, ordered newest first.
@@ -20,18 +21,31 @@ export default function ActionCentre() {
   // Slide Panel State
   const [selectedComplaintId, setSelectedComplaintId] = useState(null);
 
+  // Unregistered Link Flow States
+  const [unregisteredSCs, setUnregisteredSCs] = useState([]);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkingPendingSC, setLinkingPendingSC] = useState(null);
+  const [selectedUnregSCId, setSelectedUnregSCId] = useState('');
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkingLoading, setLinkingLoading] = useState(false);
+  const [linkError, setLinkError] = useState('');
+
   useEffect(() => {
     let active = true;
     const fetchActionItems = async () => {
-      // Intentionally NOT calling setLoading(true) synchronously here to satisfy React compiler.
-      // The initial state of loading is already true.
       try {
-        const res = await api.get('/api/complaints/action-items');
-        if (active) setData(res.data);
+        const [res, unregRes] = await Promise.all([
+          api.get('/api/complaints/action-items'),
+          api.get('/api/service-centres?isUnregistered=true&limit=1000')
+        ]);
+        if (active) {
+          setData(res.data);
+          setUnregisteredSCs(unregRes.data.serviceCentres || []);
+        }
       } catch (err) {
         console.error('Failed to load action items', err);
       } finally {
-        if (active) setLoading(false); // Asynchronous
+        if (active) setLoading(false);
       }
     };
 
@@ -64,6 +78,58 @@ export default function ActionCentre() {
       }));
     } finally {
       setActionLoading((prev) => ({ ...prev, [id]: null }));
+    }
+  };
+
+  const getPhoneMatch = (pendingSC) => {
+    return unregisteredSCs.find(unreg => 
+      (unreg.phone1 === pendingSC.phone1 || unreg.phone2 === pendingSC.phone1 || 
+       (pendingSC.phone2 && (unreg.phone1 === pendingSC.phone2 || unreg.phone2 === pendingSC.phone2)))
+    );
+  };
+
+  const handleOpenLinkModal = (pendingSC) => {
+    const match = getPhoneMatch(pendingSC);
+    setLinkingPendingSC(pendingSC);
+    setSelectedUnregSCId(match ? match._id : '');
+    setLinkSearch('');
+    setLinkError('');
+    setShowLinkModal(true);
+  };
+
+  const handleLinkConfirm = async () => {
+    if (!selectedUnregSCId || !linkingPendingSC) return;
+    setLinkingLoading(true);
+    setLinkError('');
+    try {
+      const newSCId = linkingPendingSC._id;
+      // 1. Approve
+      await api.patch(`/api/service-centres/${newSCId}/approve`);
+      // 2. Link
+      await api.patch(`/api/service-centres/${newSCId}/link-to-registered`, {
+        unregisteredSCId: selectedUnregSCId
+      });
+
+      // Optimistically remove from list
+      setData((prev) => ({
+        ...prev,
+        pendingSCRegistrations: prev.pendingSCRegistrations.filter((sc) => sc._id !== newSCId),
+        counts: {
+          ...prev.counts,
+          pendingSCRegistrations: prev.counts.pendingSCRegistrations - 1,
+        }
+      }));
+      
+      setSuccessMessage(`Successfully approved registration and linked to existing unregistered SC.`);
+      setShowLinkModal(false);
+      
+      // Refresh the unregistered SC list
+      const unregRes = await api.get('/api/service-centres?isUnregistered=true&limit=1000');
+      setUnregisteredSCs(unregRes.data.serviceCentres || []);
+    } catch (err) {
+      setLinkError(err.response?.data?.message || 'Failed to link service centres.');
+    } finally {
+      setLinkingLoading(false);
     }
   };
 
@@ -146,37 +212,68 @@ export default function ActionCentre() {
                   </span>
                 </div>
                 <div className="space-y-3">
-                  {data.pendingSCRegistrations.map((sc) => (
-                    <div key={sc._id} className="bg-card border border-border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div className="cursor-pointer flex-1" onClick={() => navigate(`/admin/service-centres/${sc._id}`)}>
-                        <p className="font-semibold text-foreground">{sc.businessName}</p>
-                        <p className="text-sm text-muted-foreground mt-0.5">{sc.ownerName} · {sc.city}, {sc.district}</p>
-                        <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                          <span>📞 {sc.phone1}</span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                            {CAPABILITY_LABELS[sc.productCapability]}
-                          </span>
+                  {data.pendingSCRegistrations.map((sc) => {
+                    const match = getPhoneMatch(sc);
+                    return (
+                      <div key={sc._id} className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="cursor-pointer flex-1" onClick={() => navigate(`/admin/service-centres/${sc._id}`)}>
+                            <p className="font-semibold text-foreground">{sc.businessName}</p>
+                            <p className="text-sm text-muted-foreground mt-0.5">{sc.ownerName} · {sc.city}, {sc.district}</p>
+                            <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                              <span>📞 {sc.phone1}</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                {CAPABILITY_LABELS[sc.productCapability]}
+                              </span>
+                            </div>
+                            {messages[sc._id] && <p className="text-xs text-green-700 mt-1">{messages[sc._id]}</p>}
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              disabled={!!actionLoading[sc._id]}
+                              onClick={() => performSCAction(sc._id, 'approve')}
+                              className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
+                            >
+                              {actionLoading[sc._id] === 'approve' ? '...' : '✓ Approve'}
+                            </button>
+                            <button
+                              disabled={!!actionLoading[sc._id]}
+                              onClick={() => performSCAction(sc._id, 'reject')}
+                              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition"
+                            >
+                              {actionLoading[sc._id] === 'reject' ? '...' : '✕ Reject'}
+                            </button>
+                          </div>
                         </div>
-                        {messages[sc._id] && <p className="text-xs text-green-700 mt-1">{messages[sc._id]}</p>}
+
+                        {/* Match Banner */}
+                        {match && (
+                          <div className="bg-amber-500/10 border border-amber-300/40 rounded-lg p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div className="text-xs text-amber-900 dark:text-amber-300">
+                              📌 An unregistered SC with phone <strong>{match.phone1}</strong> already exists: <strong>{match.businessName}</strong> ({match.city}).
+                              Would you like to link this registration to that record?
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenLinkModal(sc)}
+                                className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-semibold uppercase tracking-wider hover:bg-amber-700 transition"
+                              >
+                                Link to SC
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => performSCAction(sc._id, 'approve')}
+                                className="px-3 py-1 bg-muted hover:bg-accent text-foreground rounded text-xs font-semibold uppercase tracking-wider transition"
+                              >
+                                Skip
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-2 shrink-0">
-                        <button
-                          disabled={!!actionLoading[sc._id]}
-                          onClick={() => performSCAction(sc._id, 'approve')}
-                          className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
-                        >
-                          {actionLoading[sc._id] === 'approve' ? '...' : '✓ Approve'}
-                        </button>
-                        <button
-                          disabled={!!actionLoading[sc._id]}
-                          onClick={() => performSCAction(sc._id, 'reject')}
-                          className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition"
-                        >
-                          {actionLoading[sc._id] === 'reject' ? '...' : '✕ Reject'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}
@@ -356,6 +453,99 @@ export default function ActionCentre() {
             window.location.reload(); 
           }}
         />
+      )}
+
+      {/* Link to Unregistered SC Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 border border-border shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowLinkModal(false)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold mb-1">Link to Unregistered SC</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Select the unregistered service centre record to merge with this new registration. All past complaints will be migrated.
+            </p>
+
+            <div className="space-y-4">
+              {/* Search unregistered SCs */}
+              <div>
+                <label className="text-xs font-semibold block mb-1">Search Unregistered SCs</label>
+                <input
+                  type="text"
+                  placeholder="Search by name, phone, city..."
+                  value={linkSearch}
+                  onChange={(e) => setLinkSearch(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              {/* Candidates List */}
+              <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2 bg-muted/10">
+                {unregisteredSCs
+                  .filter((unreg) => {
+                    const s = linkSearch.toLowerCase();
+                    return (
+                      unreg.businessName.toLowerCase().includes(s) ||
+                      unreg.phone1.includes(s) ||
+                      unreg.city.toLowerCase().includes(s) ||
+                      unreg.district.toLowerCase().includes(s)
+                    );
+                  })
+                  .map((unreg) => {
+                    const isSelected = selectedUnregSCId === unreg._id;
+                    return (
+                      <div
+                        key={unreg._id}
+                        onClick={() => setSelectedUnregSCId(unreg._id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition ${
+                          isSelected
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:border-ring'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm text-foreground">{unreg.businessName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {unreg.city}, {unreg.district} · Phone: {unreg.phone1}
+                        </p>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {linkError && <p className="text-xs text-destructive">{linkError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowLinkModal(false)}
+                  className="h-9 px-4 rounded-lg border border-input hover:bg-accent text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLinkConfirm}
+                  disabled={linkingLoading || !selectedUnregSCId}
+                  className="h-9 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 text-sm flex items-center justify-center font-semibold"
+                >
+                  {linkingLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Linking...
+                    </>
+                  ) : (
+                    'Confirm Link & Approve'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -81,7 +81,6 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
         const doneScNotes = update.scNotes || (complaint ? complaint.scNotes : '');
         const doneProofPhotos = (update.images && update.images.length > 0) ? update.images : (complaint && complaint.proofPhotos ? complaint.proofPhotos : []);
         const donePetrolSC = update.petrolSC != null ? update.petrolSC : (complaint ? complaint.petrolSC : null);
-        const donePetrolAdmin = update.petrolAdmin != null ? update.petrolAdmin : (complaint ? complaint.petrolAdmin : null);
         const doneExtraCharges = (update.extraCharges && update.extraCharges.length > 0) ? update.extraCharges : (complaint ? complaint.extraCharges : []);
         const scDoneCharges = doneExtraCharges.filter(ec => ec.requestedBy === 'sc');
 

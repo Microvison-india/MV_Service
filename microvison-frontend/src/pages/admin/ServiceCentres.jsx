@@ -28,6 +28,7 @@ export default function ServiceCentres() {
     state: '',
     district: '',
     productCapability: '',
+    isUnregistered: '',
     page: 1,
   });
 
@@ -37,7 +38,7 @@ export default function ServiceCentres() {
       setError('');
       try {
         const params = new URLSearchParams();
-        Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+        Object.entries(filters).forEach(([k, v]) => { if (v !== '' && v !== null && v !== undefined) params.append(k, v); });
         const { data } = await api.get(`/api/service-centres?${params.toString()}`);
         if (active) {
           setServiceCentres(data.serviceCentres);
@@ -121,14 +122,23 @@ export default function ServiceCentres() {
                       onClick={() => navigate(`/admin/service-centres/${sc._id}`)}
                       className="border-b border-border hover:bg-muted/40 cursor-pointer transition-colors"
                     >
-                      <td className="px-4 py-3 font-medium text-foreground">{sc.businessName}</td>
-                      <td className="px-4 py-3 text-foreground">{sc.ownerName}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <div className="flex items-center gap-2">
+                          <span>{sc.businessName}</span>
+                          {sc.isUnregistered && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                              UNREGISTERED
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{sc.ownerName || 'Admin Maintained'}</td>
                       <td className="px-4 py-3 text-foreground">
                         <span>{sc.city}</span>
                         <span className="text-muted-foreground">, {sc.district}</span>
                       </td>
                       <td className="px-4 py-3 text-foreground">
-                        {CAPABILITY_LABELS[sc.productCapability] || sc.productCapability}
+                        {sc.isUnregistered ? 'LED + Cooler' : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability)}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[sc.status] || 'bg-gray-100 text-gray-600'}`}>

@@ -25,7 +25,6 @@ export default function SCDetail() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState('info');
-  const [refreshTick, setRefreshTick] = useState(0);
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -60,7 +59,7 @@ export default function SCDetail() {
     };
     fetchSC();
     return () => { active = false; };
-  }, [id, refreshTick]);
+  }, [id]);
 
   const performAction = async (action) => {
     setActionLoading(true);

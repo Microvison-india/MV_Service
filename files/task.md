@@ -107,7 +107,7 @@
   - [x] `components/complaint/PetrolEditField.jsx` (3-round petrol history + correct-turn editing)
   - [x] `App.jsx` — SC nested routes wired (/sc, /sc/new-requests, /sc/my-complaints, /sc/billing)
 
-- [/] **Phase 8.5 — Full SC Flow v1.1 Implementation (SC Portal Rebuild)**
+- [x] **Phase 8.5 — Full SC Flow v1.1 Implementation (SC Portal Rebuild)**
   > ⚠ This phase is a major expansion of the SC portal based on `Microvison_SC_Flow_v1.1.txt`. It introduces new statuses (`part_received`), new forms (Not Done, Part Pending), a new admin action (Mark as Delivered), SC action (Mark as Received), and a complete WhatsApp reminder system. Replacement is NOT a separate status — it is Part Pending where the 'part' being delivered is the full unit.
 
   **A. Backend — New Statuses & Schema**
@@ -372,80 +372,80 @@
 
 ---
 
-- [ ] **Phase 20 — Unregistered (Admin-Maintained) SC System (v1.3 Change 2)**
+- [x] **Phase 20 — Unregistered (Admin-Maintained) SC System (v1.3 Change 2)**
   > Source: `Microvison_System_Changes_v1.3.md` — Change 2A through 2F. Introduces a new type of SC record with `isUnregistered: true`. These SCs have no portal login, no WhatsApp reminders sent to them, and all complaint updates are performed by the admin on their behalf. Includes inline city creation and an upgrade/linking flow when they later register formally.
 
   **A. Backend — New Fields on ServiceCentre Model**
-  - [ ] `models/ServiceCentre.js` — Add new fields:
+  - [x] `models/ServiceCentre.js` — Add new fields:
     - `isUnregistered` (Boolean, default: `false`) — marks if this is an admin-created unregistered SC
     - `linkedRegisteredSCId` (ref: ServiceCentre, optional) — populated when the unregistered SC is linked to a newly registered account during upgrade (Section 2F)
     - `archivedAt` (Date, optional) — set when an unregistered SC is archived after upgrade (audit record)
     - `isArchived` (Boolean, default: `false`) — hides the SC from active lists after upgrade
-  - [ ] `models/ServiceCentre.js` — The `status` field on unregistered SCs is always `active` by default (they skip the approval flow entirely). The `userId` field is `null` (no User/login record).
+  - [x] `models/ServiceCentre.js` — The `status` field on unregistered SCs is always `active` by default (they skip the approval flow entirely). The `userId` field is `null` (no User/login record).
 
   **B. Backend — Unregistered SC Creation Controller**
-  - [ ] `controllers/serviceCentre.controller.js` — Add `createUnregistered` handler:
+  - [x] `controllers/serviceCentre.controller.js` — Add `createUnregistered` handler:
     - Accepts: `name` (businessName), `phone1` (required), `phone2` (optional), `city` (required), `district` (auto-filled or provided), `fullAddress` (optional), `productCapability` (optional, defaults to `both`)
     - Creates a new `ServiceCentre` document with `isUnregistered: true`, `status: 'active'`, `userId: null`
     - Does NOT create a `User` record — no login credentials
     - Returns the new SC `_id` so the caller can immediately assign the complaint to it
     - If `city` does not exist in the `cities` collection, create it on the spot (see Section 2D — inline city creation)
-  - [ ] `controllers/serviceCentre.controller.js` — Update `getAll` handler:
+  - [x] `controllers/serviceCentre.controller.js` — Update `getAll` handler:
     - Add `isUnregistered=true/false` query param filter. If not provided, return both registered and unregistered.
     - Add a `registrationType=unregistered` filter option for the SC list page.
-  - [ ] `controllers/serviceCentre.controller.js` — Add `linkToRegistered` handler (Section 2F upgrade flow):
+  - [x] `controllers/serviceCentre.controller.js` — Add `linkToRegistered` handler (Section 2F upgrade flow):
     - Called by admin during SC registration approval
     - Accepts: `unregisteredSCId` (the old record) and `newRegisteredSCId` (the newly created registered SC)
     - Reassigns all `Complaint` records from `assignedCentreId = unregisteredSCId` → `assignedCentreId = newRegisteredSCId`
     - Sets `unregisteredSC.isArchived = true`, `unregisteredSC.archivedAt = now`, `unregisteredSC.linkedRegisteredSCId = newRegisteredSCId`
     - Removes `isUnregistered` flag from new SC (it's registered now)
     - Does NOT delete old record — archived in place for audit
-  - [ ] `routes/serviceCentre.routes.js` — Add routes:
+  - [x] `routes/serviceCentre.routes.js` — Add routes:
     - `POST /service-centres/unregistered` → `createUnregistered` (admin only)
     - `PATCH /service-centres/:id/link-to-registered` → `linkToRegistered` (admin only)
 
   **C. Backend — Inline City / District / State Creation**
-  - [ ] `controllers/city.controller.js` — Add `createCity` handler:
+  - [x] `controllers/city.controller.js` — Add `createCity` handler:
     - Accepts: `city` (name), `district`, `state` (all required)
     - Checks if the city already exists (case-insensitive) — if yes, returns existing record (no duplicate)
     - If new: creates a `City` document and returns it
     - Accessible from admin only
-  - [ ] `routes/city.routes.js` — Add route: `POST /cities` → `createCity` (admin only)
+  - [x] `routes/city.routes.js` — Add route: `POST /cities` → `createCity` (admin only)
 
   **D. Backend — WhatsApp Logic for Unregistered SC**
-  - [ ] `controllers/complaint.controller.js` — Update `assignComplaint`:
+  - [x] `controllers/complaint.controller.js` — Update `assignComplaint`:
     - After assignment, check if `assignedCentre.isUnregistered === true`
     - If `true`: skip WA-01 (do NOT send WhatsApp to SC). Log in ComplaintUpdate: "Assigned to Unregistered SC — WA-01 not sent. Admin to contact SC manually."
     - WA-04 to customer still fires on SC acceptance (but since unregistered SC has no portal, admin marks `accepted` on their behalf — see frontend section)
-  - [ ] `controllers/complaint.controller.js` — Update `updateStatus`, `markGoing`, `accept`, `reject`, `markPartDelivered`, `markPartReceived`:
+  - [x] `controllers/complaint.controller.js` — Update `updateStatus`, `markGoing`, `accept`, `reject`, `markPartDelivered`, `markPartReceived`:
     - When action is performed for a complaint assigned to an unregistered SC, suppress ALL SC-directed WhatsApp triggers (WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X). Only WA-04 to customer fires (on acceptance).
     - Add a helper: `isUnregisteredSCComplaint(complaint)` — checks `complaint → assignedCentre.isUnregistered`. Use this before every WA trigger.
-  - [ ] `utils/whatsappReminder.js` (Phase 14 cron) — When built, ensure the cron queries skip complaints where `assignedCentre.isUnregistered === true` for all SC-directed reminder triggers.
+  - [x] `utils/whatsappReminder.js` (Phase 14 cron) — When built, ensure the cron queries skip complaints where `assignedCentre.isUnregistered === true` for all SC-directed reminder triggers.
 
   **E. Frontend — SC Picker + Unregistered SC Creation Form**
-  - [ ] `components/forms/Step4AssignSC.jsx` (becomes Step5 after Phase 21) — Add a `+ Create Unregistered SC` button/link below the normal SC list. Clicking opens an inline modal/form with:
+  - [x] `components/forms/Step4AssignSC.jsx` (becomes Step5 after Phase 21) — Add a `+ Create Unregistered SC` button/link below the normal SC list. Clicking opens an inline modal/form with:
     - Business Name / Name (required)
     - Phone 1 (required), Phone 2 (optional)
     - City (cascading dropdown with inline "Create new" option — see below), District (auto-filled), Full Address (optional)
     - On submit: `POST /api/service-centres/unregistered` → get back new SC `_id` → set as `selectedSCId` → proceed to assign.
-  - [ ] `components/forms/Step4AssignSC.jsx` — SC list cards: show `UNREGISTERED` badge (amber) on any card where `isUnregistered: true`. Admin can select an existing unregistered SC from the list (for reuse — Section 2E).
-  - [ ] `components/complaint/AdminComplaintDetail.jsx` — Show `UNREGISTERED SC` badge prominently in the Assigned SC section header when the complaint is assigned to an unregistered SC. Add a persistent banner in the action panel: "This complaint is assigned to an Unregistered SC. All status updates must be made manually by admin."
-  - [ ] `components/complaint/AdminComplaintDetail.jsx` — For complaints assigned to unregistered SCs: unlock all status actions for the admin (Going, Done, Not Done, Part Pending, Mark Received). The admin can perform all these actions directly — they are normally SC-only actions. All actions go through the same backend endpoints as SC actions but are performed by the admin user.
+  - [x] `components/forms/Step4AssignSC.jsx` — SC list cards: show `UNREGISTERED` badge (amber) on any card where `isUnregistered: true`. Admin can select an existing unregistered SC from the list (for reuse — Section 2E).
+  - [x] `components/complaint/AdminComplaintDetail.jsx` — Show `UNREGISTERED SC` badge prominently in the Assigned SC section header when the complaint is assigned to an unregistered SC. Add a persistent banner in the action panel: "This complaint is assigned to an Unregistered SC. All status updates must be made manually by admin."
+  - [x] `components/complaint/AdminComplaintDetail.jsx` — For complaints assigned to unregistered SCs: unlock all status actions for the admin (Going, Done, Not Done, Part Pending, Mark Received). The admin can perform all these actions directly — they are normally SC-only actions. All actions go through the same backend endpoints as SC actions but are performed by the admin user.
 
   **F. Frontend — Inline City Creation**
-  - [ ] All city dropdowns in the admin interface (SC creation, unregistered SC form, complaint registration Step 1) — when admin types a name that doesn't match any existing city, show an inline option: `'Create "[typed name]" as a new city'`. Clicking opens a small inline form: City Name (pre-filled), District Name, State Name. On confirm: `POST /api/cities` → new city returned → automatically selected in the dropdown. Instant system-wide availability.
+  - [x] All city dropdowns in the admin interface (SC creation, unregistered SC form, complaint registration Step 1) — when admin types a name that doesn't match any existing city, show an inline option: `'Create "[typed name]" as a new city'`. Clicking opens a small inline form: City Name (pre-filled), District Name, State Name. On confirm: `POST /api/cities` → new city returned → automatically selected in the dropdown. Instant system-wide availability.
 
   **G. Frontend — SC List Page (Service Centres Tab)**
-  - [ ] `pages/admin/ServiceCentres.jsx` — Add filter: `Registration Type: All / Registered / Unregistered` (maps to `isUnregistered=true/false`). Ensure existing search (name, phone, city, district) also searches unregistered SC records.
-  - [ ] `pages/admin/ServiceCentres.jsx` — Show `UNREGISTERED` badge (amber) on SC cards/rows for `isUnregistered: true` SCs.
+  - [x] `pages/admin/ServiceCentres.jsx` — Add filter: `Registration Type: All / Registered / Unregistered` (maps to `isUnregistered=true/false`). Ensure existing search (name, phone, city, district) also searches unregistered SC records.
+  - [x] `pages/admin/ServiceCentres.jsx` — Show `UNREGISTERED` badge (amber) on SC cards/rows for `isUnregistered: true` SCs.
 
   **H. Frontend — SC Registration Approval + Upgrade/Link Flow (Section 2F)**
-  - [ ] `pages/admin/ActionCentre.jsx` — In the "Pending SC Registrations" section, when the admin opens a new SC registration for approval:
+  - [x] `pages/admin/ActionCentre.jsx` — In the "Pending SC Registrations" section, when the admin opens a new SC registration for approval:
     - System checks if any unregistered SC records have a phone number match — if found, shows a suggestion banner: "An unregistered SC with phone [X] already exists — [Name], [City]. Would you like to link this registration to that record?" with `[Link]` and `[Skip]` buttons.
     - `[Link]` button: triggers a search/picker allowing admin to find the correct unregistered SC by name, city, district, phone, or address (not phone-match only). Admin selects and confirms.
     - On link confirm: call `PATCH /api/service-centres/:id/link-to-registered` with the unregistered SC ID and the new registration ID.
     - On `[Skip]` or no match: approve normally — a brand new registered SC account is created with no link to any unregistered record.
-  - [ ] `pages/admin/ActionCentre.jsx` — Show the historical `UNREGISTERED SC` badge and admin-maintained markers in the complaint timeline even after upgrade (audit trail, read-only).
+  - [x] `pages/admin/ActionCentre.jsx` — Show the historical `UNREGISTERED SC` badge and admin-maintained markers in the complaint timeline even after upgrade (audit trail, read-only).
 
 ---
 

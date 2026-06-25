@@ -9,12 +9,12 @@ import {
   DialogDescription,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
+import InlineCitySelect from '../ui/InlineCitySelect';
 
 import ReopenBanner from '../complaint/ReopenBanner';
 
 export default function Step1CustomerInfo({ formData, setFormData, reopenData, setReopenData, onReopenSuccess }) {
   const [cities, setCities] = useState([]);
-  const [loadingCities, setLoadingCities] = useState(true);
 
   // Product Tracking States
   const [checkingPhone, setCheckingPhone] = useState(false);
@@ -39,8 +39,6 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
         setCities(data);
       } catch {
         setCities([]);
-      } finally {
-        setLoadingCities(false);
       }
     };
     fetchCities();
@@ -72,16 +70,7 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
     }));
   };
 
-  const handleCityChange = (e) => {
-    const newCity = e.target.value;
-    const selectedCityObj = cities.find((c) => c.name === newCity);
-    setFormData((prev) => ({
-      ...prev,
-      city: newCity,
-      district: selectedCityObj?.district || prev.district,
-      state: selectedCityObj?.state || prev.state,
-    }));
-  };
+
 
   // ── Product Tracking: Auto-Search by Phone ─────────────────
   const checkPhoneForProducts = async () => {
@@ -208,15 +197,7 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
       .map((c) => c.district)
   )].sort();
 
-  const filteredCities = [...new Set(
-    cities
-      .filter((c) => {
-        if (formData.district) return c.district === formData.district;
-        if (formData.state) return c.state === formData.state;
-        return true;
-      })
-      .map((c) => c.name)
-  )].sort();
+
 
   const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition';
   const labelCls = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1';
@@ -397,22 +378,18 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
           {/* City */}
           <div>
             <label className={labelCls}>City <span className="text-red-500">*</span></label>
-            {loadingCities ? (
-              <div className="h-9 bg-muted rounded-lg animate-pulse" />
-            ) : (
-              <select
-                id="step1-city"
-                value={formData.city || ''}
-                onChange={handleCityChange}
-                className={inputCls}
-                required
-              >
-                <option value="">Select City</option>
-                {filteredCities.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            )}
+            <InlineCitySelect
+              value={formData.city || ''}
+              onChange={({ city, district, state }) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  city,
+                  district,
+                  state
+                }));
+              }}
+              required
+            />
           </div>
         </div>
 

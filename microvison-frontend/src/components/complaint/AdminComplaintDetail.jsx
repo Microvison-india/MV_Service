@@ -46,6 +46,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [reopenNotes, setReopenNotes] = useState('');
   const reopenPhotos = [];
 
+  // Unregistered SC Action States
+  const [unregActionForm, setUnregActionForm] = useState('');
+  const [unregNotes, setUnregNotes] = useState('');
+  const [unregAmountCollected, setUnregAmountCollected] = useState('');
+  const [unregPartDetails, setUnregPartDetails] = useState('');
+  const [unregReason, setUnregReason] = useState('');
+  const [unregPhotos, setUnregPhotos] = useState([]);
+
   // Phase 21: Closing Check States
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [markAsPaidImmediately, setMarkAsPaidImmediately] = useState(false);
@@ -434,6 +442,116 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     }
   };
 
+  // ── Unregistered SC Action Handlers ───────────────────────
+  const handleUnregAccept = async () => {
+    setActionLoading('unreg_accept');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/accept`);
+      setSuccess('Accepted on behalf of Service Centre.');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to accept on behalf of SC.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnregReject = async () => {
+    setActionLoading('unreg_reject');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/reject`);
+      setSuccess('Rejected on behalf of Service Centre.');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reject on behalf of SC.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnregGoing = async () => {
+    setActionLoading('unreg_going');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/going`);
+      setSuccess('Marked as Going on behalf of Service Centre.');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update status.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnregPartReceived = async () => {
+    setActionLoading('unreg_part_received');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/part-received`);
+      setSuccess('Part confirmed as received on behalf of Service Centre.');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update status.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnregSubmitFinal = async (statusVal) => {
+    setError('');
+    setSuccess('');
+
+    const body = {
+      newStatus: statusVal,
+      proofPhotos: unregPhotos,
+      scNotes: unregNotes,
+    };
+
+    if (statusVal === 'done') {
+      if (unregPhotos.length < 1) {
+        setError('At least one proof photo is required.');
+        return;
+      }
+      if (!isInWarranty && !unregAmountCollected) {
+        setError('Please specify the amount collected from customer.');
+        return;
+      }
+      if (!isInWarranty) {
+        body.customerPaymentAmount = Number(unregAmountCollected);
+      }
+    } else if (statusVal === 'not_done') {
+      if (!unregReason.trim()) {
+        setError('A reason note is required.');
+        return;
+      }
+      body.notDoneReason = unregReason;
+    } else if (statusVal === 'part_pending') {
+      if (unregPhotos.length < 2) {
+        setError('At least two proof photos are required for part pending.');
+        return;
+      }
+      if (!unregPartDetails.trim()) {
+        setError('Part details are required.');
+        return;
+      }
+      body.partDetails = unregPartDetails;
+    }
+
+    setActionLoading('unreg_status');
+    try {
+      await api.patch(`/api/complaints/${c._id}/status`, body);
+      setSuccess(`Complaint marked as "${statusVal.replace(/_/g, ' ')}" successfully!`);
+      setUnregActionForm('');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update status.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSaveProductDetails = async () => {
     setActionLoading('saveProduct');
     setError('');
@@ -510,9 +628,16 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             {comp.assignedCentreId && (
               <div className="rounded-xl border border-border p-4 bg-muted/20 sm:col-span-2">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Assigned Service Centre</p>
-                <p className="font-semibold text-sm text-foreground">{comp.assignedCentreId.businessName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm text-foreground">{comp.assignedCentreId.businessName}</p>
+                  {comp.assignedCentreId.isUnregistered && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                      UNREGISTERED SC
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {comp.assignedCentreId.ownerName} · {comp.assignedCentreId.phone1}
+                  {comp.assignedCentreId.ownerName || 'Admin Maintained'} · {comp.assignedCentreId.phone1}
                 </p>
               </div>
             )}
@@ -1195,7 +1320,199 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
           {/* ── Admin Action Section ─────────────────────────────── */}
           <div className="border-t border-border pt-6 space-y-5">
-          {canConfirmOrDispute ? (
+            {/* Unregistered SC Status Update Banner */}
+            {c.assignedCentreId?.isUnregistered && (
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-4 rounded-xl shadow-sm space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  ⚠️ Unregistered Service Centre
+                </p>
+                <p className="text-xs">
+                  This complaint is assigned to an <strong>Unregistered SC</strong>. All status updates must be performed manually by admin on their behalf. No WhatsApp reminders are sent to the SC.
+                </p>
+              </div>
+            )}
+
+            {/* Unregistered SC Action Panel */}
+            {c.assignedCentreId?.isUnregistered && c.status !== 'done' && (
+              <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-4">
+                <p className="text-xs font-bold text-foreground uppercase tracking-wider">
+                  ⚙️ SC Action (Admin Maintained)
+                </p>
+                
+                {c.status === 'assigned' && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleUnregAccept}
+                      disabled={!!actionLoading}
+                      className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-green-700 disabled:opacity-50 transition"
+                    >
+                      {actionLoading === 'unreg_accept' ? 'Processing...' : 'Accept Job'}
+                    </button>
+                    <button
+                      onClick={handleUnregReject}
+                      disabled={!!actionLoading}
+                      className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-red-700 disabled:opacity-50 transition"
+                    >
+                      {actionLoading === 'unreg_reject' ? 'Processing...' : 'Reject Job'}
+                    </button>
+                  </div>
+                )}
+
+                {c.status === 'accepted' && (
+                  <button
+                    onClick={handleUnregGoing}
+                    disabled={!!actionLoading}
+                    className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg font-bold text-xs uppercase tracking-wider hover:opacity-90 disabled:opacity-50 transition flex items-center justify-center gap-2"
+                  >
+                    🚗 Mark SC as Going (On the Way)
+                  </button>
+                )}
+
+                {c.status === 'going' && (
+                  <div className="space-y-4">
+                    {/* Action selector tabs */}
+                    <div className="flex border-b border-border">
+                      {['done', 'not_done', 'part_pending'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => { setUnregActionForm(t); setError(''); }}
+                          className={`flex-1 py-2 text-center text-xs font-bold uppercase tracking-wider transition ${
+                            unregActionForm === t
+                              ? 'border-b-2 border-primary text-primary'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {t.replace('_', ' ')}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Done Form */}
+                    {unregActionForm === 'done' && (
+                      <div className="space-y-3 pt-2">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Min 1) <span className="text-red-500">*</span></label>
+                          <ImageUploader
+                            maxFiles={5}
+                            uploadedUrls={unregPhotos}
+                            onUpload={setUnregPhotos}
+                          />
+                        </div>
+
+                        {!isInWarranty && (
+                          <div>
+                            <label className="text-[10px] font-bold uppercase block mb-1">Amount Collected from Customer (₹) <span className="text-red-500">*</span></label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={unregAmountCollected}
+                              onChange={(e) => setUnregAmountCollected(e.target.value)}
+                              className={inputCls}
+                              placeholder="Amount collected"
+                              required
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="text-[10px] font-bold uppercase block mb-1">SC Notes / Report</label>
+                          <textarea
+                            value={unregNotes}
+                            onChange={(e) => setUnregNotes(e.target.value)}
+                            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            rows={2}
+                            placeholder="Report details..."
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleUnregSubmitFinal('done')}
+                          disabled={actionLoading === 'unreg_status'}
+                          className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition"
+                        >
+                          Submit Done Status
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Not Done Form */}
+                    {unregActionForm === 'not_done' && (
+                      <div className="space-y-3 pt-2">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Reason / Explanation <span className="text-red-500">*</span></label>
+                          <textarea
+                            value={unregReason}
+                            onChange={(e) => setUnregReason(e.target.value)}
+                            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            rows={2}
+                            placeholder="Why is it not done?"
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleUnregSubmitFinal('not_done')}
+                          disabled={actionLoading === 'unreg_status'}
+                          className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition"
+                        >
+                          Submit Not Done Status
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Part Pending Form */}
+                    {unregActionForm === 'part_pending' && (
+                      <div className="space-y-3 pt-2">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Min 2) <span className="text-red-500">*</span></label>
+                          <ImageUploader
+                            maxFiles={5}
+                            uploadedUrls={unregPhotos}
+                            onUpload={setUnregPhotos}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Required Part Details <span className="text-red-500">*</span></label>
+                          <textarea
+                            value={unregPartDetails}
+                            onChange={(e) => setUnregPartDetails(e.target.value)}
+                            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            rows={2}
+                            placeholder="e.g. Backlight strip 32inch, Motherboard CV56B..."
+                            required
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleUnregSubmitFinal('part_pending')}
+                          disabled={actionLoading === 'unreg_status'}
+                          className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition"
+                        >
+                          Submit Part Pending Status
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {c.status === 'part_pending' && c.partDeliveredAt && (
+                  <button
+                    onClick={handleUnregPartReceived}
+                    disabled={!!actionLoading}
+                    className="w-full py-2.5 bg-green-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider hover:bg-green-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+                  >
+                    📦 Confirm Part/Unit Received by SC
+                  </button>
+                )}
+              </div>
+            )}
+
+            {canConfirmOrDispute ? (
             <div className="space-y-5">
               {/* Section heading */}
               <div className="flex items-center gap-3 pb-1">

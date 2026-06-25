@@ -11,6 +11,8 @@ const {
   update,
   deactivate,
   getStats,
+  createUnregistered,
+  linkToRegistered,
 } = require('../controllers/serviceCentre.controller');
 
 // All routes are admin-only
@@ -21,6 +23,12 @@ router.get('/', getAll);
 
 // GET /api/service-centres/pending — pending approvals only
 router.get('/pending', getPending);
+
+// POST /api/service-centres/unregistered — create unregistered SC on the spot
+router.post('/unregistered', createUnregistered);
+
+// PATCH /api/service-centres/:id/link-to-registered — link unregistered to registered
+router.patch('/:id/link-to-registered', linkToRegistered);
 
 // GET /api/service-centres/:id — single SC detail
 router.get('/:id', getById);

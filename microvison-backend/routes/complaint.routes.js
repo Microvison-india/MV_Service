@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { isAdmin, isSC } = require('../middleware/rbac');
+const { isAdmin, isSC, isAdminOrSC } = require('../middleware/rbac');
 const {
   reopenCheck,
   reopenComplaint,
@@ -77,18 +77,18 @@ router.get('/my', auth, isSC, getMyComplaints);
 router.get('/:id', auth, getComplaintById);
 
 // PATCH /api/complaints/:id/accept — SC accepts assignment
-router.patch('/:id/accept', auth, isSC, acceptComplaint);
+router.patch('/:id/accept', auth, isAdminOrSC, acceptComplaint);
 
 // PATCH /api/complaints/:id/reject — SC rejects assignment
-router.patch('/:id/reject', auth, isSC, rejectComplaint);
+router.patch('/:id/reject', auth, isAdminOrSC, rejectComplaint);
 
 // PATCH /api/complaints/:id/going — SC marks they are on the way (optional)
-router.patch('/:id/going', auth, isSC, markGoing);
+router.patch('/:id/going', auth, isAdminOrSC, markGoing);
 
 // PATCH /api/complaints/:id/status — SC submits final result after visit
-router.patch('/:id/status', auth, isSC, updateStatus);
+router.patch('/:id/status', auth, isAdminOrSC, updateStatus);
 
 // PATCH /api/complaints/:id/part-received — SC marks part received (SC Flow v1.1)
-router.patch('/:id/part-received', auth, isSC, markPartReceived);
+router.patch('/:id/part-received', auth, isAdminOrSC, markPartReceived);
 
 module.exports = router;

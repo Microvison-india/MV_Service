@@ -7,5 +7,6 @@ const citySchema = new mongoose.Schema({
 });
 
 citySchema.index({ name: 1 });
+citySchema.index({ name: 1, district: 1, state: 1 }, { unique: true });
 
 module.exports = mongoose.model('City', citySchema);

@@ -521,6 +521,17 @@ const assignComplaint = async (req, res) => {
     note: `Assigned to ${sc.businessName}.`,
   });
 
+  if (sc.isUnregistered === true) {
+    await ComplaintUpdate.create({
+      complaintId: complaint._id,
+      updatedBy: req.user.id,
+      role: 'admin',
+      oldStatus: 'assigned',
+      newStatus: 'assigned',
+      note: 'Assigned to Unregistered SC — WA-01 not sent. Admin to contact SC manually.',
+    });
+  }
+
   res.status(200).json({
     message: `Complaint assigned to ${sc.businessName} successfully.`,
     complaint,
@@ -532,36 +543,38 @@ const assignComplaint = async (req, res) => {
     complaint.customerName,
     complaint.complaintId,
     sc.businessName,
-    sc.ownerName,
+    sc.ownerName || '',
     sc.phone1
   ]);
 
-  // Trigger 3: Send basic complaint details to Assigned SC (WA-01)
-  const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'complaint_details_to_sc';
-  const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
-  
-  let reopenInfo = 'NO';
-  if (complaint.isReopened && complaint.reopenParentId) {
-    const parent = await Complaint.findById(complaint.reopenParentId);
-    reopenInfo = `REOPENED (Original Job ID: ${parent ? parent.complaintId : 'Unknown'})`;
-  }
+  // Trigger 3: Send basic complaint details to Assigned SC (WA-01) - suppressed for unregistered SCs
+  if (sc.isUnregistered !== true) {
+    const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'complaint_details_to_sc';
+    const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
+    
+    let reopenInfo = 'NO';
+    if (complaint.isReopened && complaint.reopenParentId) {
+      const parent = await Complaint.findById(complaint.reopenParentId);
+      reopenInfo = `REOPENED (Original Job ID: ${parent ? parent.complaintId : 'Unknown'})`;
+    }
 
-  sendWhatsApp(sc.phone1, templateSC, [
-    sc.ownerName,
-    complaint.complaintId,
-    complaint.customerName,
-    complaint.phone1,
-    customerAddress,
-    complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-    complaint.complaintType,
-    complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
-    complaint.notes || 'None',
-    process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in/login',
-    reopenInfo,
-    complaint.serialNumber || 'N/A',
-    complaint.modelNumber || 'N/A',
-    complaint.locationText || 'N/A'
-  ]);
+    sendWhatsApp(sc.phone1, templateSC, [
+      sc.ownerName || '',
+      complaint.complaintId,
+      complaint.customerName,
+      complaint.phone1,
+      customerAddress,
+      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+      complaint.complaintType,
+      complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
+      complaint.notes || 'None',
+      process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in/login',
+      reopenInfo,
+      complaint.serialNumber || 'N/A',
+      complaint.modelNumber || 'N/A',
+      complaint.locationText || 'N/A'
+    ]);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1368,7 +1381,7 @@ const markPartDelivered = async (req, res) => {
 
   // Find Service Centre to get their phone number
   const sc = await ServiceCentre.findById(complaint.assignedCentreId);
-  if (sc && sc.phone1) {
+  if (sc && sc.phone1 && sc.isUnregistered !== true) {
     const templateName = process.env.WHATSAPP_TEMPLATE_PART_DELIVERED || 'part_delivered_to_sc';
     const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}`;
     sendWhatsApp(sc.phone1, templateName, [

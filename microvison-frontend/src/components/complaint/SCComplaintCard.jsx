@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import api from '../../api/axios';
 
 
 // GRD Section 10.1 — The complaint card used in New Requests AND My Complaints

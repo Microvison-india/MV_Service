@@ -51,12 +51,12 @@ export default function SCFilters({ filters, onChange }) {
 
   const handleReset = () => {
     setSearchInput('');
-    onChange({ search: '', city: '', district: '', state: '', status: '', productCapability: '', page: 1 });
+    onChange({ search: '', city: '', district: '', state: '', status: '', productCapability: '', isUnregistered: '', page: 1 });
   };
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 mb-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3 items-end">
         {/* Search */}
         <div className="xl:col-span-2 space-y-1">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Search</label>
@@ -135,6 +135,22 @@ export default function SCFilters({ filters, onChange }) {
             {CAPABILITY_OPTIONS.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
+          </select>
+        </div>
+
+        {/* Registration Type */}
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reg. Type</label>
+          <select
+            id="sc-filter-regtype"
+            name="isUnregistered"
+            value={filters.isUnregistered || ''}
+            onChange={handleSelect}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+          >
+            <option value="">All SCs</option>
+            <option value="false">Registered Only</option>
+            <option value="true">Unregistered Only</option>
           </select>
         </div>
       </div>

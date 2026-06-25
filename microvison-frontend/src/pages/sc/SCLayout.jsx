@@ -25,10 +25,15 @@ export default function SCLayout() {
   }, []);
 
   useEffect(() => {
-    fetchNewCount();
+    const timer = setTimeout(() => {
+      fetchNewCount();
+    }, 0);
     // Re-poll every 60 seconds to keep badge fresh
     const interval = setInterval(fetchNewCount, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchNewCount]);
 
   const handleLogout = () => {
