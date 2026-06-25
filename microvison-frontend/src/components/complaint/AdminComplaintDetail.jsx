@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import ExtraChargesList from './ExtraChargesList';
+import ImageUploader from '../forms/ImageUploader';
 import StatusTimeline from './StatusTimeline';
 import PetrolEditField from './PetrolEditField';
 import BillSummary from './BillSummary';
@@ -43,6 +44,33 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   // Reopen states
   const [reopenNotes, setReopenNotes] = useState('');
   const reopenPhotos = [];
+
+  // Phase 21: Closing Check States
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [missingFields, setMissingFields] = useState([]);
+  const [fillValues, setFillValues] = useState({
+    billDate: '',
+    billPhoto: '',
+    shopName: '',
+    serialNumber: '',
+    modelNumber: '',
+  });
+  const [bypassedFields, setBypassedFields] = useState({
+    billDate: false,
+    billPhoto: false,
+    shopName: false,
+    serialNumber: false,
+    modelNumber: false,
+  });
+  const [modalError, setModalError] = useState('');
+
+  // Edit states for Product Registry (Phase 21)
+  const [editSerialNumber, setEditSerialNumber] = useState('');
+  const [editModelNumber, setEditModelNumber] = useState('');
+  const [editShopName, setEditShopName] = useState('');
+  const [editBillDate, setEditBillDate] = useState('');
+  const [editBillPhoto, setEditBillPhoto] = useState('');
+  const [showProductEditor, setShowProductEditor] = useState(false);
 
   // Historical details caching & expanded state
   const [loadedDetails, setLoadedDetails] = useState({});
@@ -99,11 +127,29 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             setPetrolAdmin(data.complaint.petrolAdmin ?? '');
             setPetrolSC(data.complaint.petrolSC ?? '');
             setAdminExtraCharges(data.complaint.extraCharges || []);
+
+            // Set product editor values
+            const prod = data.complaint.trackingId || {};
+            setEditSerialNumber(prod.serialNumber || '');
+            setEditModelNumber(prod.modelNumber || '');
+            setEditShopName(prod.shopName || '');
+            setEditBillDate(prod.billDate ? prod.billDate.split('T')[0] : '');
+            setEditBillPhoto(prod.billPhoto || '');
+
             isFirst = false;
           } else if (!isEditingExtraCharges && data.complaint.status !== 'done') {
             setPetrolAdmin(data.complaint.petrolAdmin ?? '');
             setPetrolSC(data.complaint.petrolSC ?? '');
             setAdminExtraCharges(data.complaint.extraCharges || []);
+
+            if (!showProductEditor) {
+              const prod = data.complaint.trackingId || {};
+              setEditSerialNumber(prod.serialNumber || '');
+              setEditModelNumber(prod.modelNumber || '');
+              setEditShopName(prod.shopName || '');
+              setEditBillDate(prod.billDate ? prod.billDate.split('T')[0] : '');
+              setEditBillPhoto(prod.billPhoto || '');
+            }
           }
           setError(''); // Cleared asynchronously on success
         }
@@ -196,6 +242,60 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     setActionLoading('confirm');
     setError('');
     try {
+      // 1. Get latest complaint details to check product fields
+      const { data: latestData } = await api.get(`/api/complaints/${c._id}`);
+      const latestComplaint = latestData.complaint;
+      const productObj = latestComplaint?.trackingId;
+
+      if (productObj) {
+        const missing = [];
+        if (!productObj.billDate) missing.push('billDate');
+        if (!productObj.billPhoto) missing.push('billPhoto');
+        if (!productObj.shopName) missing.push('shopName');
+        if (!productObj.serialNumber) missing.push('serialNumber');
+        if (!productObj.modelNumber) missing.push('modelNumber');
+
+        // If there are missing fields and the warning modal is not shown yet, open it
+        if (missing.length > 0 && !showWarningModal) {
+          setMissingFields(missing);
+          // Prefill values from SC uploaded files if present to help admin
+          setFillValues({
+            billDate: '',
+            billPhoto: latestComplaint.scBillPhotoUrl || '',
+            shopName: '',
+            serialNumber: '',
+            modelNumber: '',
+          });
+          setBypassedFields({
+            billDate: false,
+            billPhoto: false,
+            shopName: false,
+            serialNumber: false,
+            modelNumber: false,
+          });
+          setModalError('');
+          setShowWarningModal(true);
+          setActionLoading(false);
+          return;
+        }
+
+        // If warning modal is shown, validate that everything is handled (either filled or bypassed)
+        if (showWarningModal) {
+          const unhandled = [];
+          missing.forEach(f => {
+            if (!fillValues[f] && !bypassedFields[f]) {
+              unhandled.push(f);
+            }
+          });
+          if (unhandled.length > 0) {
+            setModalError(`Please fill or bypass all missing fields: ${unhandled.join(', ')}`);
+            setActionLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Build payload body
       const body = { 
         note: adminNote,
         extraCharges: adminExtraCharges
@@ -212,8 +312,25 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         }
       }
 
+      // Append filled values & bypass array if warning modal is active
+      if (showWarningModal) {
+        missingFields.forEach(f => {
+          if (fillValues[f]) {
+            body[f] = fillValues[f];
+          }
+        });
+        const bypassedArray = [];
+        missingFields.forEach(f => {
+          if (bypassedFields[f] && !fillValues[f]) {
+            bypassedArray.push(f);
+          }
+        });
+        body.missingFieldsBypassed = bypassedArray;
+      }
+
       await api.patch(`/api/complaints/${c._id}/confirm-done`, body);
       setSuccess('Job confirmed and closed successfully!');
+      setShowWarningModal(false);
       setTimeout(onUpdated, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to confirm job.');
@@ -308,6 +425,28 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       }, 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reopen complaint.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveProductDetails = async () => {
+    setActionLoading('saveProduct');
+    setError('');
+    setSuccess('');
+    try {
+      await api.put(`/api/products/${displayTrackingId}`, {
+        serialNumber: editSerialNumber,
+        modelNumber: editModelNumber,
+        shopName: editShopName,
+        billDate: editBillDate,
+        billPhoto: editBillPhoto,
+      });
+      setSuccess('Product registry details updated successfully!');
+      setShowProductEditor(false);
+      setRefreshTick(t => t + 1); // trigger reload
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update product details.');
     } finally {
       setActionLoading(false);
     }
@@ -785,6 +924,162 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 </div>
               )}
             </div>
+
+            {/* Show shop name and model number */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm pt-3 border-t border-border/40">
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Shop Name</span>
+                <p className="font-semibold text-foreground">{productInfo.shopName || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Model Number</span>
+                <p className="font-semibold text-foreground">{productInfo.modelNumber || '—'}</p>
+              </div>
+              {productInfo.warrantyForceReason && (
+                <div className="sm:col-span-2 space-y-1">
+                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs text-amber-700">Force Override Reason</span>
+                  <p className="font-medium text-amber-800 dark:text-amber-300 italic">"{productInfo.warrantyForceReason}"</p>
+                </div>
+              )}
+              {c.locationText && (
+                <div className="sm:col-span-2 space-y-1">
+                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Location / Maps Link</span>
+                  <p className="font-medium text-foreground bg-muted/40 p-2.5 rounded-lg border text-xs break-all">
+                    {c.locationText.startsWith('http') ? (
+                      <a href={c.locationText} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">
+                        {c.locationText}
+                      </a>
+                    ) : c.locationText}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Persistent Bypassed Fields Warning Badge */}
+            {productInfo.missingFieldsWarning && productInfo.missingFieldsWarning.length > 0 && (
+              <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/50 rounded-xl p-3.5 text-yellow-800 dark:text-yellow-300 text-xs font-semibold flex items-center gap-2">
+                <span>⚠️ Missing fields bypassed in registry: <strong>{productInfo.missingFieldsWarning.join(', ')}</strong></span>
+              </div>
+            )}
+
+            {/* SC Uploaded Photo displays */}
+            {(c.scBillPhotoUrl || c.scSerialSlipPhotoUrl) && (
+              <div className="pt-3 border-t border-border/40 space-y-3">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs block">SC Uploaded Proofs</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {c.scBillPhotoUrl && (
+                    <div className="border rounded-xl p-3 bg-muted/20 space-y-2">
+                      <span className="text-xs font-semibold text-foreground block">Uploaded Bill Photo:</span>
+                      <a href={c.scBillPhotoUrl} target="_blank" rel="noreferrer" className="block relative aspect-video bg-muted rounded-lg overflow-hidden border">
+                        <img src={c.scBillPhotoUrl} alt="SC Uploaded Bill" className="object-cover w-full h-full" />
+                      </a>
+                    </div>
+                  )}
+                  {c.scSerialSlipPhotoUrl && (
+                    <div className="border rounded-xl p-3 bg-muted/20 space-y-2">
+                      <span className="text-xs font-semibold text-foreground block">Uploaded Serial/Model sticker:</span>
+                      <a href={c.scSerialSlipPhotoUrl} target="_blank" rel="noreferrer" className="block relative aspect-video bg-muted rounded-lg overflow-hidden border">
+                        <img src={c.scSerialSlipPhotoUrl} alt="SC Uploaded Serial Sticker" className="object-cover w-full h-full" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Manage Product Registry collapsible button and editor */}
+            <div className="pt-3 border-t border-border/40">
+              <button
+                type="button"
+                onClick={() => setShowProductEditor(!showProductEditor)}
+                className="w-full py-2 bg-muted hover:bg-muted/80 text-foreground transition rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+              >
+                <span>⚙️</span> {showProductEditor ? 'Hide Registry Editor' : 'Edit Product Registry & Transcribe'}
+              </button>
+
+              {showProductEditor && (
+                <div className="mt-4 p-4 border rounded-xl bg-card space-y-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-muted-foreground mb-1">Serial Number</label>
+                      <input
+                        type="text"
+                        value={editSerialNumber}
+                        onChange={(e) => setEditSerialNumber(e.target.value)}
+                        placeholder="Enter serial number"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-muted-foreground mb-1">Model Number / Variant</label>
+                      <input
+                        type="text"
+                        value={editModelNumber}
+                        onChange={(e) => setEditModelNumber(e.target.value)}
+                        placeholder="Enter model number"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-muted-foreground mb-1">Shop / Dealer Name</label>
+                      <input
+                        type="text"
+                        value={editShopName}
+                        onChange={(e) => setEditShopName(e.target.value)}
+                        placeholder="Enter dealer shop name"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-muted-foreground mb-1">Bill Date</label>
+                      <input
+                        type="date"
+                        value={editBillDate}
+                        onChange={(e) => setEditBillDate(e.target.value)}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block font-bold text-muted-foreground mb-1">Bill / Invoice Photo Link</label>
+                      {editBillPhoto ? (
+                        <div className="flex items-center gap-2 border rounded-lg p-2 bg-muted/40">
+                          <a href={editBillPhoto} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-xs font-medium">
+                            View Current Bill Photo
+                          </a>
+                          <button type="button" onClick={() => setEditBillPhoto('')} className="text-red-500 font-bold ml-auto">Remove</button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {c.scBillPhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setEditBillPhoto(c.scBillPhotoUrl)}
+                              className="px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded font-bold text-[10px] uppercase tracking-wider mb-2"
+                            >
+                              ✓ Use SC Uploaded Bill Photo
+                            </button>
+                          )}
+                          <ImageUploader
+                            maxFiles={1}
+                            uploadedUrls={[]}
+                            onUpload={(urls) => setEditBillPhoto(urls[0] || '')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveProductDetails}
+                    disabled={actionLoading === 'saveProduct'}
+                    className="w-full py-2.5 bg-primary text-primary-foreground font-bold hover:opacity-90 disabled:opacity-50 transition rounded-lg uppercase tracking-wider text-[10px]"
+                  >
+                    {actionLoading === 'saveProduct' ? 'Saving Details...' : '✓ Save Product Registry Details'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Unified Product Lifecycle Timeline (The Big Window) */}
@@ -1207,6 +1502,135 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
           {success && <p className="text-xs font-semibold text-green-600 bg-green-50 p-3 rounded-xl border border-green-200 mt-2">{success}</p>}
         </div>
       </div>
+
+      {/* Missing Fields Warning Modal */}
+      {showWarningModal && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+            <div className="bg-background border border-border w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="p-6 border-b border-border flex items-center justify-between">
+                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                  ⚠️ Product Information Missing
+                </h3>
+                <button type="button" onClick={() => setShowWarningModal(false)} className="text-muted-foreground hover:text-foreground">✕</button>
+              </div>
+
+              <div className="p-6 space-y-5 flex-1 text-xs">
+                <p className="text-muted-foreground leading-relaxed">
+                  The following product fields are still empty. Please fill them before closing or bypass each field individually.
+                </p>
+
+                {modalError && (
+                  <p className="text-red-600 bg-red-50 dark:bg-red-950/20 p-2.5 rounded-lg border border-red-200 dark:border-red-900/50 font-semibold">
+                    {modalError}
+                  </p>
+                )}
+
+                <div className="space-y-4">
+                  {missingFields.map((field) => {
+                    const fieldLabel = {
+                      billDate: 'Bill Date / Date of purchase',
+                      billPhoto: 'Bill / Invoice Photo',
+                      shopName: 'Shop / Dealer Name',
+                      serialNumber: 'Serial Number',
+                      modelNumber: 'Model Number / Variant',
+                    }[field];
+
+                    return (
+                      <div key={field} className="border rounded-xl p-4 bg-muted/20 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="font-bold text-foreground">{fieldLabel}</label>
+                          <label className="flex items-center gap-1.5 text-muted-foreground cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!bypassedFields[field]}
+                              onChange={(e) => {
+                                setBypassedFields(prev => ({ ...prev, [field]: e.target.checked }));
+                                if (e.target.checked) {
+                                  setFillValues(prev => ({ ...prev, [field]: '' }));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                            />
+                            Bypass this field
+                          </label>
+                        </div>
+
+                        {!bypassedFields[field] ? (
+                          <div>
+                            {field === 'billDate' ? (
+                              <input
+                                type="date"
+                                value={fillValues.billDate}
+                                onChange={(e) => setFillValues(prev => ({ ...prev, billDate: e.target.value }))}
+                                className={inputCls}
+                              />
+                            ) : field === 'billPhoto' ? (
+                              fillValues.billPhoto ? (
+                                <div className="flex items-center gap-2 border rounded-lg p-2 bg-background">
+                                  <span className="truncate max-w-xs font-medium">📄 bill_photo.jpg</span>
+                                  <button type="button" onClick={() => setFillValues(prev => ({ ...prev, billPhoto: '' }))} className="text-red-500 font-semibold ml-auto">Remove</button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {c.scBillPhotoUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setFillValues(prev => ({ ...prev, billPhoto: c.scBillPhotoUrl }))}
+                                      className="px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded font-bold text-[10px] uppercase tracking-wider mb-2 block"
+                                    >
+                                      ✓ Use SC Uploaded Bill Photo
+                                    </button>
+                                  )}
+                                  <ImageUploader
+                                    maxFiles={1}
+                                    uploadedUrls={[]}
+                                    onUpload={(urls) => setFillValues(prev => ({ ...prev, billPhoto: urls[0] || '' }))}
+                                  />
+                                </div>
+                              )
+                            ) : (
+                              <input
+                                type="text"
+                                value={fillValues[field]}
+                                onChange={(e) => setFillValues(prev => ({ ...prev, [field]: e.target.value }))}
+                                placeholder={`Enter ${fieldLabel}`}
+                                className={inputCls}
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-amber-600 dark:text-amber-400 font-semibold italic bg-amber-50 dark:bg-amber-950/20 p-2 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                            Bypassed. You will be prompted again in future complaints until filled.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-border flex justify-end gap-3 bg-muted/10">
+                <button
+                  type="button"
+                  onClick={() => setShowWarningModal(false)}
+                  className="px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-muted text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={actionLoading === 'confirm'}
+                  className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  {actionLoading === 'confirm' ? 'Saving...' : 'Confirm & Close'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

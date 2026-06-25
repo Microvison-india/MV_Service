@@ -30,9 +30,17 @@ const complaintSchema = new mongoose.Schema(
     complaintType: { type: String, enum: ['installation', 'complaint'], required: true },
     warrantyStatus: { type: String, enum: ['in_warranty', 'out_of_warranty'], required: true },
     warrantyExpiryDate: { type: Date, default: null },
-    warrantySource: { type: String, enum: ['auto_calculated', 'manual'], default: 'manual' },
+    warrantySource: { type: String, enum: ['auto_calculated', 'manual', 'forced'], default: 'manual' },
     billPhoto: { type: String, default: '' },
     billDate: { type: Date, default: null },
+    shopName: { type: String, default: '' },
+    modelNumber: { type: String, default: '' },
+    locationText: { type: String, default: '' },
+    warrantyForceReason: { type: String, default: '' },
+    scBillPhotoUrl: { type: String, default: '' },
+    scSerialSlipPhotoUrl: { type: String, default: '' },
+    missingFieldsBypassed: [{ type: String }],
+    scMissingBypass: [{ type: String }],
 
     // ── Preset & Base Charges (in-warranty only) ──────────────
     presetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Preset', default: null },

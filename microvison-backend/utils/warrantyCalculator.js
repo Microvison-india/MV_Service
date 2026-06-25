@@ -1,13 +1,34 @@
 /**
- * Calculates the warranty status based on Addendum v1.2 logic.
+ * Calculates the warranty status based on Addendum v1.3 logic.
  * 
- * @param {Date|null} billDate - The invoice date provided
- * @param {String} complaintType - 'installation' or 'complaint'
- * @param {String|null} manualSelection - 'in_warranty' or 'out_of_warranty' explicitly set by admin
- * @returns {Object} { warrantyStatus, warrantyExpiryDate, warrantySource }
+ * @param {Object} options
+ * @param {Date|null} options.billDate - The invoice date provided
+ * @param {String} options.complaintType - 'installation' or 'complaint'
+ * @param {String|null} options.manualSelection - 'in_warranty' or 'out_of_warranty' explicitly set by admin
+ * @param {String|null} options.manualReason - reason text for manual selection
+ * @param {Boolean|null} options.forceOverride - whether admin overrides calculated status
+ * @param {String|null} options.forceReason - reason text for force override
+ * @returns {Object} { warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }
  */
-const calculateWarranty = (billDate, complaintType, manualSelection) => {
-  // 1. If we have a bill date, it overrides everything and auto-calculates
+const calculateWarranty = ({
+  billDate,
+  complaintType,
+  manualSelection,
+  manualReason,
+  forceOverride,
+  forceReason,
+}) => {
+  // Rule 4 (Force override) takes precedence over all other rules
+  if (forceOverride === true || forceOverride === 'true') {
+    return {
+      warrantyStatus: manualSelection || 'out_of_warranty',
+      warrantyExpiryDate: null,
+      warrantySource: 'forced',
+      warrantyForceReason: forceReason || '',
+    };
+  }
+
+  // Rule 1 (Bill Date present)
   if (billDate) {
     const bDate = new Date(billDate);
     const expiryDate = new Date(bDate);
@@ -25,36 +46,39 @@ const calculateWarranty = (billDate, complaintType, manualSelection) => {
 
     return {
       warrantyStatus: status,
-      warrantyExpiryDate: expiryDate, // Store standard date
-      warrantySource: 'auto_calculated'
+      warrantyExpiryDate: expiryDate,
+      warrantySource: 'auto_calculated',
+      warrantyForceReason: '',
     };
   }
 
-  // 2. If no bill date, but manual selection is provided
+  // Rule 2 (No bill date, manual selection)
   if (manualSelection) {
     return {
       warrantyStatus: manualSelection,
       warrantyExpiryDate: null,
-      warrantySource: 'manual'
+      warrantySource: 'manual',
+      warrantyForceReason: '',
     };
   }
 
-  // 3. Fallbacks if neither provided
+  // Rule 3 (LED Installation, nothing provided)
   if (complaintType === 'installation') {
-    // Brand new installation gets in_warranty by default
     return {
       warrantyStatus: 'in_warranty',
       warrantyExpiryDate: null,
-      warrantySource: 'manual'
-    };
-  } else {
-    // Any other complaint (LED/Cooler) with no bill gets out_of_warranty
-    return {
-      warrantyStatus: 'out_of_warranty',
-      warrantyExpiryDate: null,
-      warrantySource: 'manual'
+      warrantySource: 'manual',
+      warrantyForceReason: '',
     };
   }
+
+  // Default fallback (e.g. cooler complaint with nothing provided)
+  return {
+    warrantyStatus: 'out_of_warranty',
+    warrantyExpiryDate: null,
+    warrantySource: 'manual',
+    warrantyForceReason: '',
+  };
 };
 
 module.exports = { calculateWarranty };

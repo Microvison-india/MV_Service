@@ -3,12 +3,12 @@ import api from '../../api/axios';
 import ImageUploader from './ImageUploader';
 import VoiceRecorder from './VoiceRecorder';
 
-// GRD Section 6.3 — Step 3: Charges & Media
+// GRD Section 6.4 — Step 4 (was Step 3): Charges & Media
 // In-warranty: preset selector + petrol estimate + extra charges
 // Out-of-warranty: no preset, no petrol, only optional admin-added extras
 // Both warranty types: notes (text), voice note (max 60s), 2 admin photos
 
-export default function Step3Charges({ formData, setFormData }) {
+export default function Step4Charges({ formData, setFormData }) {
   const [presets, setPresets] = useState([]);
   const [loadingPresets, setLoadingPresets] = useState(false);
 
@@ -16,8 +16,11 @@ export default function Step3Charges({ formData, setFormData }) {
 
   // Fetch presets filtered by product + complaintType
   useEffect(() => {
+    let active = true;
     if (!isInWarranty || !formData.product || !formData.complaintType) {
-      setPresets([]);
+      Promise.resolve().then(() => {
+        if (active) setPresets([]);
+      });
       return;
     }
 
@@ -38,21 +41,25 @@ export default function Step3Charges({ formData, setFormData }) {
         }
 
         const { data } = await api.get('/api/presets', { params: { type: presetType, status: 'active' } });
-        setPresets(data.presets || data);
+        if (active) setPresets(data.presets || data);
       } catch {
-        setPresets([]);
+        if (active) setPresets([]);
       } finally {
-        setLoadingPresets(false);
+        if (active) setLoadingPresets(false);
       }
     };
     fetchPresets();
-  }, [formData.product, formData.complaintType, formData.warrantyStatus]);
+
+    return () => {
+      active = false;
+    };
+  }, [formData.product, formData.complaintType, formData.warrantyStatus, isInWarranty]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Extra Charges management (GRD 6.3)
+  // Extra Charges management (GRD 6.4)
   const addExtraCharge = () => {
     setFormData((prev) => ({
       ...prev,
@@ -95,7 +102,7 @@ export default function Step3Charges({ formData, setFormData }) {
           ) : (
             <div className="space-y-3">
               <select
-                id="step3-preset"
+                id="step4-preset"
                 value={formData.presetId || ''}
                 onChange={(e) => handleChange('presetId', e.target.value)}
                 className={inputCls}
@@ -148,7 +155,7 @@ export default function Step3Charges({ formData, setFormData }) {
             Optional. This is Edit 1 of 3. SC adjusts actual later; admin can override once.
           </p>
           <input
-            id="step3-petrol"
+            id="step4-petrol"
             type="number"
             min="0"
             value={formData.petrolAdmin || ''}
@@ -204,7 +211,7 @@ export default function Step3Charges({ formData, setFormData }) {
         ))}
         <button
           type="button"
-          id="step3-add-extra"
+          id="step4-add-extra"
           onClick={addExtraCharge}
           className="mt-2 px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition"
         >
@@ -216,7 +223,7 @@ export default function Step3Charges({ formData, setFormData }) {
       <div>
         <label className={labelCls}>Admin Notes (optional)</label>
         <textarea
-          id="step3-notes"
+          id="step4-notes"
           value={formData.notes || ''}
           onChange={(e) => handleChange('notes', e.target.value)}
           rows={3}

@@ -23,6 +23,8 @@ const productSchema = new mongoose.Schema(
     // Bill & Warranty Details (Latest)
     billPhoto: { type: String, default: '' }, // Cloudinary URL
     billDate: { type: Date, default: null },
+    shopName: { type: String, default: '' },
+    modelNumber: { type: String, default: '' },
     warrantyStatus: {
       type: String,
       enum: ['in_warranty', 'out_of_warranty'],
@@ -31,9 +33,11 @@ const productSchema = new mongoose.Schema(
     warrantyExpiryDate: { type: Date, default: null },
     warrantySource: {
       type: String,
-      enum: ['auto_calculated', 'manual'],
+      enum: ['auto_calculated', 'manual', 'forced'],
       required: true,
     },
+    warrantyForceReason: { type: String, default: '' },
+    missingFieldsWarning: [{ type: String }],
 
     // Timeline History
     complaintHistory: [

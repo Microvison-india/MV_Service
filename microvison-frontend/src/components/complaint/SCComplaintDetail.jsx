@@ -65,6 +65,12 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [extraCharges, setExtraCharges] = useState([]);
   const [markingReceived, setMarkingReceived] = useState(false);
 
+  // Phase 21 State Variables
+  const [scBillPhotoUrl, setScBillPhotoUrl] = useState('');
+  const [scSerialSlipPhotoUrl, setScSerialSlipPhotoUrl] = useState('');
+  const [skipBillPhoto, setSkipBillPhoto] = useState(false);
+  const [skipSerialPhoto, setSkipSerialPhoto] = useState(false);
+
   useEffect(() => {
     let active = true;
     let isFirst = true;
@@ -84,6 +90,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setTotalVisits(1);
       setDistanceTravelled('');
       setExtraCharges([]);
+      setScBillPhotoUrl('');
+      setScSerialSlipPhotoUrl('');
+      setSkipBillPhoto(false);
+      setSkipSerialPhoto(false);
       setError('');
       setSuccess('');
     });
@@ -216,6 +226,32 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       body.distanceTravelled = distanceTravelled ? Number(distanceTravelled) : undefined;
       body.doneVoiceUrl = doneVoiceUrl;
 
+      // Check missing fields on product
+      const productObj = c?.trackingId;
+      const isBillInfoMissing = productObj && (!productObj.billDate || !productObj.billPhoto || !productObj.shopName);
+      const isSerialInfoMissing = productObj && (!productObj.serialNumber || !productObj.modelNumber);
+
+      if (isBillInfoMissing) {
+        if (!scBillPhotoUrl && !skipBillPhoto) {
+          setError('Please upload the product bill photo or check "Skip for now".');
+          return;
+        }
+        body.scBillPhotoUrl = scBillPhotoUrl || undefined;
+      }
+
+      if (isSerialInfoMissing) {
+        if (!scSerialSlipPhotoUrl && !skipSerialPhoto) {
+          setError('Please upload the product serial/model sticker photo or check "Skip for now".');
+          return;
+        }
+        body.scSerialSlipPhotoUrl = scSerialSlipPhotoUrl || undefined;
+      }
+
+      const bypassedFields = [];
+      if (isBillInfoMissing && skipBillPhoto) bypassedFields.push('billPhoto');
+      if (isSerialInfoMissing && skipSerialPhoto) bypassedFields.push('serialPhoto');
+      body.scMissingBypass = bypassedFields;
+
       // Petrol SC (only if in-warranty and SC's turn)
       if (isInWarranty && (c.petrolEditCount === 1 || c.petrolEditCount === 0) && petrolSC !== '') {
         body.petrolSC = Number(petrolSC);
@@ -282,6 +318,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       </div>
     );
   }
+
+  const productObj = c?.trackingId;
+  const isBillInfoMissing = productObj && (!productObj.billDate || !productObj.billPhoto || !productObj.shopName);
+  const isSerialInfoMissing = productObj && (!productObj.serialNumber || !productObj.modelNumber);
 
   return (
     <>
@@ -568,6 +608,89 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 {/* Path 1: DONE Form */}
                 {activeForm === 'done' && (
                   <div className="space-y-4 pt-2 border-t border-border/50">
+                    {/* Demanded Bill Info Sub-section */}
+                    {isBillInfoMissing && (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl space-y-3">
+                        <div>
+                          <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                            Product Bill Info Required
+                          </h4>
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                            The bill information for this product was not provided at registration. Please ask the customer for their purchase bill and upload a photo here.
+                          </p>
+                        </div>
+                        {scBillPhotoUrl ? (
+                          <div className="flex items-center gap-3 border rounded-lg p-2 bg-background">
+                            <span className="text-xs font-medium truncate max-w-xs">📄 Bill Photo Uploaded</span>
+                            <button type="button" onClick={() => setScBillPhotoUrl('')} className="text-xs text-red-500 font-bold ml-auto">
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <ImageUploader
+                            maxFiles={1}
+                            uploadedUrls={[]}
+                            onUpload={(urls) => setScBillPhotoUrl(urls[0] || '')}
+                          />
+                        )}
+                        <p className="text-[10px] text-muted-foreground italic">
+                          This will be used to update the product's warranty information.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="skip-bill-photo"
+                            checked={skipBillPhoto}
+                            onChange={(e) => setSkipBillPhoto(e.target.checked)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <label htmlFor="skip-bill-photo" className="text-xs font-medium text-amber-900 dark:text-amber-200 cursor-pointer">
+                            Skip for now
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Demanded Serial/Model Info Sub-section */}
+                    {isSerialInfoMissing && (
+                      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl space-y-3">
+                        <div>
+                          <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                            Product Serial Info Required
+                          </h4>
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
+                            Please photograph the serial number / model sticker on the product.
+                          </p>
+                        </div>
+                        {scSerialSlipPhotoUrl ? (
+                          <div className="flex items-center gap-3 border rounded-lg p-2 bg-background">
+                            <span className="text-xs font-medium truncate max-w-xs">📷 Sticker Photo Uploaded</span>
+                            <button type="button" onClick={() => setScSerialSlipPhotoUrl('')} className="text-xs text-red-500 font-bold ml-auto">
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <ImageUploader
+                            maxFiles={1}
+                            uploadedUrls={[]}
+                            onUpload={(urls) => setScSerialSlipPhotoUrl(urls[0] || '')}
+                          />
+                        )}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="skip-serial-photo"
+                            checked={skipSerialPhoto}
+                            onChange={(e) => setSkipSerialPhoto(e.target.checked)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <label htmlFor="skip-serial-photo" className="text-xs font-medium text-amber-900 dark:text-amber-200 cursor-pointer">
+                            Skip for now
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Out of Warranty payment collection */}
                     {!isInWarranty && (
                       <div>

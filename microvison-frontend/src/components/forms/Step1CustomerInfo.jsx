@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Loader2, Link as LinkIcon, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Link as LinkIcon } from 'lucide-react';
 import api from '../../api/axios';
 import {
   Dialog,
@@ -318,19 +318,6 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
           </div>
         </div>
 
-        {/* Serial Number (Optional but globally unique) */}
-        <div>
-          <label className={labelCls}>Serial Number</label>
-          <input
-            id="step1-serialNumber"
-            type="text"
-            value={formData.serialNumber || ''}
-            onChange={(e) => handleChange('serialNumber', e.target.value.toUpperCase())}
-            placeholder="e.g. SN-12345 (Optional)"
-            className={inputCls}
-          />
-        </div>
-
         {/* Customer Name */}
         <div className="sm:col-span-2">
           <label className={labelCls}>Customer Name <span className="text-red-500">*</span></label>
@@ -427,6 +414,19 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
               </select>
             )}
           </div>
+        </div>
+
+        {/* Location / Action Text */}
+        <div className="sm:col-span-2">
+          <label className={labelCls}>Location / Maps Link (optional)</label>
+          <textarea
+            id="step1-locationText"
+            value={formData.locationText || ''}
+            onChange={(e) => handleChange('locationText', e.target.value)}
+            placeholder="Paste a Google Maps link, coordinates, or any navigation notes here. This will be sent to the SC."
+            rows={3}
+            className={inputCls}
+          />
         </div>
       </div>
 

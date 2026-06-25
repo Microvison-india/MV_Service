@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import api from '../../api/axios';
 
-// GRD Section 6.4 — Step 4: Assign Service Centre
+// GRD Section 6.5 — Step 5 (was Step 4): Assign Service Centre
 // Filters SCs by: customer's city (primary), district (secondary), product capability
 // Shows each SC with live load stats
 // Admin clicks a card to select → Submit triggers create + assign in sequence
+// Admin can also skip assignment — complaint is created as 'unassigned' and
+// assigned later from the Action Centre or complaint detail view (v1.3 Change 1A).
 
 const CAPABILITY_LABELS = {
   led_only: 'LED Only',
@@ -20,7 +22,7 @@ const getRequiredCapabilities = (product) => {
   return [];
 };
 
-export default function Step4AssignSC({ formData, setFormData, onSubmit, submitting }) {
+export default function Step5AssignSC({ formData, setFormData, onSubmit, submitting }) {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -157,7 +159,7 @@ export default function Step4AssignSC({ formData, setFormData, onSubmit, submitt
       {/* Submit Button & Skip option */}
       <div className="pt-4 space-y-3">
         <button
-          id="step4-submit"
+          id="step5-submit"
           type="button"
           disabled={!formData.selectedSCId || submitting}
           onClick={() => onSubmit(false)}
@@ -172,7 +174,7 @@ export default function Step4AssignSC({ formData, setFormData, onSubmit, submitt
         )}
 
         <button
-          id="step4-skip"
+          id="step5-skip"
           type="button"
           disabled={submitting}
           onClick={() => {
@@ -183,7 +185,7 @@ export default function Step4AssignSC({ formData, setFormData, onSubmit, submitt
         >
           Skip — Assign Later
         </button>
-        
+
         <p className="text-xs text-muted-foreground text-center mt-2">
           You can assign an SC from the complaint detail view or Action Centre.
         </p>

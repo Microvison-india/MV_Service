@@ -185,7 +185,7 @@ const reopenComplaint = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 const createComplaint = async (req, res) => {
   const {
-    // Step 1
+    // Step 1: Customer Info
     customerName,
     phone1,
     phone2,
@@ -193,17 +193,25 @@ const createComplaint = async (req, res) => {
     city,
     district,
     state,
+    locationText,
 
-    // Step 2
-    trackingId,      // Optional from frontend if an existing product is selected
-    serialNumber,    // Optional from frontend
-    product,
-    complaintType,
-    warrantyStatus,  // Manual fallback from frontend if no billDate
+    // Step 2: Product Info
     billPhoto,       // New from frontend
     billDate,        // New from frontend
+    shopName,
+    serialNumber,    // Optional from frontend
+    modelNumber,
+    forceOverride,
+    warrantyForceReason,
+    manualReason,
+    warrantyStatus,  // Manual fallback from frontend if no billDate
 
-    // Step 3
+    // Step 3: Product & Type
+    trackingId,      // Optional from frontend if an existing product is selected
+    product,
+    complaintType,
+
+    // Step 4: Charges & Media
     presetId,
     petrolAdmin,
     extraCharges,   // Array of { label, amount }
@@ -281,17 +289,26 @@ const createComplaint = async (req, res) => {
   const petrolValue = (petrolAdmin != null) ? Number(petrolAdmin) : null;
   const petrolEditCount = petrolValue != null ? 1 : 0;
 
-  // ── Product Tracking (Addendum v1.2) ──────────────────────
+  // ── Product Tracking (Addendum v1.3) ──────────────────────
   let productRecord;
   let finalWarrantyStatus = warrantyStatus;
   let finalWarrantyExpiryDate = null;
   let finalWarrantySource = 'manual';
+  let finalWarrantyForceReason = '';
 
-  // Calculate final warranty based on provided bill info and manual fallbacks
-  const calculated = calculateWarranty(billDate, complaintType, warrantyStatus);
+  // Calculate final warranty based on provided bill info, forceOverride and manual selection
+  const calculated = calculateWarranty({
+    billDate,
+    complaintType,
+    manualSelection: warrantyStatus,
+    manualReason,
+    forceOverride,
+    forceReason: warrantyForceReason,
+  });
   finalWarrantyStatus = calculated.warrantyStatus;
   finalWarrantyExpiryDate = calculated.warrantyExpiryDate;
   finalWarrantySource = calculated.warrantySource;
+  finalWarrantyForceReason = calculated.warrantyForceReason;
 
   // ── Generate unique complaint ID ──────────────────────────
   const complaintId = await generateComplaintId(complaintType, finalWarrantyStatus);
@@ -310,6 +327,9 @@ const createComplaint = async (req, res) => {
     productRecord.city = city;
     productRecord.district = district;
     productRecord.state = state;
+    if (shopName) productRecord.shopName = shopName;
+    if (modelNumber) productRecord.modelNumber = modelNumber;
+    
     if (serialNumber && serialNumber !== productRecord.serialNumber) {
       const existing = await Product.findOne({ serialNumber });
       if (existing && existing.trackingId !== trackingId) {
@@ -319,17 +339,19 @@ const createComplaint = async (req, res) => {
       productRecord.hasSerial = true;
     }
     // Only update bill info if provided newly, else keep existing
-    if (billDate !== undefined) {
-      productRecord.billDate = billDate;
-      productRecord.billPhoto = billPhoto || productRecord.billPhoto;
+    if (billDate !== undefined || forceOverride !== undefined || warrantyForceReason !== undefined) {
+      productRecord.billDate = billDate !== undefined ? (billDate || null) : productRecord.billDate;
+      productRecord.billPhoto = billPhoto !== undefined ? (billPhoto || '') : productRecord.billPhoto;
       productRecord.warrantyStatus = finalWarrantyStatus;
       productRecord.warrantyExpiryDate = finalWarrantyExpiryDate;
       productRecord.warrantySource = finalWarrantySource;
+      productRecord.warrantyForceReason = finalWarrantyForceReason;
     } else {
-      // If no new billDate provided, use the product's existing warranty for the complaint snapshot
+      // If no new billDate / forceOverride provided, use the product's existing warranty for the complaint snapshot
       finalWarrantyStatus = productRecord.warrantyStatus;
       finalWarrantyExpiryDate = productRecord.warrantyExpiryDate;
       finalWarrantySource = productRecord.warrantySource;
+      finalWarrantyForceReason = productRecord.warrantyForceReason;
     }
   } else {
     // Brand new product
@@ -352,9 +374,12 @@ const createComplaint = async (req, res) => {
       state,
       billPhoto: billPhoto || '',
       billDate: billDate || null,
+      shopName: shopName || '',
+      modelNumber: modelNumber || '',
       warrantyStatus: finalWarrantyStatus,
       warrantyExpiryDate: finalWarrantyExpiryDate,
       warrantySource: finalWarrantySource,
+      warrantyForceReason: finalWarrantyForceReason,
       complaintHistory: []
     });
   }
@@ -366,6 +391,10 @@ const createComplaint = async (req, res) => {
     serialNumber: serialNumber || productRecord.serialNumber || null,
     billPhoto: billPhoto || productRecord.billPhoto || '',
     billDate: billDate || productRecord.billDate || null,
+    shopName: shopName || productRecord.shopName || '',
+    modelNumber: modelNumber || productRecord.modelNumber || '',
+    locationText: locationText || '',
+    warrantyForceReason: finalWarrantyForceReason || productRecord.warrantyForceReason || '',
     warrantyStatus: finalWarrantyStatus,
     warrantyExpiryDate: finalWarrantyExpiryDate,
     warrantySource: finalWarrantySource,
@@ -528,7 +557,10 @@ const assignComplaint = async (req, res) => {
     complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
     complaint.notes || 'None',
     process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in/login',
-    reopenInfo
+    reopenInfo,
+    complaint.serialNumber || 'N/A',
+    complaint.modelNumber || 'N/A',
+    complaint.locationText || 'N/A'
   ]);
 };
 
@@ -726,6 +758,9 @@ const updateStatus = async (req, res) => {
     distanceTravelled,
     totalVisits,
     extraCharges,
+    scBillPhotoUrl,
+    scSerialSlipPhotoUrl,
+    scMissingBypass,
   } = req.body;
 
   const ALLOWED_FINAL_STATUSES = ['done', 'not_done', 'part_pending'];
@@ -828,6 +863,51 @@ const updateStatus = async (req, res) => {
     }
 
     if (scNotes) complaint.scNotes = scNotes.trim();
+
+    // Check linked Product's 5 Step 2 fields and save SC photo uploads
+    if (complaint.trackingId) {
+      const product = await Product.findById(complaint.trackingId);
+      if (product) {
+        let productUpdated = false;
+
+        // 1. Missing Bill Info
+        if (!product.billDate || !product.billPhoto || !product.shopName) {
+          if (scBillPhotoUrl) {
+            complaint.scBillPhotoUrl = scBillPhotoUrl;
+            product.billPhoto = scBillPhotoUrl;
+            productUpdated = true;
+          }
+        }
+
+        // 2. Missing Serial / Model Info
+        if (!product.serialNumber || !product.modelNumber) {
+          if (scSerialSlipPhotoUrl) {
+            complaint.scSerialSlipPhotoUrl = scSerialSlipPhotoUrl;
+          }
+        }
+
+        // 3. Store bypassed field names
+        if (scMissingBypass && Array.isArray(scMissingBypass)) {
+          complaint.scMissingBypass = scMissingBypass;
+        }
+
+        if (productUpdated) {
+          // Re-run warranty calculation for the Product record
+          const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty({
+            billDate: product.billDate,
+            complaintType: complaint.complaintType || 'complaint',
+            manualSelection: product.warrantyStatus,
+            forceOverride: product.warrantySource === 'forced',
+            forceReason: product.warrantyForceReason,
+          });
+          product.warrantyStatus = calcStatus;
+          product.warrantyExpiryDate = warrantyExpiryDate;
+          product.warrantySource = warrantySource;
+        }
+
+        await product.save();
+      }
+    }
     timelineNote = scNotes ? scNotes.trim() : 'SC marked as done.';
     timelineVoiceUrl = doneVoiceUrl || '';
   }
@@ -929,6 +1009,64 @@ const confirmDone = async (req, res) => {
 
   if (complaint.status !== 'done') {
     return res.status(400).json({ message: 'Complaint is not in Done status. Admin can only confirm completed Done jobs.' });
+  }
+
+  // Check linked Product's 5 Step 2 fields if trackingId exists
+  if (complaint.trackingId) {
+    const product = await Product.findById(complaint.trackingId);
+    if (product) {
+      // If admin sent any of these in req.body during Confirm Done, update them on the product first!
+      const { billDate, billPhoto, shopName, serialNumber, modelNumber } = req.body;
+      let productUpdated = false;
+      if (billDate !== undefined) { product.billDate = billDate || null; productUpdated = true; }
+      if (billPhoto !== undefined) { product.billPhoto = billPhoto || ''; productUpdated = true; }
+      if (shopName !== undefined) { product.shopName = shopName || ''; productUpdated = true; }
+      if (serialNumber !== undefined) { product.serialNumber = serialNumber || ''; productUpdated = true; }
+      if (modelNumber !== undefined) { product.modelNumber = modelNumber || ''; productUpdated = true; }
+      if (productUpdated) {
+        // Re-run warranty calculator
+        const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty({
+          billDate: product.billDate,
+          complaintType: complaint.complaintType || 'complaint',
+          manualSelection: product.warrantyStatus,
+          forceOverride: product.warrantySource === 'forced',
+          forceReason: product.warrantyForceReason,
+        });
+        product.warrantyStatus = calcStatus;
+        product.warrantyExpiryDate = warrantyExpiryDate;
+        product.warrantySource = warrantySource;
+        await product.save();
+      }
+
+      // Check for missing fields
+      const missingFields = [];
+      if (!product.billDate) missingFields.push('billDate');
+      if (!product.billPhoto) missingFields.push('billPhoto');
+      if (!product.shopName) missingFields.push('shopName');
+      if (!product.serialNumber) missingFields.push('serialNumber');
+      if (!product.modelNumber) missingFields.push('modelNumber');
+
+      if (missingFields.length > 0) {
+        const { missingFieldsBypassed } = req.body;
+        if (!missingFieldsBypassed || !Array.isArray(missingFieldsBypassed)) {
+          return res.status(428).json({
+            message: 'Product fields are missing. Please fill or bypass them.',
+            missingFields,
+          });
+        }
+        
+        // Save bypassed fields to complaint
+        complaint.missingFieldsBypassed = missingFieldsBypassed;
+        
+        // Add bypassed fields to product's missingFieldsWarning (append uniquely)
+        missingFieldsBypassed.forEach(f => {
+          if (!product.missingFieldsWarning.includes(f)) {
+            product.missingFieldsWarning.push(f);
+          }
+        });
+        await product.save();
+      }
+    }
   }
 
   // Determine if bill should be generated. Generated for all closed complaints to track in Billing.
@@ -1334,7 +1472,8 @@ const getAllComplaints = async (req, res) => {
     // 1. Text Search (customerName, phone1, phone2, complaintId, product serialNumber, product trackingId)
     const term = q || search;
     if (term) {
-      const searchRegex = new RegExp(term.trim(), 'i');
+      const escapedTerm = term.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const searchRegex = new RegExp(escapedTerm, 'i');
       const complaintPattern = makeComplaintIdPattern(term);
       
       // Query Product to find matching serialNumber or trackingId

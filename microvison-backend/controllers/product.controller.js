@@ -126,7 +126,13 @@ const createProduct = async (req, res) => {
       billPhoto,
       billDate,
       warrantyStatus, // manual fallback if passed
-      complaintType // used for default calc
+      complaintType, // used for default calc
+      shopName,
+      modelNumber,
+      warrantyForceReason,
+      forceOverride,
+      manualReason,
+      missingFieldsWarning,
     } = req.body;
 
     if (serialNumber) {
@@ -138,12 +144,20 @@ const createProduct = async (req, res) => {
 
     const trackingId = await generateTrackingId(productType);
     
-    // Calculate warranty using new utility
-    const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty(
+    // Calculate warranty using new utility options object signature
+    const {
+      warrantyStatus: calcStatus,
+      warrantyExpiryDate,
+      warrantySource,
+      warrantyForceReason: forceReasonVal,
+    } = calculateWarranty({
       billDate,
-      complaintType || 'complaint',
-      warrantyStatus
-    );
+      complaintType: complaintType || 'complaint',
+      manualSelection: warrantyStatus,
+      manualReason,
+      forceOverride,
+      forceReason: warrantyForceReason,
+    });
 
     const productRecord = await Product.create({
       trackingId,
@@ -159,9 +173,13 @@ const createProduct = async (req, res) => {
       state,
       billPhoto: billPhoto || '',
       billDate: billDate || null,
+      shopName: shopName || '',
+      modelNumber: modelNumber || '',
       warrantyStatus: calcStatus,
       warrantyExpiryDate,
       warrantySource,
+      warrantyForceReason: forceReasonVal || '',
+      missingFieldsWarning: missingFieldsWarning || [],
       complaintHistory: [],
     });
 
@@ -192,7 +210,13 @@ const updateProduct = async (req, res) => {
       billDate,
       warrantyStatus,
       complaintType, // used for recalculation context
-      serialNumber
+      serialNumber,
+      shopName,
+      modelNumber,
+      warrantyForceReason,
+      forceOverride,
+      manualReason,
+      missingFieldsWarning,
     } = req.body;
 
     const product = await Product.findOne({ trackingId });
@@ -216,21 +240,40 @@ const updateProduct = async (req, res) => {
     if (city) product.city = city;
     if (district) product.district = district;
     if (state) product.state = state;
+    if (shopName !== undefined) product.shopName = shopName;
+    if (modelNumber !== undefined) product.modelNumber = modelNumber;
+    if (missingFieldsWarning !== undefined) product.missingFieldsWarning = missingFieldsWarning;
 
     // Recalculate warranty if bill info or manual override is provided
-    if (billDate !== undefined || warrantyStatus !== undefined) {
-      product.billDate = billDate || product.billDate;
-      product.billPhoto = billPhoto || product.billPhoto;
-      
-      const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty(
-        product.billDate,
-        complaintType || 'complaint',
-        warrantyStatus || product.warrantyStatus
-      );
-      
+    if (
+      billDate !== undefined ||
+      warrantyStatus !== undefined ||
+      forceOverride !== undefined ||
+      warrantyForceReason !== undefined ||
+      shopName !== undefined ||
+      modelNumber !== undefined
+    ) {
+      product.billDate = billDate !== undefined ? (billDate || null) : product.billDate;
+      product.billPhoto = billPhoto !== undefined ? (billPhoto || '') : product.billPhoto;
+
+      const {
+        warrantyStatus: calcStatus,
+        warrantyExpiryDate,
+        warrantySource,
+        warrantyForceReason: forceReasonVal,
+      } = calculateWarranty({
+        billDate: product.billDate,
+        complaintType: complaintType || 'complaint',
+        manualSelection: warrantyStatus !== undefined ? warrantyStatus : product.warrantyStatus,
+        manualReason,
+        forceOverride: forceOverride !== undefined ? forceOverride : (product.warrantySource === 'forced'),
+        forceReason: warrantyForceReason !== undefined ? warrantyForceReason : product.warrantyForceReason,
+      });
+
       product.warrantyStatus = calcStatus;
       product.warrantyExpiryDate = warrantyExpiryDate;
       product.warrantySource = warrantySource;
+      product.warrantyForceReason = forceReasonVal || '';
     }
 
     await product.save();
