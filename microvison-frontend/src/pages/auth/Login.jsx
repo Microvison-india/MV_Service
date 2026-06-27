@@ -117,6 +117,14 @@ export default function Login() {
             </Link>
           </p>
         </div>
+
+        {/* Footer with Business Disclaimer for Meta Verification */}
+        <div className="text-center mt-12 text-xs text-muted-foreground space-y-1">
+          <p>© {new Date().getFullYear()} Microvison Services. All rights reserved.</p>
+          <p>Microvison Services is a registered trade name of JAI BAJRANG BALI ELECTROVISION.</p>
+          <p>Proprietor: Preeti | GSTIN: 08BDDPP8769A1ZA</p>
+          <p>Principal Place of Business: Farm Complex, Suratgarh, Sri Ganganagar, Rajasthan, 335804</p>
+        </div>
       </div>
     </div>
   );
