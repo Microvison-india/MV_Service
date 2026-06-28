@@ -5,6 +5,98 @@ const City = require('../models/City');
 const Complaint = require('../models/Complaint');
 const { toTitleCase } = require('./city.controller');
 
+// Helper to populate load stats for an array of Service Centres
+const populateSCStats = async (serviceCentres) => {
+  if (!serviceCentres || serviceCentres.length === 0) return serviceCentres;
+
+  const scIds = serviceCentres.map((sc) => sc._id);
+
+  // 1. Get Assigned count: status in ['assigned', 'accepted', 'going', 'part_pending', 'part_received', 'reopened']
+  const assignedCounts = await Complaint.aggregate([
+    {
+      $match: {
+        assignedCentreId: { $in: scIds },
+        status: { $in: ['assigned', 'accepted', 'going', 'part_pending', 'part_received', 'reopened'] }
+      }
+    },
+    {
+      $group: {
+        _id: '$assignedCentreId',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // 2. Get Pending count: status === 'assigned'
+  const pendingCounts = await Complaint.aggregate([
+    {
+      $match: {
+        assignedCentreId: { $in: scIds },
+        status: 'assigned'
+      }
+    },
+    {
+      $group: {
+        _id: '$assignedCentreId',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // 3. Get Done this month count: status in ['done', 'closed'] and updatedAt >= start of current month
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const doneCounts = await Complaint.aggregate([
+    {
+      $match: {
+        assignedCentreId: { $in: scIds },
+        status: { $in: ['done', 'closed'] },
+        updatedAt: { $gte: startOfMonth }
+      }
+    },
+    {
+      $group: {
+        _id: '$assignedCentreId',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // Create maps for quick lookup
+  const assignedMap = {};
+  assignedCounts.forEach((item) => {
+    if (item._id) {
+      assignedMap[item._id.toString()] = item.count;
+    }
+  });
+
+  const pendingMap = {};
+  pendingCounts.forEach((item) => {
+    if (item._id) {
+      pendingMap[item._id.toString()] = item.count;
+    }
+  });
+
+  const doneMap = {};
+  doneCounts.forEach((item) => {
+    if (item._id) {
+      doneMap[item._id.toString()] = item.count;
+    }
+  });
+
+  // Attach stats to each service centre document (convert to plain object first)
+  return serviceCentres.map((sc) => {
+    const scObj = sc.toObject ? sc.toObject() : sc;
+    const scIdStr = scObj._id.toString();
+    scObj.stats = {
+      assigned: assignedMap[scIdStr] || 0,
+      pending: pendingMap[scIdStr] || 0,
+      doneThisMonth: doneMap[scIdStr] || 0
+    };
+    return scObj;
+  });
+};
+
 // @desc    Get all Service Centres with filters + pagination
 // @route   GET /api/service-centres
 // @access  Admin
@@ -48,8 +140,10 @@ const getAll = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    const serviceCentresWithStats = await populateSCStats(serviceCentres);
+
     res.status(200).json({
-      serviceCentres,
+      serviceCentres: serviceCentresWithStats,
       total,
       page: parseInt(page),
       totalPages: Math.ceil(total / parseInt(limit)),
@@ -239,15 +333,20 @@ const deactivate = async (req, res) => {
 // @access  Admin
 const getStats = async (req, res) => {
   try {
-    // Placeholder — will be populated in Phase 7 when Complaint model is built
-    res.status(200).json({
-      total: 0,
-      pending: 0,
-      in_progress: 0,
-      resolved: 0,
-      rejected: 0,
-    });
+    const scId = req.params.id;
+    const complaints = await Complaint.find({ assignedCentreId: scId });
+
+    const stats = {
+      total: complaints.length,
+      pending: complaints.filter(c => c.status === 'assigned').length,
+      in_progress: complaints.filter(c => ['accepted', 'going', 'part_pending', 'part_received'].includes(c.status)).length,
+      resolved: complaints.filter(c => ['done', 'closed'].includes(c.status)).length,
+      rejected: complaints.filter(c => c.status === 'rejected_by_sc').length,
+    };
+
+    res.status(200).json(stats);
   } catch (error) {
+    console.error('getStats error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

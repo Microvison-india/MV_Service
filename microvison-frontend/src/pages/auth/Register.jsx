@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
+import InlineSelect from '../../components/ui/InlineSelect';
+import InlineCitySelect from '../../components/ui/InlineCitySelect';
 
 // All SC registration fields per GRD Section 3.2
 const CAPABILITY_OPTIONS = [
@@ -42,8 +44,7 @@ export default function Register() {
   };
 
   // 3-way cascading logic
-  const handleStateChange = (e) => {
-    const newState = e.target.value;
+  const handleStateChange = (newState) => {
     setFormData((prev) => ({
       ...prev,
       state: newState,
@@ -53,8 +54,7 @@ export default function Register() {
     setError('');
   };
 
-  const handleDistrictChange = (e) => {
-    const newDistrict = e.target.value;
+  const handleDistrictChange = (newDistrict) => {
     // Find which state this district belongs to
     const matchingCity = cities.find((c) => c.district === newDistrict);
     setFormData((prev) => ({
@@ -66,8 +66,7 @@ export default function Register() {
     setError('');
   };
 
-  const handleCityChange = (e) => {
-    const newCity = e.target.value;
+  const handleCityChange = (newCity) => {
     const selectedCityObj = cities.find((c) => c.name === newCity);
     setFormData((prev) => ({
       ...prev,
@@ -184,56 +183,48 @@ export default function Register() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* State Dropdown */}
               <div className="space-y-1">
-                <label htmlFor="state" className="text-sm font-medium text-foreground">State *</label>
-                <select
+                <label className="text-sm font-medium text-foreground">State *</label>
+                <InlineSelect
                   id="state"
-                  name="state"
-                  required
                   value={formData.state}
+                  options={uniqueStates}
                   onChange={handleStateChange}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                >
-                  <option value="">Select state</option>
-                  {uniqueStates.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                  placeholder="Select state"
+                  required
+                />
               </div>
 
               {/* District Dropdown */}
               <div className="space-y-1">
-                <label htmlFor="district" className="text-sm font-medium text-foreground">District *</label>
-                <select
+                <label className="text-sm font-medium text-foreground">District *</label>
+                <InlineSelect
                   id="district"
-                  name="district"
-                  required
                   value={formData.district}
+                  options={filteredDistricts}
                   onChange={handleDistrictChange}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                >
-                  <option value="">Select district</option>
-                  {filteredDistricts.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                  placeholder="Select district"
+                  required
+                />
               </div>
 
               {/* City Dropdown */}
               <div className="space-y-1">
-                <label htmlFor="city" className="text-sm font-medium text-foreground">City *</label>
-                <select
-                  id="city"
-                  name="city"
-                  required
+                <label className="text-sm font-medium text-foreground">City *</label>
+                <InlineCitySelect
                   value={formData.city}
-                  onChange={handleCityChange}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                >
-                  <option value="">Select city</option>
-                  {filteredCities.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  filterState={formData.state}
+                  filterDistrict={formData.district}
+                  onChange={({ city, district, state }) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      city,
+                      district,
+                      state
+                    }));
+                  }}
+                  placeholder="Select city"
+                  required
+                />
               </div>
             </div>
 

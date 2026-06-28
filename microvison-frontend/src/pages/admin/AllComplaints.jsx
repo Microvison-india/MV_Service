@@ -77,9 +77,10 @@ export default function AllComplaints() {
           </div>
         )}
 
-        {/* Complaints Table */}
+        {/* Complaints Table / Cards */}
         <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm text-left text-foreground">
               <thead className="bg-muted/50 text-muted-foreground border-b border-border">
                 <tr>
@@ -172,6 +173,92 @@ export default function AllComplaints() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card List View */}
+          <div className="block md:hidden divide-y divide-border">
+            {loading ? (
+              // Mobile skeleton card
+              Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="p-4 space-y-3 bg-card">
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
+                    <div className="h-5 bg-muted rounded animate-pulse w-1/4" />
+                  </div>
+                  <div className="h-4 bg-muted rounded animate-pulse w-2/3" />
+                  <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
+                </div>
+              ))
+            ) : complaints.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground bg-card">
+                No complaints found matching your filters.
+              </div>
+            ) : (
+              complaints.map((c) => (
+                <div
+                  key={c._id}
+                  onClick={() => setSelectedComplaintId(c._id)}
+                  className="p-4 hover:bg-muted/30 cursor-pointer transition bg-card flex flex-col gap-2.5"
+                >
+                  {/* Top Row: ID & Status */}
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-muted-foreground bg-muted/65 px-2 py-0.5 rounded border border-border/40">
+                      {c.complaintId}
+                    </span>
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize ${
+                        STATUS_BADGE_STYLES[c.status] || 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {c.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+
+                  {/* Customer & Location */}
+                  <div>
+                    <h3 className="font-bold text-foreground text-sm leading-tight">{c.customerName}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      📍 {c.city}, {c.district}
+                    </p>
+                  </div>
+
+                  {/* Product & Warranty */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="bg-secondary text-secondary-foreground px-2 py-0.5 rounded font-medium">
+                      {PRODUCT_LABELS[c.product] || c.product}
+                    </span>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="capitalize">{c.complaintType}</span>
+                    <span className="text-muted-foreground">•</span>
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap ${
+                        c.warrantyStatus === 'in_warranty'
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-orange-50 text-orange-700 border border-orange-200'
+                      }`}
+                    >
+                      {c.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out Warranty'}
+                    </span>
+                  </div>
+
+                  {/* Assigned SC & Date */}
+                  <div className="flex justify-between items-center text-xs border-t border-border/30 pt-2 mt-0.5">
+                    <div className="text-muted-foreground">
+                      SC: <span className={c.assignedCentreId?.businessName ? "text-foreground font-semibold" : "text-red-500 font-bold italic"}>
+                        {c.assignedCentreId?.businessName || 'Unassigned'}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground font-medium text-[10px]">
+                      {new Date(c.createdAt).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Pagination Controls */}

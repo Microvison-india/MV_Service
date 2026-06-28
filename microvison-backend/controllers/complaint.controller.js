@@ -1073,7 +1073,7 @@ const confirmDone = async (req, res) => {
           billDate: product.billDate,
           complaintType: complaint.complaintType || 'complaint',
           manualSelection: product.warrantyStatus,
-          forceOverride: product.warrantySource === 'forced',
+          forceOverride: billDate ? false : (product.warrantySource === 'forced'),
           forceReason: product.warrantyForceReason,
         });
         product.warrantyStatus = calcStatus;
@@ -1088,6 +1088,9 @@ const confirmDone = async (req, res) => {
         complaint.warrantyExpiryDate = product.warrantyExpiryDate;
         complaint.warrantySource = product.warrantySource;
         complaint.warrantyForceReason = product.warrantyForceReason;
+        complaint.shopName = product.shopName;
+        complaint.modelNumber = product.modelNumber;
+        complaint.serialNumber = product.serialNumber;
       }
 
       // Check for missing fields

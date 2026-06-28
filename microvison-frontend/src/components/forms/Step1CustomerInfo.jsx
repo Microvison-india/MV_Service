@@ -10,6 +10,7 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import InlineCitySelect from '../ui/InlineCitySelect';
+import InlineSelect from '../ui/InlineSelect';
 
 import ReopenBanner from '../complaint/ReopenBanner';
 
@@ -49,8 +50,7 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
   };
 
   // 3-way cascading logic
-  const handleStateChange = (e) => {
-    const newState = e.target.value;
+  const handleStateChange = (newState) => {
     setFormData((prev) => ({
       ...prev,
       state: newState,
@@ -59,8 +59,7 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
     }));
   };
 
-  const handleDistrictChange = (e) => {
-    const newDistrict = e.target.value;
+  const handleDistrictChange = (newDistrict) => {
     const matchingCity = cities.find((c) => c.district === newDistrict);
     setFormData((prev) => ({
       ...prev,
@@ -344,39 +343,27 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
           {/* State */}
           <div>
             <label className={labelCls}>State <span className="text-red-500">*</span></label>
-            <input
+            <InlineSelect
               id="step1-state"
-              list="states-list"
               value={formData.state || ''}
+              options={uniqueStates}
               onChange={handleStateChange}
               placeholder="Select or enter new state"
-              className={inputCls}
               required
             />
-            <datalist id="states-list">
-              {uniqueStates.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
           </div>
 
           {/* District */}
           <div>
             <label className={labelCls}>District <span className="text-red-500">*</span></label>
-            <input
+            <InlineSelect
               id="step1-district"
-              list="districts-list"
               value={formData.district || ''}
+              options={filteredDistricts}
               onChange={handleDistrictChange}
               placeholder="Select or enter new district"
-              className={inputCls}
               required
             />
-            <datalist id="districts-list">
-              {filteredDistricts.map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
           </div>
 
           {/* City */}

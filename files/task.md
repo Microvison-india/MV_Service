@@ -183,8 +183,8 @@
 
   **I. Refine SC Assignment Logic & Locations**
   > ⚠ Items below are now fully superseded or expanded by Phase 19 (Skip SC), Phase 20 (Unregistered SC), and Phase 21 (New Step 2). See those phases for the definitive implementation spec.
-  - [ ] Refine SC Assignment Logic — now handled in Phase 19 (Step 5 of new 5-step form, with Skip option and capability filtering)
-  - [ ] Support custom/new cities/locations — now handled in Phase 20 (Section 2D, inline "Create new" from any city field)
+  - [x] Refine SC Assignment Logic — now handled in Phase 19 (Step 5 of new 5-step form, with Skip option and capability filtering)
+  - [x] Support custom/new cities/locations — now handled in Phase 20 (Section 2D, inline "Create new" from any city field)
   - [x] Add optional `location` text field — addressed in Phase 21 (Section 3C, `locationText` field added to Step 1 `Step1CustomerInfo.jsx` and `Complaint` model)
   - [ ] Advanced pagination
   - [ ] SC specific complaint and stats

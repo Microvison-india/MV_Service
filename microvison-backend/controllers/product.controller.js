@@ -267,7 +267,7 @@ const updateProduct = async (req, res) => {
         complaintType: complaintType || 'complaint',
         manualSelection: warrantyStatus !== undefined ? warrantyStatus : product.warrantyStatus,
         manualReason,
-        forceOverride: forceOverride !== undefined ? forceOverride : (product.warrantySource === 'forced'),
+        forceOverride: forceOverride !== undefined ? forceOverride : (billDate ? false : (product.warrantySource === 'forced')),
         forceReason: warrantyForceReason !== undefined ? warrantyForceReason : product.warrantyForceReason,
       });
 
@@ -279,30 +279,33 @@ const updateProduct = async (req, res) => {
 
     await product.save();
 
-    // Sync warranty & bill info to any active (non-closed) complaint linked to this product
-    if (
-      billDate !== undefined ||
-      warrantyStatus !== undefined ||
-      forceOverride !== undefined ||
-      warrantyForceReason !== undefined
-    ) {
-      await Complaint.updateMany(
-        {
-          trackingId: product._id,
-          status: { $nin: ['closed'] },
+    // Sync product & warranty snapshot details to any active (non-closed) complaint linked to this product
+    await Complaint.updateMany(
+      {
+        trackingId: product._id,
+        status: { $nin: ['closed'] },
+      },
+      {
+        $set: {
+          customerName: product.customerName,
+          phone1: product.phone1,
+          phone2: product.phone2,
+          localAddress: product.localAddress,
+          city: product.city,
+          district: product.district,
+          state: product.state,
+          serialNumber: product.serialNumber,
+          shopName: product.shopName,
+          modelNumber: product.modelNumber,
+          billDate: product.billDate,
+          billPhoto: product.billPhoto,
+          warrantyStatus: product.warrantyStatus,
+          warrantyExpiryDate: product.warrantyExpiryDate,
+          warrantySource: product.warrantySource,
+          warrantyForceReason: product.warrantyForceReason,
         },
-        {
-          $set: {
-            billDate: product.billDate,
-            billPhoto: product.billPhoto,
-            warrantyStatus: product.warrantyStatus,
-            warrantyExpiryDate: product.warrantyExpiryDate,
-            warrantySource: product.warrantySource,
-            warrantyForceReason: product.warrantyForceReason,
-          },
-        }
-      );
-    }
+      }
+    );
 
     res.status(200).json({ message: 'Product updated', product });
   } catch (error) {

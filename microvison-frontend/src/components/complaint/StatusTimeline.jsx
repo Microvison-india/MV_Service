@@ -116,7 +116,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
         const hideGenericInfo = isNotDoneCustom || isDoneCustom || isPartPendingCustom || isClosedCustom;
 
         return (
-          <div key={update._id} className="relative flex gap-4">
+          <div key={update._id} className="relative flex gap-2.5 sm:gap-4">
             {/* Timeline Line */}
             {!isLast && (
               <div className="absolute left-2.5 top-6 bottom-[-16px] w-0.5 bg-border" />
@@ -131,7 +131,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
             <div className="flex-1 pb-1">
               <div 
                 onClick={() => toggleExpand(update._id)}
-                className="flex items-center justify-between cursor-pointer select-none bg-muted/40 hover:bg-muted/70 px-3.5 py-2.5 rounded-xl border border-border/50 transition duration-150"
+                className="flex items-center justify-between cursor-pointer select-none bg-muted/40 hover:bg-muted/70 px-2.5 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-border/50 transition duration-150"
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-foreground text-xs uppercase tracking-wide">
@@ -154,7 +154,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
               </div>
  
               {isExpanded && (
-                <div className="mt-2.5 p-3.5 bg-background/50 border border-border/40 rounded-xl space-y-3 pl-4 border-l-2 border-l-primary/45 transition duration-200">
+                <div className="mt-2 p-2.5 sm:p-3.5 bg-background/50 border border-border/40 rounded-xl space-y-2.5 pl-3 sm:pl-4 border-l-2 border-l-primary/45 transition duration-200">
                   {!hideGenericInfo && update.note && (
                     <div>
                       <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Remarks / Notes</span>
@@ -182,7 +182,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
 
                   {/* Status-specific Integrated Details */}
                   {isPartPendingCustom && (
-                    <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3.5 space-y-2.5">
+                    <div className="bg-orange-50/30 border border-orange-100/60 rounded-xl p-2.5 sm:p-3.5 space-y-2 text-xs">
                       <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider border-b border-orange-200/50 pb-1">⚙️ Part Sourcing Info</p>
                       {partDetailsText && (
                         <div>
@@ -262,7 +262,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                   )}
 
                   {isNotDoneCustom && (
-                    <div className="bg-red-50/40 border border-red-100 rounded-xl p-3.5 space-y-2.5">
+                    <div className="bg-red-50/20 border border-red-100/50 rounded-xl p-2.5 sm:p-3.5 space-y-2 text-xs">
                       <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider border-b border-red-200/40 pb-1">⚠️ Not Done Details</p>
                       {notDoneReasonText && (
                         <div>
@@ -298,7 +298,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                   )}
 
                   {isDoneCustom && (
-                    <div className="bg-muted/30 border border-border/80 rounded-xl p-3.5 space-y-3">
+                    <div className="bg-muted/20 border border-border/60 rounded-xl p-2.5 sm:p-3.5 space-y-2.5 text-xs">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/40 pb-1">🚗 Job Execution Metrics</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {doneTotalVisits != null && (
@@ -371,7 +371,7 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                   )}
 
                   {isClosedCustom && (
-                    <div className="bg-green-50/40 border border-green-100 rounded-xl p-3.5 space-y-3">
+                    <div className="bg-green-50/20 border border-green-100/50 rounded-xl p-2.5 sm:p-3.5 space-y-2.5 text-xs">
                       <p className="text-[10px] font-bold text-green-800 uppercase tracking-wider border-b border-green-200/40 pb-1">🔒 Final Closure Details</p>
                       
                       {closedNote && (

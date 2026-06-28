@@ -21,7 +21,7 @@ function AccordionSection({ title, icon, children, defaultOpen = true }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-5 py-3.5 font-bold text-xs text-foreground hover:bg-muted/30 transition select-none border-b border-border/40"
+        className="w-full flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3.5 font-bold text-xs text-foreground hover:bg-muted/30 transition select-none border-b border-border/40"
       >
         <div className="flex items-center gap-2">
           {icon && <span className="text-sm">{icon}</span>}
@@ -32,7 +32,7 @@ function AccordionSection({ title, icon, children, defaultOpen = true }) {
         </span>
       </button>
       {isOpen && (
-        <div className="p-5 space-y-5 bg-background/30 border-t border-border/20">
+        <div className="p-3.5 sm:p-5 space-y-5 bg-background/30 border-t border-border/20">
           {children}
         </div>
       )}
@@ -346,7 +346,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-background shadow-2xl flex flex-col">
         
         {/* Sticky Header */}
-        <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between z-10 shadow-sm">
+        <div className="sticky top-0 bg-background border-b border-border px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10 shadow-sm">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="bg-primary/10 text-primary text-[10px] font-extrabold px-2.5 py-0.5 rounded uppercase tracking-wider">
@@ -362,7 +362,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
         </div>
 
         {/* Scrollable Container */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-36">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 pb-36">
           
           {/* Section 1: Admin Remarks & Description Accordion */}
           <AccordionSection title="Admin Remarks & Description" icon="📣" defaultOpen={true}>

@@ -609,7 +609,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         </div>
 
         {/* Section 1: Job Context & Admin Info (Static Card) */}
-        <div className="border border-border/80 rounded-xl bg-card p-6 space-y-4 shadow-sm">
+        <div className="border border-border/80 rounded-xl bg-card p-4 sm:p-6 space-y-4 shadow-sm">
           <div className="flex items-center gap-2 border-b border-border/40 pb-3">
             <span className="text-base">🔍</span>
             <span className="font-bold text-xs uppercase tracking-wider text-foreground">Job Context & Admin Parameters</span>
@@ -690,7 +690,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         </div>
 
         {/* Section 2: Activity Timeline (collapsible updates) */}
-        <div className="border border-border/80 rounded-xl bg-card p-6 space-y-4 shadow-sm">
+        <div className="border border-border/80 rounded-xl bg-card p-4 sm:p-6 space-y-4 shadow-sm">
           <div className="flex items-center gap-2 border-b border-border/40 pb-3">
             <span className="text-base">📜</span>
             <span className="font-bold text-xs uppercase tracking-wider text-foreground">Activity Timeline & SC Work</span>
@@ -910,6 +910,8 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const latestWarrantySource = productInfo.warrantySource || c?.warrantySource;
   const latestBillDate = productInfo.billDate || c?.billDate;
   const latestWarrantyExpiryDate = productInfo.warrantyExpiryDate || c?.warrantyExpiryDate;
+  const latestShopName = productInfo.shopName || c?.shopName;
+  const latestModelNumber = productInfo.modelNumber || c?.modelNumber;
   const displayTrackingId = typeof latestTrackingId === 'object'
     ? (latestTrackingId?.trackingId || latestTrackingId?._id || '')
     : (latestTrackingId || '');
@@ -960,7 +962,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-3xl bg-background shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-background border-b border-border px-8 py-5 flex items-center justify-between z-10 shadow-sm">
+        <div className="sticky top-0 bg-background border-b border-border px-4 sm:px-8 py-3.5 sm:py-5 flex items-center justify-between z-10 shadow-sm">
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${
@@ -984,10 +986,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         </div>
 
         {/* Scrollable drawer body */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6 pb-10">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 pb-10">
           
           {/* Customer & Product Profile (Static Card) */}
-          <div className="border border-border/80 rounded-xl bg-card p-6 space-y-4 shadow-sm">
+          <div className="border border-border/80 rounded-xl bg-card p-4 sm:p-6 space-y-4 shadow-sm">
             <div className="flex items-center gap-2 border-b border-border/40 pb-3 mb-1">
               <span className="text-base">📋</span>
               <span className="font-bold text-xs uppercase tracking-wider text-foreground">Customer & Product Profile</span>
@@ -1036,39 +1038,33 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               </div>
 
               {/* Bill Date */}
-              {latestBillDate && (
-                <div className="space-y-1">
-                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Bill Date</span>
-                  <p className="font-semibold text-foreground">{formatDate(latestBillDate)}</p>
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Bill Date</span>
+                <p className="font-semibold text-foreground">{latestBillDate ? formatDate(latestBillDate) : '—'}</p>
+              </div>
 
               {/* Expiry Date */}
-              {latestWarrantyExpiryDate && (
-                <div className="space-y-1">
-                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Warranty Expiry Date</span>
-                  <p className="font-semibold text-foreground">{formatDate(latestWarrantyExpiryDate)}</p>
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Warranty Expiry Date</span>
+                <p className="font-semibold text-foreground">{latestWarrantyExpiryDate ? formatDate(latestWarrantyExpiryDate) : '—'}</p>
+              </div>
 
               {/* Serial Number */}
-              {latestSerialNumber && (
-                <div className="space-y-1">
-                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Serial Number</span>
-                  <p className="font-mono text-foreground font-bold">{latestSerialNumber}</p>
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Serial Number</span>
+                <p className="font-mono text-foreground font-bold">{latestSerialNumber || '—'}</p>
+              </div>
             </div>
 
             {/* Show shop name and model number */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm pt-3 border-t border-border/40">
               <div className="space-y-1">
                 <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Shop Name</span>
-                <p className="font-semibold text-foreground">{productInfo.shopName || '—'}</p>
+                <p className="font-semibold text-foreground">{latestShopName || '—'}</p>
               </div>
               <div className="space-y-1">
                 <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Model Number</span>
-                <p className="font-semibold text-foreground">{productInfo.modelNumber || '—'}</p>
+                <p className="font-semibold text-foreground">{latestModelNumber || '—'}</p>
               </div>
               {productInfo.warrantyForceReason && (
                 <div className="sm:col-span-2 space-y-1">
@@ -1218,7 +1214,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
           </div>
 
           {/* Unified Product Lifecycle Timeline (The Big Window) */}
-          <div className="border border-border/80 rounded-xl bg-card p-6 space-y-6 shadow-sm">
+          <div className="border border-border/80 rounded-xl bg-card p-4 sm:p-6 space-y-6 shadow-sm">
             <div className="flex items-center gap-2 border-b border-border/40 pb-3 mb-1">
               <span className="text-base">📜</span>
               <span className="font-bold text-xs uppercase tracking-wider text-foreground">Product Complaints & History</span>
@@ -1292,7 +1288,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
                       {/* Node Details */}
                       {isExpanded && (
-                        <div className="border-t border-border p-6 bg-background/40 rounded-b-xl">
+                        <div className="border-t border-border p-4 sm:p-6 bg-background/40 rounded-b-xl">
                           {isNodeLoading ? (
                             <div className="py-8 text-center text-sm text-muted-foreground animate-pulse">
                               Loading job details...
@@ -1891,7 +1887,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         <>
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
             <div className="bg-background border border-border w-full max-w-2xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] flex flex-col max-h-[85vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-border flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+              <div className="p-4 sm:p-6 border-b border-border flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur-sm z-10">
                 <div>
                   <h3 className="text-lg font-extrabold text-foreground flex items-center gap-2">
                     ⚠️ Product Information Missing (Step 2 Details)
@@ -1903,7 +1899,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 <button type="button" onClick={() => setShowWarningModal(false)} className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-muted transition font-bold">✕</button>
               </div>
 
-              <div className="p-6 space-y-5 flex-1 text-xs">
+              <div className="p-4 sm:p-6 space-y-5 flex-1 text-xs">
                 <p className="text-muted-foreground leading-relaxed">
                   The following product fields are still empty. Please fill them before closing or bypass each field individually.
                 </p>
@@ -1998,7 +1994,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 </div>
               </div>
 
-              <div className="p-6 border-t border-border flex justify-end gap-3 bg-muted/10">
+              <div className="p-4 sm:p-6 border-t border-border flex justify-end gap-3 bg-muted/10">
                 <button
                   type="button"
                   onClick={() => setShowWarningModal(false)}
