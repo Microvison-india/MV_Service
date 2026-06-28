@@ -519,5 +519,20 @@ graph TD
 
 ---
 
+## Phase 28 — Complaint Draft System
+
+### DEV-GRD-050
+- **Phase:** 28
+- **GRD Section:** 6 (Complaint Registration Steps / Wizard)
+- **Type:** ADDED
+- **Summary:** Introduced a persistent, database-backed **Complaint Draft System** for the 5-step complaint registration wizard (`NewComplaint.jsx`). Since admins can close the app, switch laptops/devices, or switch tabs, local storage is not sufficient.
+  - As the admin fills out the wizard steps, progress is auto-saved to MongoDB every 2 seconds with a debounce.
+  - When opening the New Complaint page, if any incomplete drafts exist for the logged-in admin, the page halts and shows a list of incomplete drafts.
+  - The admin can click **Resume** (pre-fills all form values and navigates to the saved step), **Delete** (permanently deletes draft from MongoDB), or **Start Fresh** (discards draft history and opens a blank step 1 form).
+  - Drafts are stored in a separate collection so they do not pollute the unassigned complaints queue or active dashboard.
+  - Upon successful complaint creation and submission, the draft is automatically cleaned up and deleted from MongoDB.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

@@ -19,6 +19,7 @@ const productSchema = new mongoose.Schema(
     city: { type: String, required: true },
     district: { type: String, required: true },
     state: { type: String, required: true },
+    locationText: { type: String, default: '' },
 
     // Bill & Warranty Details (Latest)
     billPhoto: { type: String, default: '' }, // Cloudinary URL

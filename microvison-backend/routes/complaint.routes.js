@@ -25,6 +25,13 @@ const {
   updateSingleExtraCharge,
 } = require('../controllers/complaint.controller');
 
+const {
+  getDrafts,
+  getDraft,
+  saveDraft,
+  deleteDraft,
+} = require('../controllers/draft.controller');
+
 // ── Admin Routes (all require auth + isAdmin) ───────────────────
 // GET  /api/complaints — Get all complaints (with filters)
 router.get('/', auth, isAdmin, getAllComplaints);
@@ -40,6 +47,12 @@ router.patch('/:id/assign', auth, isAdmin, assignComplaint);
 
 // POST /api/complaints/:id/reopen — Reopen a closed complaint
 router.post('/:id/reopen', auth, isAdmin, reopenComplaint);
+
+// ── Admin Draft Routes ──────────────────────────────────────────
+router.get('/drafts', auth, isAdmin, getDrafts);
+router.get('/drafts/:id', auth, isAdmin, getDraft);
+router.post('/drafts', auth, isAdmin, saveDraft);
+router.delete('/drafts/:id', auth, isAdmin, deleteDraft);
 
 // ── Admin Action Centre Routes (Phase 9) ───────────────────
 // GET /api/complaints/action-items — Dashboard lists and counts

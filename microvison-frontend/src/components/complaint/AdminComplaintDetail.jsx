@@ -951,6 +951,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
           warrantyStatus: productInfo.warrantyStatus || c?.warrantyStatus || '',
           billPhoto: productInfo.billPhoto || c?.billPhoto || '',
           billDate: productInfo.billDate || c?.billDate || '',
+          shopName: latestShopName,
+          modelNumber: latestModelNumber,
+          locationText: productInfo.locationText || c?.locationText || '',
         }
       }
     });

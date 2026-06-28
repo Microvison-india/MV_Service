@@ -78,6 +78,7 @@ const migrateLegacyComplaints = async () => {
           city: latestComplaint.city,
           district: latestComplaint.district,
           state: latestComplaint.state,
+          locationText: latestComplaint.locationText || '',
           billPhoto: latestComplaint.billPhoto || '',
           billDate: latestComplaint.billDate || null,
           warrantyStatus: latestComplaint.warrantyStatus || 'out_of_warranty',

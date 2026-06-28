@@ -582,5 +582,37 @@ Each entry follows this structure:
 
 ---
 
+## Phase 28 — Complaint Draft System
+
+### DEV-TBP-067
+- **Phase:** 28
+- **TBP Section / File:** NEW FILE `models/ComplaintDraft.js` + NEW FILE `controllers/draft.controller.js`
+- **Type:** ADDED
+- **Summary:** Added the backend schema and controllers for handling saved draft sessions.
+  1. **`models/ComplaintDraft.js`**: Schema contains `createdBy` (ObjectId ref to User), `currentStep` (Number, default 1), and `formData` (Schema.Types.Mixed) to hold all dynamic wizard state fields. Added `timestamps: true` for sorting.
+  2. **`controllers/draft.controller.js`**: Handler methods:
+     - `getDrafts`: Retrieves all incomplete drafts created by the current admin user (sorted by `updatedAt` descending).
+     - `getDraft`: Fetches a single draft by ID.
+     - `saveDraft`: Upserts a draft (creates new if no `draftId` provided, otherwise updates existing) for the current user.
+     - `deleteDraft`: Removes draft by ID.
+
+### DEV-TBP-068
+- **Phase:** 28
+- **TBP Section / File:** `routes/complaint.routes.js`
+- **Type:** ADDED
+- **Summary:** Registered endpoints for draft operations under `/api/complaints/drafts` and `/api/complaints/drafts/:id`. These are registered before the generic parameterized `/:id` (which resolves `getComplaintById`) to avoid endpoint collision. All draft operations are restricted to `auth` and `isAdmin`.
+
+### DEV-TBP-069
+- **Phase:** 28
+- **TBP Section / File:** `pages/admin/NewComplaint.jsx`
+- **Type:** CHANGED
+- **Summary:** Integrates auto-saving and draft recovery in the complaint wizard UI:
+  - Fetches incomplete drafts on mount (unless prefilled from page route state).
+  - Displays draft selector list showing customer info, product, saved step, and last updated time. Allows user to Resume, Delete, or Start Fresh.
+  - Implemented 2-second debounced autosave hook which calls `POST /api/complaints/drafts` after any `formData` changes, using a `resuming` state guard to block saves during initial state loading.
+  - Cleans up and deletes draft record from MongoDB upon successful submission of the complaint.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

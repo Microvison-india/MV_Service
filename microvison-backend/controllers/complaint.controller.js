@@ -122,6 +122,13 @@ const reopenComplaint = async (req, res) => {
       product: parent.product,
       complaintType: parent.complaintType,
       warrantyStatus: parent.warrantyStatus,
+      trackingId: parent.trackingId,
+      serialNumber: parent.serialNumber || null,
+      billPhoto: parent.billPhoto || '',
+      billDate: parent.billDate || null,
+      shopName: parent.shopName || '',
+      modelNumber: parent.modelNumber || '',
+      locationText: parent.locationText || '',
       presetId: parent.presetId,
       presetName: parent.presetName,
       presetPrice: parent.presetPrice,
@@ -146,6 +153,25 @@ const reopenComplaint = async (req, res) => {
       status: 'unassigned',
       createdBy: req.user.id,
     });
+
+    // Link to Product record and add to history if trackingId exists
+    if (parent.trackingId) {
+      const productRecord = await Product.findById(parent.trackingId);
+      if (productRecord) {
+        productRecord.complaintHistory.push({
+          complaintId: reopened._id,
+          mvId: reopened.complaintId,
+          type: reopened.complaintType || 'complaint',
+          status: reopened.status,
+          date: reopened.createdAt,
+          assignedCentreId: reopened.assignedCentreId || null
+        });
+        productRecord.complaintHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+        productRecord.lastComplaintId = reopened._id;
+        productRecord.lastComplaintDate = reopened.createdAt;
+        await productRecord.save();
+      }
+    }
 
     // Create ComplaintUpdate log for the new reopened complaint
     await ComplaintUpdate.create({
@@ -329,6 +355,7 @@ const createComplaint = async (req, res) => {
     productRecord.state = state;
     if (shopName) productRecord.shopName = shopName;
     if (modelNumber) productRecord.modelNumber = modelNumber;
+    if (locationText !== undefined) productRecord.locationText = locationText;
     
     if (serialNumber && serialNumber !== productRecord.serialNumber) {
       const existing = await Product.findOne({ serialNumber });
@@ -376,6 +403,7 @@ const createComplaint = async (req, res) => {
       billDate: billDate || null,
       shopName: shopName || '',
       modelNumber: modelNumber || '',
+      locationText: locationText || '',
       warrantyStatus: finalWarrantyStatus,
       warrantyExpiryDate: finalWarrantyExpiryDate,
       warrantySource: finalWarrantySource,
@@ -393,7 +421,7 @@ const createComplaint = async (req, res) => {
     billDate: billDate || productRecord.billDate || null,
     shopName: shopName || productRecord.shopName || '',
     modelNumber: modelNumber || productRecord.modelNumber || '',
-    locationText: locationText || '',
+    locationText: locationText || productRecord.locationText || '',
     warrantyForceReason: finalWarrantyForceReason || productRecord.warrantyForceReason || '',
     warrantyStatus: finalWarrantyStatus,
     warrantyExpiryDate: finalWarrantyExpiryDate,

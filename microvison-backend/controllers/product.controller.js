@@ -124,6 +124,7 @@ const createProduct = async (req, res) => {
       city,
       district,
       state,
+      locationText,
       billPhoto,
       billDate,
       warrantyStatus, // manual fallback if passed
@@ -172,6 +173,7 @@ const createProduct = async (req, res) => {
       city,
       district,
       state,
+      locationText: locationText || '',
       billPhoto: billPhoto || '',
       billDate: billDate || null,
       shopName: shopName || '',
@@ -207,6 +209,7 @@ const updateProduct = async (req, res) => {
       city,
       district,
       state,
+      locationText,
       billPhoto,
       billDate,
       warrantyStatus,
@@ -241,6 +244,7 @@ const updateProduct = async (req, res) => {
     if (city) product.city = city;
     if (district) product.district = district;
     if (state) product.state = state;
+    if (locationText !== undefined) product.locationText = locationText;
     if (shopName !== undefined) product.shopName = shopName;
     if (modelNumber !== undefined) product.modelNumber = modelNumber;
     if (missingFieldsWarning !== undefined) product.missingFieldsWarning = missingFieldsWarning;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import SCFilters from '../../components/filters/SCFilters';
+import Pagination from '../../components/ui/Pagination';
 
 const CAPABILITY_LABELS = {
   led_only: 'LED Only',
@@ -21,7 +22,7 @@ export default function ServiceCentres() {
   const [serviceCentres, setServiceCentres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1 });
+  const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1, limit: 20 });
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -30,6 +31,7 @@ export default function ServiceCentres() {
     productCapability: '',
     isUnregistered: '',
     page: 1,
+    limit: 20,
   });
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export default function ServiceCentres() {
         const { data } = await api.get(`/api/service-centres?${params.toString()}`);
         if (active) {
           setServiceCentres(data.serviceCentres);
-          setPagination({ total: data.total, page: data.page, totalPages: data.totalPages });
+          setPagination({ total: data.total, page: data.page, totalPages: data.totalPages, limit: data.limit || 20 });
         }
       } catch {
         if (active) setError('Failed to load service centres. Please try again.');
@@ -60,6 +62,10 @@ export default function ServiceCentres() {
 
   const handlePageChange = (newPage) => {
     setFilters((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setFilters((prev) => ({ ...prev, limit: newLimit, page: 1 }));
   };
 
   return (
@@ -156,30 +162,15 @@ export default function ServiceCentres() {
           </div>
 
           {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-              <p className="text-sm text-muted-foreground">
-                Page {pagination.page} of {pagination.totalPages}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  id="sc-prev-page"
-                  disabled={pagination.page <= 1}
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Previous
-                </button>
-                <button
-                  id="sc-next-page"
-                  disabled={pagination.page >= pagination.totalPages}
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+          {!loading && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              limit={pagination.limit || filters.limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+            />
           )}
         </div>
       </div>

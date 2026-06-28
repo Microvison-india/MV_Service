@@ -136,11 +136,14 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
       city: product.city || prev.city,
       district: product.district || prev.district,
       state: product.state || prev.state,
+      locationText: product.locationText || prev.locationText || '',
       // Pass along existing product & warranty data for Step 2 context
       linkedProductType: product.product,
       billPhoto: product.billPhoto || prev.billPhoto,
       billDate: product.billDate || prev.billDate,
       warrantyStatus: product.warrantyStatus || prev.warrantyStatus,
+      shopName: product.shopName || prev.shopName || '',
+      modelNumber: product.modelNumber || prev.modelNumber || '',
     }));
     
     // Clear modals and banners

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../api/axios';
 import Step1CustomerInfo from '../../components/forms/Step1CustomerInfo';
@@ -67,6 +67,8 @@ export default function NewComplaint() {
   const navigate = useNavigate();
   const location = useLocation();
   const prefill = location.state?.prefill || {};
+  // Stable flag: true when the page was opened via navigate with prefill state (link product, reopen flow)
+  const hasPrefill = Object.keys(prefill).some((k) => prefill[k]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [stepError, setStepError] = useState('');
@@ -119,6 +121,95 @@ export default function NewComplaint() {
     reopenNotes: '',
     reopenPhotos: [],
   });
+
+  const [draftsList, setDraftsList] = useState([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(!hasPrefill);
+  const [showDraftSelection, setShowDraftSelection] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState(null);
+  // Flag to block auto-save while resuming a draft (prevents duplicate saves)
+  const [resuming, setResuming] = useState(false);
+
+  // Fetch drafts on mount — only when NOT coming from a prefill navigation
+  useEffect(() => {
+    if (hasPrefill) {
+      return;
+    }
+
+    const fetchDrafts = async () => {
+      try {
+        const { data } = await api.get('/api/complaints/drafts');
+        if (data.drafts && data.drafts.length > 0) {
+          setDraftsList(data.drafts);
+          setShowDraftSelection(true);
+        }
+      } catch (err) {
+        console.error('Error fetching drafts:', err);
+      } finally {
+        setLoadingDrafts(false);
+      }
+    };
+    fetchDrafts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounced Auto-Save Draft
+  useEffect(() => {
+    // Don't auto-save while: draft screen shown, still loading, submitting, or just resuming a draft
+    if (showDraftSelection || loadingDrafts || submitting || resuming) return;
+
+    // Don't auto-save on a prefill navigation (linking product or reopen)
+    if (hasPrefill && !currentDraftId) return;
+
+    // Don't save a completely blank form
+    const hasData = formData.customerName?.trim() || formData.phone1?.trim() ||
+      formData.localAddress?.trim() || formData.serialNumber?.trim() || formData.billDate;
+    if (!hasData) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const payload = { currentStep, formData };
+        if (currentDraftId) payload.draftId = currentDraftId;
+
+        const { data } = await api.post('/api/complaints/drafts', payload);
+        if (!currentDraftId && data.draftId) {
+          setCurrentDraftId(data.draftId);
+        }
+      } catch (err) {
+        console.error('Error auto-saving draft:', err);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, currentStep, currentDraftId, showDraftSelection, submitting, loadingDrafts, resuming]);
+
+  const handleResumeDraft = (draft) => {
+    setResuming(true);  // Block auto-save while we apply the resumed state
+    setCurrentDraftId(draft._id);
+    setCurrentStep(draft.currentStep);
+    setFormData(draft.formData);
+    setShowDraftSelection(false);
+    // Allow auto-save again after React has re-rendered with the new state
+    setTimeout(() => setResuming(false), 200);
+  };
+
+  const handleDeleteDraft = async (id) => {
+    try {
+      await api.delete(`/api/complaints/drafts/${id}`);
+      setDraftsList((prev) => {
+        const updated = prev.filter((d) => d._id !== id);
+        if (updated.length === 0) setShowDraftSelection(false);
+        return updated;
+      });
+    } catch (err) {
+      console.error('Error deleting draft:', err);
+    }
+  };
+
+  const handleStartFresh = () => {
+    setShowDraftSelection(false);
+    setCurrentDraftId(null);
+  };
 
   const goNext = () => {
     const error = validateStep(currentStep, formData);
@@ -207,6 +298,13 @@ export default function NewComplaint() {
         ? `Complaint ${complaintId} created and assigned successfully!`
         : `Complaint ${complaintId} created as Unassigned. Assign an SC from the Action Centre.`;
 
+      // Delete draft if it exists
+      if (currentDraftId) {
+        await api.delete(`/api/complaints/drafts/${currentDraftId}`).catch(err => {
+          console.error('Failed to clean up draft:', err);
+        });
+      }
+
       navigate('/admin', { state: { successMessage } });
 
     } catch (err) {
@@ -214,6 +312,95 @@ export default function NewComplaint() {
       setSubmitting(false);
     }
   };
+
+  if (loadingDrafts) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm text-muted-foreground font-medium">Checking for saved drafts...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showDraftSelection) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="flex justify-between items-center pb-4 border-b border-border/60">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Incomplete Drafts</h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                You have unfinished complaint drafts from previous sessions.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/admin')}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition"
+            >
+              ← Action Centre
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {draftsList.map((draft) => {
+              const name = draft.formData?.customerName || 'Unnamed Customer';
+              const phone = draft.formData?.phone1 || 'No Phone';
+              const productType = draft.formData?.product || 'No Product';
+              const stepName = STEPS[draft.currentStep - 1]?.title || `Step ${draft.currentStep}`;
+              const lastUpdated = new Date(draft.updatedAt).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+
+              return (
+                <div key={draft._id} className="bg-card border border-border rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-foreground text-sm">{name}</h3>
+                    <p className="text-muted-foreground text-xs">
+                      Phone: <span className="font-semibold text-foreground">{phone}</span>
+                      {draft.formData?.product && (
+                        <> | Product: <span className="font-semibold text-foreground capitalize">{productType}</span></>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/80">
+                      Last edited: <span className="font-medium">{lastUpdated}</span> | Saved at: <span className="font-bold text-primary">{stepName}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => handleResumeDraft(draft)}
+                      className="flex-1 sm:flex-initial px-4.5 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition shadow-sm"
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDraft(draft._id)}
+                      className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-5 border-t border-border/60 flex justify-end gap-3">
+            <button
+              onClick={handleStartFresh}
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold rounded-lg border border-border bg-background hover:bg-muted text-foreground transition shadow-sm"
+            >
+              Start Fresh (New Complaint)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">

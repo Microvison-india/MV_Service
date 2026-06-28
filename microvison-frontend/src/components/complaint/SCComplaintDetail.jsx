@@ -500,6 +500,20 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                   <p className="font-mono text-foreground font-semibold">{latestSerialNumber}</p>
                 </div>
               )}
+
+              {/* Location / Maps Link */}
+              {c.locationText && (
+                <div className="sm:col-span-2 space-y-1">
+                  <span className="text-muted-foreground uppercase font-bold tracking-wider text-[9px]">Location / Maps Link</span>
+                  <p className="font-medium text-foreground bg-muted/40 p-2.5 rounded-lg border text-xs break-all">
+                    {c.locationText.startsWith('http') ? (
+                      <a href={c.locationText} target="_blank" rel="noreferrer" className="text-primary hover:underline font-bold">
+                        {c.locationText}
+                      </a>
+                    ) : c.locationText}
+                  </p>
+                </div>
+              )}
             </div>
           </AccordionSection>
 

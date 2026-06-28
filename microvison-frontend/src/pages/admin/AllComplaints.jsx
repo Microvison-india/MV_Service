@@ -2,6 +2,7 @@ import { useState } from 'react';
 import useComplaints from '../../hooks/useComplaints';
 import ComplaintFilters from '../../components/filters/ComplaintFilters';
 import AdminComplaintDetail from '../../components/complaint/AdminComplaintDetail';
+import Pagination from '../../components/ui/Pagination';
 
 const STATUS_BADGE_STYLES = {
   new: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -52,6 +53,10 @@ export default function AllComplaints() {
 
   const handlePageChange = (newPage) => {
     setFilters((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setFilters((prev) => ({ ...prev, limit: newLimit, page: 1 }));
   };
 
   return (
@@ -262,28 +267,15 @@ export default function AllComplaints() {
           </div>
 
           {/* Pagination Controls */}
-          {!loading && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card">
-              <p className="text-sm text-muted-foreground">
-                Showing page {pagination.page} of {pagination.totalPages}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  disabled={pagination.page <= 1}
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Previous
-                </button>
-                <button
-                  disabled={pagination.page >= pagination.totalPages}
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  className="px-3 py-1.5 text-sm border border-border rounded-lg hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+          {!loading && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              limit={pagination.limit || filters.limit}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+            />
           )}
         </div>
       </div>
