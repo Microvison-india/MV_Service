@@ -45,6 +45,9 @@ export default function MonthlyInvoice({ invoice }) {
       extrasTotal: c.extrasTotal,
       total: c.total,
       customerPaymentAmount: c.customerPaymentAmount,
+      // Change 5: Critical Action deduction visible to SC (spec §7)
+      customerChargePaidToSCAmount: c.customerChargePaidToSCAmount,
+      customerChargeReason: c.customerChargeReason,
     },
   }));
 

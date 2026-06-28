@@ -22,7 +22,9 @@ export default function BillingTable({
   const totalPetrol = bills.reduce((sum, b) => sum + (b.billing?.petrol || 0), 0);
   const totalExtras = bills.reduce((sum, b) => sum + (b.billing?.extrasTotal || 0), 0);
   const totalOwed = bills.reduce((sum, b) => sum + (b.billing?.total || 0), 0);
-  const totalCustomerPaid = bills.reduce((sum, b) => sum + (b.billing?.customerPaymentAmount || 0), 0);
+  // SC-visible deduction: OOW customer payment + Critical Action paid_to_sc amount
+  const totalCustomerPaid = bills.reduce((sum, b) =>
+    sum + (b.billing?.customerPaymentAmount || 0) + (b.billing?.customerChargePaidToSCAmount || 0), 0);
 
   // Client-side running totals
   const totalAll = bills.reduce((s, b) => s + (b.billing?.total || 0), 0);
@@ -164,9 +166,23 @@ export default function BillingTable({
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-green-700">
-                        {!isWarranty && b.billing?.customerPaymentAmount > 0 
-                          ? `₹${b.billing?.customerPaymentAmount}` 
-                          : '—'}
+                        {/* Show OOW customer payment + Critical Action paid_to_sc deduction */}
+                        {(() => {
+                          const oow = !isWarranty && (b.billing?.customerPaymentAmount || 0);
+                          const crit = b.billing?.customerChargePaidToSCAmount || 0;
+                          const total = (oow || 0) + crit;
+                          if (total > 0) {
+                            return (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span>-₹{total}</span>
+                                {crit > 0 && b.billing?.customerChargeReason && (
+                                  <span className="text-[10px] text-red-500 italic font-normal">{b.billing.customerChargeReason}</span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return <span className="text-muted-foreground">—</span>;
+                        })()}
                       </td>
                     </tr>
                   );

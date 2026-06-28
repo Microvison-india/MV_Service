@@ -27,19 +27,16 @@ export default function BillSummary({ complaint }) {
   const approvedExtras = (complaint.extraCharges || []).filter((ec) => ec.status === 'approved');
   const extrasTotal = approvedExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
 
-  // 4. Microvison-approved extras (Change 6A)
-  const mvExtras = complaint.mvApprovedExtras || 0;
-
   // 5. Gross total
   const grossTotal = isWarranty
-    ? presetPrice + petrol + extrasTotal + mvExtras
-    : extrasTotal + mvExtras;
+    ? presetPrice + petrol + extrasTotal
+    : extrasTotal;
 
   // 6. Deductions: Customer paid to SC
   const customerPaidToSC = (complaint.customerPaymentAmount || 0) + (complaint.customerChargePaidToSCAmount || 0);
 
-  // 7. Net total owed to SC
-  const total = Math.max(0, grossTotal - customerPaidToSC);
+  // 7. Net total owed to SC (can be negative — SC owes Microvison if customer paid more to SC than SC's bill)
+  const total = grossTotal - customerPaidToSC;
 
   return (
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
@@ -82,14 +79,6 @@ export default function BillSummary({ complaint }) {
           </>
         )}
 
-        {/* Microvision Extras */}
-        {mvExtras > 0 && (
-          <div className="flex justify-between text-foreground">
-            <span className="text-muted-foreground">Microvision Approved Extras:</span>
-            <span className="font-medium">₹{mvExtras}</span>
-          </div>
-        )}
-
         {/* Approved Extras list */}
         {approvedExtras.length > 0 && (
           <div className="space-y-1.5 pt-1.5 border-t border-dashed border-border/60">
@@ -124,10 +113,13 @@ export default function BillSummary({ complaint }) {
         )}
 
         {/* Final Total Owed by MV */}
-        <div className="flex justify-between text-foreground font-bold text-base pt-3 border-t border-border">
-          <span>Total Owed by Microvision:</span>
-          <span className="text-primary">₹{total}</span>
+        <div className={`flex justify-between font-bold text-base pt-3 border-t border-border ${total < 0 ? 'text-red-600' : 'text-foreground'}`}>
+          <span>{total < 0 ? '⚠ SC Owes Microvison:' : 'Total Owed by Microvison:'}</span>
+          <span className={total < 0 ? 'text-red-600' : 'text-primary'}>₹{total}</span>
         </div>
+        {total < 0 && (
+          <p className="text-[10px] text-red-500 text-right italic mt-0.5">Customer paid more than SC's bill — SC must return ₹{Math.abs(total)} to Microvison.</p>
+        )}
 
         {/* Informational: Customer Paid Microvison Directly */}
         {complaint.customerPaymentToMicrovison > 0 && (

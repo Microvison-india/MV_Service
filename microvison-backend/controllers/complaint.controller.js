@@ -478,9 +478,11 @@ const getMyComplaints = async (req, res) => {
   if (complaintType) filter.complaintType = complaintType;
   if (warrantyStatus) filter.warrantyStatus = warrantyStatus;
   if (dateFrom || dateTo) {
+    const { parseLocalDate } = require('../utils/dateParser');
+    const tzOffset = req.headers['x-timezone-offset'];
     filter.createdAt = {};
-    if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-    if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+    if (dateFrom) filter.createdAt.$gte = parseLocalDate(dateFrom, tzOffset, false);
+    if (dateTo) filter.createdAt.$lte = parseLocalDate(dateTo, tzOffset, true);
   }
 
   const complaints = await Complaint.find(filter)
@@ -619,12 +621,19 @@ const markGoing = async (req, res) => {
     }
   }
 
-  if (complaint.status !== 'accepted') {
-    return res.status(400).json({ message: `Cannot mark as going from status '${complaint.status}'.` });
-  }
+  const updatedComplaint = await Complaint.findOneAndUpdate(
+    { _id: complaint._id, status: 'accepted' },
+    { $set: { status: 'going' } },
+    { new: true }
+  );
 
-  complaint.status = 'going';
-  await complaint.save();
+  if (!updatedComplaint) {
+    // Re-fetch to show current status in error message
+    const current = await Complaint.findById(complaint._id).select('status');
+    return res.status(400).json({ 
+      message: `Cannot mark as going. The complaint is no longer in 'accepted' status (currently: ${current?.status}).` 
+    });
+  }
 
   await ComplaintUpdate.create({
     complaintId: complaint._id,
@@ -735,11 +744,10 @@ const updateStatus = async (req, res) => {
     // Petrol Edit 2 — SC's turn as long as admin has not locked it (GRD 6.3)
     if (
       complaint.warrantyStatus === 'in_warranty' &&
-      petrolSC != null &&
-      petrolSC !== '' &&
-      !complaint.petrolLocked
+      !complaint.petrolLocked &&
+      petrolSC !== undefined
     ) {
-      complaint.petrolSC = Number(petrolSC);
+      complaint.petrolSC = (petrolSC === '' || petrolSC === null) ? null : Number(petrolSC);
       complaint.petrolEditCount = 2;
     }
 
@@ -938,7 +946,6 @@ const confirmDone = async (req, res) => {
     criticalActionAcknowledgedAt,
     presetPriceOverride,
     presetPriceOverrideReason,
-    mvApprovedExtras,
     customerPaymentToMicrovison,
     engineerName,
   } = req.body;
@@ -949,8 +956,8 @@ const confirmDone = async (req, res) => {
     return res.status(404).json({ message: 'Complaint not found.' });
   }
 
-  if (complaint.status !== 'done') {
-    return res.status(400).json({ message: 'Complaint is not in Done status. Admin can only confirm completed Done jobs.' });
+  if (!['done', 'not_done'].includes(complaint.status)) {
+    return res.status(400).json({ message: 'Complaint is not in Done or Not Done status. Admin can only confirm finalized jobs.' });
   }
 
   // Change 5: If critical action was enabled, admin MUST have acknowledged before closing
@@ -1061,15 +1068,16 @@ const confirmDone = async (req, res) => {
   }
 
   // Change 6B: Preset price override
-  if (presetPriceOverride !== undefined && presetPriceOverride !== null && presetPriceOverride !== '') {
-    complaint.presetPriceOverride = Number(presetPriceOverride);
-    complaint.presetPriceOverrideReason = presetPriceOverrideReason || '';
+  if (presetPriceOverride !== undefined) {
+    complaint.presetPriceOverride = (presetPriceOverride === '' || presetPriceOverride === null) ? null : Number(presetPriceOverride);
+    if (complaint.presetPriceOverride === null) {
+      complaint.presetPriceOverrideReason = '';
+    } else {
+      complaint.presetPriceOverrideReason = presetPriceOverrideReason || '';
+    }
   }
 
-  // Change 6A: Microvison-approved extras and customer payment to Microvison
-  if (mvApprovedExtras !== undefined && mvApprovedExtras !== null && mvApprovedExtras !== '') {
-    complaint.mvApprovedExtras = Number(mvApprovedExtras);
-  }
+  // Change 6A: Customer payment to Microvison
   if (customerPaymentToMicrovison !== undefined && customerPaymentToMicrovison !== null) {
     complaint.customerPaymentToMicrovison = Number(customerPaymentToMicrovison) || null;
   }
@@ -1100,18 +1108,18 @@ const confirmDone = async (req, res) => {
   }
   
   // Update petrol Admin & SC estimates if sent
-  if (req.body.petrolAdmin !== undefined && req.body.petrolAdmin !== null && req.body.petrolAdmin !== '') {
-    complaint.petrolAdmin = Number(req.body.petrolAdmin);
+  if (req.body.petrolAdmin !== undefined) {
+    complaint.petrolAdmin = (req.body.petrolAdmin === '' || req.body.petrolAdmin === null) ? null : Number(req.body.petrolAdmin);
   }
-  if (req.body.petrolSC !== undefined && req.body.petrolSC !== null && req.body.petrolSC !== '') {
-    complaint.petrolSC = Number(req.body.petrolSC);
+  if (req.body.petrolSC !== undefined) {
+    complaint.petrolSC = (req.body.petrolSC === '' || req.body.petrolSC === null) ? null : Number(req.body.petrolSC);
   }
 
   // Admin final petrol lock (edit 3)
-  if (req.body.petrolFinal !== undefined && req.body.petrolFinal !== null && req.body.petrolFinal !== '') {
-    complaint.petrolFinal = Number(req.body.petrolFinal);
-  } else {
-    // If they just confirm without override, copy the last entered value
+  if (req.body.petrolFinal !== undefined) {
+    complaint.petrolFinal = (req.body.petrolFinal === '' || req.body.petrolFinal === null) ? null : Number(req.body.petrolFinal);
+  } else if (complaint.petrolFinal === null) {
+    // If they just confirm without override and it was previously null, copy the last entered value
     if (complaint.petrolSC != null) {
       complaint.petrolFinal = complaint.petrolSC;
     } else if (complaint.petrolAdmin != null) {
@@ -1551,14 +1559,14 @@ const getAllComplaints = async (req, res) => {
 
     // 6. Date Range filter (createdAt)
     if (dateFrom || dateTo) {
+      const { parseLocalDate } = require('../utils/dateParser');
+      const tzOffset = req.headers['x-timezone-offset'];
       query.createdAt = {};
       if (dateFrom) {
-        query.createdAt.$gte = new Date(dateFrom);
+        query.createdAt.$gte = parseLocalDate(dateFrom, tzOffset, false);
       }
       if (dateTo) {
-        const endOfDay = new Date(dateTo);
-        endOfDay.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = endOfDay;
+        query.createdAt.$lte = parseLocalDate(dateTo, tzOffset, true);
       }
     }
 
@@ -1744,6 +1752,18 @@ const saveCriticalAction = async (req, res) => {
     complaint.warrantyRevoked = !!warrantyRevoked;
     complaint.warrantyRevocationReason = warrantyRevoked ? (warrantyRevocationReason || '') : '';
     complaint.criticalActionLastEditedAt = new Date();
+
+    if (warrantyRevoked && complaint.trackingId) {
+      await Product.findByIdAndUpdate(complaint.trackingId, {
+        $set: {
+          warrantyStatus: 'out_of_warranty',
+          warrantySource: 'revoked',
+          revocationReason: warrantyRevocationReason || '',
+          revocationDate: new Date(),
+          revocationComplaintId: complaint._id,
+        },
+      });
+    }
 
     await complaint.save();
     res.status(200).json({ message: 'Critical action saved.', complaint });

@@ -47,7 +47,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [activeForm, setActiveForm] = useState('done'); // 'done' | 'not_done' | 'part_pending'
   const [petrolSC, setPetrolSC] = useState('');
   const [customerPayment, setCustomerPayment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+
   const [markingGoing, setMarkingGoing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -147,6 +147,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   }, [initial._id]);
 
   const isInWarranty = c.warrantyStatus === 'in_warranty';
+  const [submitting, setSubmitting] = useState(false);
+  
+  const isProcessing = markingGoing || markingReceived || submitting;
+
   const canMarkGoing = c.status === 'accepted';
   const showMarkReceived = c.status === 'part_pending' && c.partDeliveredAt;
   const showWaitingDelivery = c.status === 'part_pending' && !c.partDeliveredAt;
@@ -270,8 +274,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       body.scMissingBypass = bypassedFields;
 
       // Petrol SC (only if in-warranty and petrol is not locked by admin)
-      if (isInWarranty && !c.petrolLocked && petrolSC !== '') {
-        body.petrolSC = Number(petrolSC);
+      if (isInWarranty && !c.petrolLocked) {
+        body.petrolSC = (petrolSC === '' || petrolSC === null || petrolSC === undefined) ? null : Number(petrolSC);
       }
 
       // Extra Charges
@@ -964,8 +968,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 <button
                   type="button"
                   onClick={handleSubmitFinal}
-                  disabled={submitting}
-                  className="w-full py-3 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:opacity-90 disabled:opacity-50 transition shadow-sm"
+                  disabled={isProcessing}
+                  className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50 transition"
                 >
                   {submitting ? 'Submitting Conclusion...' : `✓ Submit conclusion as "${activeForm.replace(/_/g, ' ')}"`}
                 </button>
@@ -997,7 +1001,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
               
               <button
                 onClick={handleMarkReceived}
-                disabled={markingReceived}
+                disabled={isProcessing}
                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold uppercase tracking-wider disabled:opacity-50 transition"
               >
                 {markingReceived ? 'Confirming...' : '✓ Confirm Receipt of Part'}
@@ -1006,7 +1010,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
           ) : canMarkGoing ? (
             <button
               onClick={handleMarkGoing}
-              disabled={markingGoing}
+              disabled={isProcessing}
               className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-bold uppercase tracking-wider disabled:opacity-50 transition"
             >
               {markingGoing ? 'Marking Going...' : '🚗 Mark as Going (Start Travel)'}

@@ -481,7 +481,14 @@ export default function SCDetail() {
                           className="border-b border-border hover:bg-muted/40 cursor-pointer transition"
                         >
                           <td className="px-4 py-3 font-mono text-xs font-semibold text-muted-foreground">
-                            {c.complaintId}
+                            <div className="flex flex-col gap-1">
+                              <span>{c.complaintId}</span>
+                              {c.warrantyRevoked && (
+                                <span className="inline-flex max-w-max bg-rose-100 text-rose-800 text-[9px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-200">
+                                  ⚠️ CRITICAL
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 font-medium text-foreground">
                             {c.customerName}
@@ -557,9 +564,16 @@ export default function SCDetail() {
                     >
                       {/* Top Row: ID & Status */}
                       <div className="flex justify-between items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-muted-foreground bg-muted/65 px-2 py-0.5 rounded border border-border/40">
-                          {c.complaintId}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-muted-foreground bg-muted/65 px-2 py-0.5 rounded border border-border/40">
+                            {c.complaintId}
+                          </span>
+                          {c.warrantyRevoked && (
+                            <span className="bg-rose-100 text-rose-800 text-[9px] font-black px-1.5 py-0.5 rounded uppercase border border-rose-200">
+                              ⚠️ CRITICAL
+                            </span>
+                          )}
+                        </div>
                         <span
                           className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize ${
                             STATUS_BADGE_STYLES[c.status] || 'bg-gray-100 text-gray-700'

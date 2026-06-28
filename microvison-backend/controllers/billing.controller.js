@@ -38,13 +38,11 @@ const getComplaintBills = async (req, res) => {
 
     // Date filtering — billLockedAt is the true billing date
     if (dateFrom || dateTo) {
+      const { parseLocalDate } = require('../utils/dateParser');
+      const tzOffset = req.headers['x-timezone-offset'];
       query.billLockedAt = {};
-      if (dateFrom) query.billLockedAt.$gte = new Date(dateFrom);
-      if (dateTo) {
-        const end = new Date(dateTo);
-        end.setHours(23, 59, 59, 999);
-        query.billLockedAt.$lte = end;
-      }
+      if (dateFrom) query.billLockedAt.$gte = parseLocalDate(dateFrom, tzOffset, false);
+      if (dateTo) query.billLockedAt.$lte = parseLocalDate(dateTo, tzOffset, true);
     } else if (month && year) {
       // Legacy fallback
       const m = parseInt(month, 10);
@@ -113,8 +111,10 @@ const getMonthlyInvoice = async (req, res) => {
 
     let start, end;
     if (dateFrom || dateTo) {
-      start = dateFrom ? new Date(dateFrom) : new Date(0);
-      end   = dateTo   ? (() => { const d = new Date(dateTo); d.setHours(23, 59, 59, 999); return d; })() : new Date();
+      const { parseLocalDate } = require('../utils/dateParser');
+      const tzOffset = req.headers['x-timezone-offset'];
+      start = dateFrom ? parseLocalDate(dateFrom, tzOffset, false) : new Date(0);
+      end   = dateTo   ? parseLocalDate(dateTo, tzOffset, true) : new Date();
     } else if (month && year) {
       const m = parseInt(month, 10);
       const y = parseInt(year, 10);
@@ -165,6 +165,9 @@ const getMonthlyInvoice = async (req, res) => {
         petrol: calculation.petrol,
         extrasTotal: calculation.extrasTotal,
         customerPaymentAmount: calculation.customerPaymentAmount,
+        // Change 5: Critical Action deduction — visible to SC (spec §7)
+        customerChargePaidToSCAmount: c.customerChargePaidToSCAmount || 0,
+        customerChargeReason: c.customerChargeReason || '',
       };
     });
 

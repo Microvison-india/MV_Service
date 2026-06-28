@@ -38,13 +38,10 @@ function calcBill(complaint) {
   const approvedExtras = (complaint.extraCharges || []).filter((ec) => ec.status === 'approved');
   const extrasTotal = approvedExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
 
-  // 4. Microvison-approved extras (both warranty types, optional)
-  const mvExtras = complaint.mvApprovedExtras || 0;
-
   // 5. Gross total before deductions
   const grossTotal = isWarranty
-    ? effectivePreset + petrol + extrasTotal + mvExtras
-    : extrasTotal + mvExtras;
+    ? effectivePreset + petrol + extrasTotal
+    : extrasTotal;
 
   // 6. Deductions from SC bill: customer amounts SC already collected
   //    Source 1: Standard OOW customer payment (existing field)
@@ -53,8 +50,8 @@ function calcBill(complaint) {
     (complaint.customerPaymentAmount || 0) +
     (complaint.customerChargePaidToSCAmount || 0);
 
-  // 7. Net SC total (cannot go below 0)
-  const netTotal = Math.max(0, grossTotal - customerPaidToSC);
+  // 7. Net SC total (can be negative if customer paid more to SC than SC's bill)
+  const netTotal = grossTotal - customerPaidToSC;
 
   return {
     preset: effectivePreset,
@@ -64,7 +61,7 @@ function calcBill(complaint) {
     petrol,
     extrasTotal,
     extrasList: approvedExtras.map((ec) => ({ label: ec.label, amount: ec.amount })),
-    mvExtras,
+    mvExtras: 0,
     customerPaidToSC,         // total deducted from SC (shown on SC bill)
     customerPaymentToMicrovison: complaint.customerPaymentToMicrovison || 0,  // record only
     grossTotal,

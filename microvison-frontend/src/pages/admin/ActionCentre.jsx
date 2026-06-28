@@ -148,6 +148,11 @@ export default function ActionCentre() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-mono text-muted-foreground">{c.complaintId}</span>
+          {c.warrantyRevoked && (
+            <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase border border-rose-200">
+              ⚠️ CRITICAL
+            </span>
+          )}
           <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded uppercase">
             {c.status.replace(/_/g, ' ')}
           </span>

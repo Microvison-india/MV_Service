@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import ExtraChargesList from './ExtraChargesList';
@@ -18,6 +18,11 @@ import { Loader2, Plus, X } from 'lucide-react';
 const inputCls =
   'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition';
 
+const labelCls = 'block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide';
+
+const selectCls =
+  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition';
+
 export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }) {
   const navigate = useNavigate();
   const [c, setC] = useState(null);
@@ -29,6 +34,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [disputeNote, setDisputeNote] = useState('');
   const [adminNote, setAdminNote] = useState(''); // For confirm
   const [deliveryNote, setDeliveryNote] = useState(''); // For marking parts delivered
+  const [forceCloseNote, setForceCloseNote] = useState(''); // For force closing complaints
   const [petrolFinal, setPetrolFinal] = useState('');
   const [petrolAdmin, setPetrolAdmin] = useState('');
   const [petrolSC, setPetrolSC] = useState('');
@@ -72,9 +78,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
+  const syncedComplaintId = useRef(null);
+
   // Sync candidate form data with complaint defaults
   useEffect(() => {
-    if (c) {
+    if (c && syncedComplaintId.current !== c._id) {
       setModalData((prev) => ({
         ...prev,
         city: c.city || '',
@@ -210,23 +218,23 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [modalError, setModalError] = useState('');
 
   // Phase 8 States
-  const [criticalActionEnabled, setCriticalActionEnabled] = useState(c?.criticalActionEnabled || false);
+  const hasSavedCriticalInit = c?.criticalActionEnabled || !!(c?.customerExtraCharge || c?.customerChargePaymentMode || c?.warrantyRevoked || c?.criticalActionLastEditedAt);
+  const [criticalActionEnabled, setCriticalActionEnabled] = useState(hasSavedCriticalInit);
   const [customerExtraCharge, setCustomerExtraCharge] = useState(c?.customerExtraCharge ?? '');
   const [customerChargePaymentMode, setCustomerChargePaymentMode] = useState(c?.customerChargePaymentMode || '');
   const [customerChargeReason, setCustomerChargeReason] = useState(c?.customerChargeReason || '');
   const [warrantyRevoked, setWarrantyRevoked] = useState(c?.warrantyRevoked || false);
   const [warrantyRevocationReason, setWarrantyRevocationReason] = useState(c?.warrantyRevocationReason || '');
   const [savingCritical, setSavingCritical] = useState(false);
-  const [showCriticalPanel, setShowCriticalPanel] = useState(false);
+  const [showCriticalPanel, setShowCriticalPanel] = useState(hasSavedCriticalInit);
 
   const [presetPriceOverride, setPresetPriceOverride] = useState(c?.presetPriceOverride ?? '');
   const [presetPriceOverrideReason, setPresetPriceOverrideReason] = useState(c?.presetPriceOverrideReason || '');
   const [editingPreset, setEditingPreset] = useState(false);
-  const [mvApprovedExtras, setMvApprovedExtras] = useState(c?.mvApprovedExtras ?? '');
-  const [customerPaymentToMicrovison, setCustomerPaymentToMicrovison] = useState(c?.customerPaymentToMicrovison ?? '');
   const [criticalActionAcknowledged, setCriticalActionAcknowledged] = useState(false);
   
   const [adminEngineerName, setAdminEngineerName] = useState(c?.engineerName || '');
+  const [selectedEngineerType, setSelectedEngineerType] = useState(c?.engineerName ? 'sc_submitted' : 'custom');
 
   // Edit states for Product Registry (Phase 21)
   const [editSerialNumber, setEditSerialNumber] = useState('');
@@ -291,6 +299,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             setPetrolAdmin(data.complaint.petrolAdmin ?? '');
             setPetrolSC(data.complaint.petrolSC ?? '');
             setAdminExtraCharges(data.complaint.extraCharges || []);
+            setAdminEngineerName(data.complaint.engineerName || '');
+            setSelectedEngineerType(data.complaint.engineerName ? 'sc_submitted' : 'custom');
+            setPresetPriceOverride(data.complaint.presetPriceOverride ?? '');
+            setPresetPriceOverrideReason(data.complaint.presetPriceOverrideReason || '');
 
             // Set product editor values
             const prod = data.complaint.trackingId || {};
@@ -333,7 +345,31 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       active = false;
       clearInterval(intervalId);
     };
-  }, [complaintId, refreshTick, isEditingExtraCharges, adminMadeEdits]);
+  }, [complaintId, refreshTick, isEditingExtraCharges, adminMadeEdits, showProductEditor]);
+
+  // IMPORTANT: useState initialises from c which is null at mount (async load),
+  // so we must re-sync here after c is loaded or refreshed, BUT ONLY ONCE per complaint
+  // to avoid overwriting user input during the 5s polling interval.
+  useEffect(() => {
+    if (!c || syncedComplaintId.current === c._id) return;
+    syncedComplaintId.current = c._id;
+    const hasSavedCritical = c.criticalActionEnabled || !!(c.customerExtraCharge || c.customerChargePaymentMode || c.warrantyRevoked || c.criticalActionLastEditedAt);
+    setCriticalActionEnabled(hasSavedCritical);
+    setCustomerExtraCharge(c.customerExtraCharge ?? '');
+    setCustomerChargePaymentMode(c.customerChargePaymentMode || '');
+    setCustomerChargeReason(c.customerChargeReason || '');
+    setWarrantyRevoked(c.warrantyRevoked || false);
+    setWarrantyRevocationReason(c.warrantyRevocationReason || '');
+    setAdminEngineerName(c.engineerName || '');
+    setSelectedEngineerType(c.engineerName ? 'sc_submitted' : 'custom');
+    setPresetPriceOverride(c.presetPriceOverride ?? '');
+    setPresetPriceOverrideReason(c.presetPriceOverrideReason || '');
+    // Auto-expand the panel if a critical action was previously saved on this complaint
+    if (hasSavedCritical) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowCriticalPanel(true);
+    }
+  }, [c]);
 
   // Fetch candidate Service Centres for reassignment
   useEffect(() => {
@@ -373,7 +409,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         });
     }
     return () => { active = false; };
-  }, [c?.district, c?.product, c?.status]);
+  }, [c, c?.district, c?.product, c?.status]);
 
   if (loading) {
     return (
@@ -389,14 +425,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
   const isInWarranty = c.warrantyStatus === 'in_warranty';
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
-  const canConfirmOrDispute = c.status === 'done';
-
-  const getPreCloseStatus = () => {
-    if (!updates || updates.length === 0) return null;
-    const closedUpdate = updates.find(u => u.newStatus === 'closed');
-    return closedUpdate ? closedUpdate.oldStatus : null;
-  };
-  const preCloseStatus = getPreCloseStatus();
+  const canConfirmOrDispute = ['done', 'not_done'].includes(c.status);
 
   const handleSaveCriticalAction = async () => {
     setSavingCritical(true);
@@ -500,8 +529,8 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         // Phase 8: Billing and Engineer Additions
         presetPriceOverride,
         presetPriceOverrideReason,
-        mvApprovedExtras,
-        customerPaymentToMicrovison,
+        // customerPaymentToMicrovison is now derived from Critical Action (paid_to_microvison mode)
+        customerPaymentToMicrovison: (criticalActionEnabled && customerChargePaymentMode === 'paid_to_microvison') ? customerExtraCharge : '',
         engineerName: adminEngineerName,
       };
 
@@ -519,15 +548,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         body.criticalActionAcknowledgedAt = new Date().toISOString();
       }
       if (isInWarranty && !c.petrolLocked) {
-        if (petrolAdmin !== '' && petrolAdmin !== null && petrolAdmin !== undefined) {
-          body.petrolAdmin = Number(petrolAdmin);
-        }
-        if (petrolSC !== '' && petrolSC !== null && petrolSC !== undefined) {
-          body.petrolSC = Number(petrolSC);
-        }
-        if (petrolFinal !== '' && petrolFinal !== null && petrolFinal !== undefined) {
-          body.petrolFinal = Number(petrolFinal);
-        }
+        body.petrolAdmin = (petrolAdmin === '' || petrolAdmin === null || petrolAdmin === undefined) ? null : Number(petrolAdmin);
+        body.petrolSC = (petrolSC === '' || petrolSC === null || petrolSC === undefined) ? null : Number(petrolSC);
+        body.petrolFinal = (petrolFinal === '' || petrolFinal === null || petrolFinal === undefined) ? null : Number(petrolFinal);
       }
 
       // Append filled values & bypass array if warning modal is active
@@ -787,6 +810,12 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
           <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${compInWarranty ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
             {compInWarranty ? '✅ In Warranty' : '⚠️ Out of Warranty'}
           </span>
+          {/* Show revocation reason inline when warranty is revoked */}
+          {!compInWarranty && comp?.trackingId?.warrantySource === 'revoked' && comp?.trackingId?.revocationReason && (
+            <span className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full">
+              Revoked: {comp.trackingId.revocationReason}
+            </span>
+          )}
           <span className="bg-secondary text-secondary-foreground text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full">
             {PRODUCT_LABELS[comp.product] || comp.product}
           </span>
@@ -1152,9 +1181,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               }`}>
                 {c.status.replace(/_/g, ' ')}
               </span>
-              {c?.criticalActionEnabled && (
+              {c?.warrantyRevoked && (
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
-                  ⚠ CRITICAL ACTION
+                  ⚠ WARRANTY REVOKED
                 </span>
               )}
               <p className="text-xs text-muted-foreground font-mono font-semibold">
@@ -1718,7 +1747,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               </div>
               
               {/* Petrol Verification Section (Warranty only) */}
-              {isInWarranty && !c.petrolLocked && (
+              {c.status === 'done' && isInWarranty && !c.petrolLocked && (
                 <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3.5 hover:border-primary/20 transition-all">
                   <div className="flex items-center justify-between border-b border-border/50 pb-2">
                     <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1785,136 +1814,138 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               )}
 
               {/* Extra Charges Verification Section */}
-              <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3.5 hover:border-primary/20 transition-all">
-                <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                  <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    💳 Extra Charges Verification & Adjustment
-                  </span>
-                  <span className="text-[10px] bg-blue-500/10 text-blue-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
-                    {adminExtraCharges.length} item{adminExtraCharges.length === 1 ? '' : 's'}
-                  </span>
-                </div>
-                
-                {/* List of Extra charges */}
-                {adminExtraCharges.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                    {adminExtraCharges.map((item, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-background p-2.5 rounded-lg border border-border gap-2 text-xs hover:border-border/80 transition">
-                        <div className="flex items-center gap-2 flex-grow">
-                          <input
-                            type="text"
-                            value={item.label}
-                            onChange={(e) => {
-                              const newLabel = e.target.value;
-                              setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, label: newLabel } : ec));
-                              setAdminMadeEdits(true);
-                            }}
-                            className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
-                            placeholder="Description"
-                          />
-                          <input
-                            type="number"
-                            value={item.amount}
-                            onChange={(e) => {
-                              const newAmount = e.target.value === '' ? '' : Number(e.target.value);
-                              setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, amount: newAmount } : ec));
-                              setAdminMadeEdits(true);
-                            }}
-                            className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
-                            placeholder="Amount"
-                          />
-                          <span className={`px-2 py-1 rounded text-[9px] font-extrabold uppercase shrink-0 ${
-                            item.requestedBy === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300'
-                          }`}>
-                            {item.requestedBy}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 shrink-0">
-                          {/* Approval status toggler */}
-                          <select
-                            value={item.status}
-                            onChange={(e) => {
-                              const newStatus = e.target.value;
-                              setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, status: newStatus } : ec));
-                              setAdminMadeEdits(true);
-                            }}
-                            className={`bg-background border border-border text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none ${
-                              item.status === 'approved' ? 'text-green-600 border-green-300 dark:border-green-800' :
-                              item.status === 'rejected' ? 'text-red-600 border-red-300 dark:border-red-800' :
-                              'text-yellow-600 border-yellow-300 dark:border-yellow-800'
-                            }`}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                          </select>
-                          
-                          {/* Delete button */}
-                          <button
-                            type="button"
-                            onClick={() => { setAdminExtraCharges(prev => prev.filter((_, i) => i !== idx)); setAdminMadeEdits(true); }}
-                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition font-bold"
-                            title="Delete charge"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+              {c.status === 'done' && (
+                <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3.5 hover:border-primary/20 transition-all">
+                  <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                    <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      💳 Extra Charges Verification & Adjustment
+                    </span>
+                    <span className="text-[10px] bg-blue-500/10 text-blue-600 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
+                      {adminExtraCharges.length} item{adminExtraCharges.length === 1 ? '' : 's'}
+                    </span>
                   </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic py-1">No extra charges requested.</p>
-                )}
+                  
+                  {/* List of Extra charges */}
+                  {adminExtraCharges.length > 0 ? (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                      {adminExtraCharges.map((item, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-background p-2.5 rounded-lg border border-border gap-2 text-xs hover:border-border/80 transition">
+                          <div className="flex items-center gap-2 flex-grow">
+                            <input
+                              type="text"
+                              value={item.label}
+                              onChange={(e) => {
+                                const newLabel = e.target.value;
+                                setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, label: newLabel } : ec));
+                                setAdminMadeEdits(true);
+                              }}
+                              className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
+                              placeholder="Description"
+                            />
+                            <input
+                              type="number"
+                              value={item.amount}
+                              onChange={(e) => {
+                                const newAmount = e.target.value === '' ? '' : Number(e.target.value);
+                                setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, amount: newAmount } : ec));
+                                setAdminMadeEdits(true);
+                              }}
+                              className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
+                              placeholder="Amount"
+                            />
+                            <span className={`px-2 py-1 rounded text-[9px] font-extrabold uppercase shrink-0 ${
+                              item.requestedBy === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300'
+                            }`}>
+                              {item.requestedBy}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Approval status toggler */}
+                            <select
+                              value={item.status}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, status: newStatus } : ec));
+                                setAdminMadeEdits(true);
+                              }}
+                              className={`bg-background border border-border text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none ${
+                                item.status === 'approved' ? 'text-green-600 border-green-300 dark:border-green-800' :
+                                item.status === 'rejected' ? 'text-red-600 border-red-300 dark:border-red-800' :
+                                'text-yellow-600 border-yellow-300 dark:border-yellow-800'
+                              }`}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="approved">Approved</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                            
+                            {/* Delete button */}
+                            <button
+                              type="button"
+                              onClick={() => { setAdminExtraCharges(prev => prev.filter((_, i) => i !== idx)); setAdminMadeEdits(true); }}
+                              className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition font-bold"
+                              title="Delete charge"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic py-1">No extra charges requested.</p>
+                  )}
 
-                {/* Add new extra charge form */}
-                <div className="flex gap-2 items-center pt-1">
-                  <input
-                    type="text"
-                    id="admin-confirm-extra-label"
-                    placeholder="Add new charge description..."
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
-                  />
-                  <input
-                    type="number"
-                    id="admin-confirm-extra-amount"
-                    placeholder="₹ Amount"
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
-                  />
-                  <select
-                    id="admin-confirm-extra-requested-by"
-                    className="bg-background border border-border text-xs rounded-lg px-2.5 py-2 font-semibold text-foreground focus:outline-none shrink-0"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="sc">SC</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const lbl = document.getElementById('admin-confirm-extra-label')?.value || '';
-                      const amt = document.getElementById('admin-confirm-extra-amount')?.value || '';
-                      const reqBy = document.getElementById('admin-confirm-extra-requested-by')?.value || 'admin';
-                      if (lbl.trim() && amt && !isNaN(Number(amt))) {
-                        setAdminExtraCharges(prev => [...prev, {
-                          label: lbl.trim(),
-                          amount: Number(amt),
-                          requestedBy: reqBy,
-                          status: 'approved'
-                        }]);
-                        setAdminMadeEdits(true);
-                        document.getElementById('admin-confirm-extra-label').value = '';
-                        document.getElementById('admin-confirm-extra-amount').value = '';
-                      }
-                    }}
-                    className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition whitespace-nowrap shrink-0"
-                  >
-                    + Add Charge
-                  </button>
+                  {/* Add new extra charge form */}
+                  <div className="flex gap-2 items-center pt-1">
+                    <input
+                      type="text"
+                      id="admin-confirm-extra-label"
+                      placeholder="Add new charge description..."
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
+                    />
+                    <input
+                      type="number"
+                      id="admin-confirm-extra-amount"
+                      placeholder="₹ Amount"
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
+                    />
+                    <select
+                      id="admin-confirm-extra-requested-by"
+                      className="bg-background border border-border text-xs rounded-lg px-2.5 py-2 font-semibold text-foreground focus:outline-none shrink-0"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="sc">SC</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lbl = document.getElementById('admin-confirm-extra-label')?.value || '';
+                        const amt = document.getElementById('admin-confirm-extra-amount')?.value || '';
+                        const reqBy = document.getElementById('admin-confirm-extra-requested-by')?.value || 'admin';
+                        if (lbl.trim() && amt && !isNaN(Number(amt))) {
+                          setAdminExtraCharges(prev => [...prev, {
+                            label: lbl.trim(),
+                            amount: Number(amt),
+                            requestedBy: reqBy,
+                            status: 'approved'
+                          }]);
+                          setAdminMadeEdits(true);
+                          document.getElementById('admin-confirm-extra-label').value = '';
+                          document.getElementById('admin-confirm-extra-amount').value = '';
+                        }
+                      }}
+                      className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition whitespace-nowrap shrink-0"
+                    >
+                      + Add Charge
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* --- PHASE 8: CRITICAL ACTION & BILLING SUMMARY --- */}
-              {['done', 'not_done', 'part_pending', 'part_received'].includes(c?.status) && (
+              {/* --- PHASE 8: CRITICAL ACTION PANEL (In-Warranty only) --- */}
+              {isInWarranty && ['done', 'not_done', 'part_pending', 'part_received'].includes(c?.status) && (
                 <div className="space-y-4 pt-2">
                   
                   {/* --- CRITICAL ACTION PANEL --- */}
@@ -1935,19 +1966,85 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     
                     {showCriticalPanel && (
                       <div className="p-4 bg-amber-50/30 space-y-5">
-                        <div className="text-[11px] font-semibold text-amber-700 bg-amber-100/50 p-2 rounded flex items-center gap-2">
-                          <span>🔒</span> This section is never visible to the Service Centre.
+                        {/* Context: This section is complaint-specific, not product-specific */}
+                        <div className="text-[11px] font-semibold text-amber-700 bg-amber-100/50 p-2 rounded flex flex-col gap-1">
+                          <span className="flex items-center gap-2"><span>🔒</span> This section is never visible to the Service Centre.</span>
+                          <span className="text-[10px] text-amber-600 font-normal">
+                            Critical Actions are <strong>complaint-specific</strong> — Job: <span className="font-mono">{c?.complaintId}</span>. Each complaint has its own independent edge-case record. Product warranty changes affect all future complaints.
+                          </span>
                         </div>
 
+                        {/* Product-level warranty revocation banner — shows reason + date + source */}
                         {c?.trackingId?.warrantySource === 'revoked' && (
-                          <div className="text-[11px] font-semibold text-rose-700 bg-rose-100/50 p-2 rounded flex items-center gap-2 border border-rose-200">
-                            <span>⚠</span> Note: This product's warranty was previously revoked.
+                          <div className="text-[11px] font-semibold text-rose-700 bg-rose-50 p-3 rounded-lg flex flex-col gap-1.5 border border-rose-200">
+                            <span className="flex items-center gap-1.5 font-bold text-rose-800">
+                              ⚠️ Product Warranty was Revoked
+                            </span>
+                            {c?.trackingId?.revocationReason && (
+                              <span className="text-rose-700 font-normal">
+                                Reason: <span className="font-semibold">{c.trackingId.revocationReason}</span>
+                              </span>
+                            )}
+                            {c?.trackingId?.revocationDate && (
+                              <span className="text-rose-600 font-normal">
+                                Revoked on: {new Date(c.trackingId.revocationDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            )}
+                            <span className="text-rose-500 italic font-normal text-[10px]">
+                              This affects ALL future complaints for this product. Current complaint billing is unaffected.
+                            </span>
                           </div>
                         )}
 
                         {c?.criticalActionLastEditedAt && (
                           <div className="text-[10px] text-muted-foreground italic font-medium">
-                            Last edited: {new Date(c.criticalActionLastEditedAt).toLocaleString('en-IN')}
+                            Last edited on this complaint: {new Date(c.criticalActionLastEditedAt).toLocaleString('en-IN')}
+                          </div>
+                        )}
+
+                        {/* Spec §4C: Edit warning — only fires when local state has criticalActionEnabled checked AND it was previously saved */}
+                        {criticalActionEnabled && c?.criticalActionLastEditedAt && (
+                          <div className="text-[11px] font-bold text-orange-800 bg-orange-100 border border-orange-300 p-2.5 rounded flex items-start gap-2">
+                            <span className="text-base leading-none mt-0.5">⚠️</span>
+                            <span>You are editing a previously recorded critical action. Please review carefully before saving.</span>
+                          </div>
+                        )}
+
+                        {/* Previously-saved critical action summary for THIS complaint (read-only context) */}
+                        {c?.criticalActionEnabled && c?.criticalActionLastEditedAt && (
+                          <div className="bg-white dark:bg-card border border-amber-200 rounded-xl p-3 space-y-1.5 text-[11px]">
+                            <p className="font-bold text-amber-900 uppercase tracking-wider text-[10px] mb-2">💾 Previously Saved on This Complaint</p>
+                            {c?.customerExtraCharge > 0 ? (
+                              <div className="flex items-start gap-2">
+                                <span className="text-muted-foreground w-32 shrink-0">Customer Charged:</span>
+                                <span className="font-semibold text-foreground">₹{c.customerExtraCharge}
+                                  {c?.customerChargePaymentMode && (
+                                    <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold uppercase">
+                                      {c.customerChargePaymentMode === 'paid_to_sc' ? 'Paid to SC' : c.customerChargePaymentMode === 'paid_to_microvison' ? 'Paid to Microvison' : 'Not Agreed'}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-start gap-2">
+                                <span className="text-muted-foreground w-32 shrink-0">Customer Charged:</span>
+                                <span className="text-muted-foreground italic">None</span>
+                              </div>
+                            )}
+                            {c?.customerChargeReason && (
+                              <div className="flex items-start gap-2">
+                                <span className="text-muted-foreground w-32 shrink-0">Charge Reason:</span>
+                                <span className="font-medium text-foreground">{c.customerChargeReason}</span>
+                              </div>
+                            )}
+                            <div className="flex items-start gap-2">
+                              <span className="text-muted-foreground w-32 shrink-0">Warranty Revoked:</span>
+                              {c?.warrantyRevoked ? (
+                                <span className="font-semibold text-rose-700">✔ Yes — {c.warrantyRevocationReason}</span>
+                              ) : (
+                                <span className="text-muted-foreground italic">No revocation on this complaint</span>
+                              )}
+                            </div>
                           </div>
                         )}
 
@@ -1963,9 +2060,76 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
                         {criticalActionEnabled && (
                           <div className="pl-6 space-y-4 border-l-2 border-amber-200 ml-1">
-                            
-                            {/* Warranty Revocation */}
-                            <div className="space-y-2">
+
+                            {/* ── 4A. Customer Extra Charge & Payment Mode ── */}
+                            <div className="space-y-3">
+                              <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Customer Extra Charge (Due to Customer's Fault)</p>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Enter the amount the customer needs to pay for damage/misuse not covered by Microvison. Then select how they paid (or if they refused).
+                              </p>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className={labelCls}>Amount Customer Charged (₹)</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={customerExtraCharge}
+                                    onChange={(e) => setCustomerExtraCharge(e.target.value)}
+                                    className={inputCls}
+                                    placeholder="Leave blank if not charged"
+                                  />
+                                </div>
+                                <div>
+                                  <label className={labelCls}>How Was It Paid?</label>
+                                  <select
+                                    value={customerChargePaymentMode}
+                                    onChange={(e) => setCustomerChargePaymentMode(e.target.value)}
+                                    className={selectCls}
+                                  >
+                                    <option value="">— Select Mode —</option>
+                                    <option value="not_applicable">Customer refused / Not applicable</option>
+                                    <option value="paid_to_sc">Paid directly to SC (SC already has ₹)</option>
+                                    <option value="paid_to_microvison">Paid directly to Microvison</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Mode explanations */}
+                              {customerChargePaymentMode === 'paid_to_sc' && (
+                                <div className="text-[11px] bg-red-50 border border-red-200 text-red-800 p-2 rounded">
+                                  💸 <strong>DEDUCTED from SC bill:</strong> ₹{customerExtraCharge || 0} will be subtracted from what Microvison pays SC for this job.
+                                </div>
+                              )}
+                              {customerChargePaymentMode === 'paid_to_microvison' && (
+                                <div className="text-[11px] bg-green-50 border border-green-200 text-green-800 p-2 rounded">
+                                  ✅ <strong>Internal record only:</strong> ₹{customerExtraCharge || 0} paid to Microvison directly. SC billing is NOT affected.
+                                </div>
+                              )}
+                              {customerChargePaymentMode === 'not_applicable' && (
+                                <div className="text-[11px] bg-gray-50 border border-gray-200 text-gray-700 p-2 rounded">
+                                  ℹ️ Customer was informed but refused to pay. No effect on SC billing.
+                                </div>
+                              )}
+
+                              <div>
+                                <label className={labelCls}>Charge Reason <span className="text-rose-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={customerChargeReason}
+                                  onChange={(e) => setCustomerChargeReason(e.target.value)}
+                                  className={inputCls}
+                                  placeholder="e.g. Physical damage — customer dropped the TV, panel cracked"
+                                />
+                              </div>
+                            </div>
+
+                            {/* ── 4B. Warranty Revocation ── */}
+                            <div className="space-y-2 pt-3 border-t border-amber-200">
+                              <p className="text-xs font-bold text-rose-700 uppercase tracking-wider">Warranty Revocation (Going Forward Only)</p>
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Revoking removes warranty on ALL future complaints for this product. The current complaint billing stays in-warranty.
+                              </p>
                               <label className="flex items-center gap-2.5 cursor-pointer">
                                 <input
                                   type="checkbox"
@@ -1973,63 +2137,21 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                                   onChange={(e) => setWarrantyRevoked(e.target.checked)}
                                   className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
                                 />
-                                <span className="text-sm font-bold text-rose-700">Revoke Warranty Completely</span>
+                                <span className="text-sm font-bold text-rose-700">Revoke Warranty Going Forward</span>
                               </label>
                               {warrantyRevoked && (
                                 <div>
-                                  <label className={labelCls}>Revocation Reason <span className="text-rose-500">*</span></label>
+                                  <label className={labelCls}>Revocation Reason <span className="text-rose-500">* Required</span></label>
                                   <textarea
                                     value={warrantyRevocationReason}
                                     onChange={(e) => setWarrantyRevocationReason(e.target.value)}
-                                    placeholder="Why is the warranty being revoked?"
+                                    placeholder="e.g. Unauthorized 3rd party repair found inside unit — soldering damage on motherboard"
                                     className={`${inputCls} border-rose-200 focus:ring-rose-300`}
                                     rows={2}
                                   />
                                 </div>
                               )}
                             </div>
-
-                            {/* Customer Extra Charge */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div>
-                                <label className={labelCls}>Customer Extra Charge (₹)</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={customerExtraCharge}
-                                  onChange={(e) => setCustomerExtraCharge(e.target.value)}
-                                  className={inputCls}
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label className={labelCls}>Payment Mode</label>
-                                <select
-                                  value={customerChargePaymentMode}
-                                  onChange={(e) => setCustomerChargePaymentMode(e.target.value)}
-                                  className={selectCls}
-                                  disabled={!customerExtraCharge}
-                                >
-                                  <option value="">-- Select --</option>
-                                  <option value="not_applicable">N/A</option>
-                                  <option value="paid_to_sc">Paid to SC</option>
-                                  <option value="paid_to_microvison">Paid to Microvison directly</option>
-                                </select>
-                              </div>
-                            </div>
-                            
-                            {(customerExtraCharge || customerChargePaymentMode) && (
-                              <div>
-                                <label className={labelCls}>Charge Reason</label>
-                                <input
-                                  type="text"
-                                  value={customerChargeReason}
-                                  onChange={(e) => setCustomerChargeReason(e.target.value)}
-                                  className={inputCls}
-                                  placeholder="e.g. Out of warranty mishandling"
-                                />
-                              </div>
-                            )}
 
                             {/* Save Button */}
                             <div className="pt-2">
@@ -2039,8 +2161,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                                 disabled={savingCritical}
                                 className="px-5 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition shadow-sm disabled:opacity-50"
                               >
-                                {savingCritical ? 'Saving...' : 'Save Critical Action'}
+                                {savingCritical ? 'Saving...' : '💾 Save Critical Action'}
                               </button>
+                              <p className="text-[10px] text-muted-foreground mt-1.5">Saves immediately — you can still close the complaint later.</p>
                             </div>
 
                           </div>
@@ -2048,8 +2171,12 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                       </div>
                     )}
                   </div>
+                </div>
+              )}
 
-                  {/* --- PRE-CLOSE BILLING SUMMARY PANEL --- */}
+              {/* --- PRE-CLOSE BILLING SUMMARY PANEL (Done status only) --- */}
+              {c?.status === 'done' && (
+                <div className="space-y-4 pt-2">
                   {(() => {
                     // Inline Billing Calculation (mirrors billingCalculator.js)
                     const isWarr = isInWarranty;
@@ -2069,37 +2196,29 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     const appExtras = adminExtraCharges.filter(ec => ec.status === 'approved');
                     const extrasTot = appExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
                     
-                    const effMvExtras = mvApprovedExtras ? Number(mvApprovedExtras) : 0;
+                    const gross = isWarr ? (effPreset + effPetrol + extrasTot) : extrasTot;
                     
-                    const gross = isWarr ? (effPreset + effPetrol + extrasTot + effMvExtras) : (extrasTot + effMvExtras);
+                    const custToSC = (c?.customerPaymentAmount || 0) + (
+                      criticalActionEnabled 
+                        ? (customerChargePaymentMode === 'paid_to_sc' ? Number(customerExtraCharge || 0) : 0)
+                        : (c?.customerChargePaidToSCAmount || 0)
+                    );
                     
-                    const custToSC = (c?.customerPaymentAmount || 0) + (criticalActionEnabled && customerChargePaymentMode === 'paid_to_sc' ? Number(customerExtraCharge || 0) : 0);
+                    const activeReason = criticalActionEnabled ? customerChargeReason : (c?.customerChargeReason || '');
                     
-                    const net = Math.max(0, gross - custToSC);
+                    // Net can be negative — meaning SC owes Microvison money
+                    const net = gross - custToSC;
 
                     return (
                       <div className="bg-card border-2 border-primary/20 rounded-xl overflow-hidden shadow-sm mb-4">
                         <div className="bg-primary/5 px-4 py-3 border-b border-primary/10 flex justify-between items-center">
                           <span className="text-sm font-bold text-foreground uppercase tracking-wider">💰 Pre-Close Billing Summary</span>
-                          {criticalActionEnabled && !criticalActionAcknowledged && (
-                            <label className="flex items-center gap-2 cursor-pointer bg-rose-100 text-rose-800 px-3 py-1 rounded-full border border-rose-300">
-                              <input 
-                                type="checkbox" 
-                                checked={criticalActionAcknowledged}
-                                onChange={e => setCriticalActionAcknowledged(e.target.checked)}
-                                className="w-3.5 h-3.5 accent-rose-600 rounded cursor-pointer"
-                              />
-                              <span className="text-[10px] font-bold uppercase tracking-wider">I acknowledge Critical Action implications</span>
-                            </label>
-                          )}
                         </div>
                         
                         <div className="p-4 space-y-4">
                           {(() => {
                             let modifiedCount = 0;
                             if (presetPriceOverride !== '' && Number(presetPriceOverride) !== origPreset) modifiedCount++;
-                            if (mvApprovedExtras !== '' && Number(mvApprovedExtras) !== (c?.mvApprovedExtras || 0)) modifiedCount++;
-                            if (customerPaymentToMicrovison !== '' && Number(customerPaymentToMicrovison) !== (c?.customerPaymentToMicrovison || 0)) modifiedCount++;
                             if (adminExtraCharges.length !== (c?.extraCharges || []).length || adminExtraCharges.some((ec, i) => ec.amount !== c?.extraCharges?.[i]?.amount)) modifiedCount++;
                             
                             if (modifiedCount > 0) {
@@ -2113,16 +2232,43 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           })()}
                           
                           {/* Engineer Row */}
-                          <div className="flex items-center justify-between pb-3 border-b border-border border-dashed">
-                            <span className="text-sm text-muted-foreground font-semibold">Engineer Name:</span>
-                            <input 
-                              type="text" 
-                              value={adminEngineerName}
-                              onChange={e => setAdminEngineerName(e.target.value)}
-                              placeholder="e.g. Ravi Kumar"
-                              className="text-right text-sm font-bold bg-transparent border-b border-muted-foreground/30 focus:border-primary focus:outline-none w-48"
-                            />
-                          </div>
+                          <div className="flex flex-col gap-2 pb-3 border-b border-border border-dashed">
+                             <div className="flex items-center justify-between">
+                               <span className="text-sm text-muted-foreground font-semibold">Engineer Name:</span>
+                               <select
+                                 value={selectedEngineerType}
+                                 onChange={(e) => {
+                                   const val = e.target.value;
+                                   setSelectedEngineerType(val);
+                                   if (val === 'sc_submitted') {
+                                     setAdminEngineerName(c?.engineerName || '');
+                                   } else if (val === 'none') {
+                                     setAdminEngineerName('');
+                                   }
+                                 }}
+                                 className="text-sm font-bold bg-transparent border border-muted-foreground/30 rounded-lg p-1.5 focus:border-primary focus:outline-none max-w-xs text-right"
+                               >
+                                 {c?.engineerName && (
+                                   <option value="sc_submitted">
+                                     {c.engineerName} (SC Submitted)
+                                   </option>
+                                 )}
+                                 <option value="custom">Custom (Type below)...</option>
+                                 <option value="none">None / Clear</option>
+                               </select>
+                             </div>
+                             {selectedEngineerType === 'custom' && (
+                               <div className="flex justify-end">
+                                 <input 
+                                   type="text" 
+                                   value={adminEngineerName}
+                                   onChange={e => setAdminEngineerName(e.target.value)}
+                                   placeholder="Type engineer name..."
+                                   className="text-right text-sm font-bold bg-transparent border-b border-muted-foreground/30 focus:border-primary focus:outline-none w-48"
+                                 />
+                               </div>
+                             )}
+                           </div>
 
                           {/* Billing Breakdown */}
                           {isWarr && (
@@ -2176,51 +2322,71 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between py-1">
-                            <span className="text-sm text-muted-foreground font-semibold">Approved Extra Charges:</span>
-                            <span className="text-sm font-bold text-foreground">₹{extrasTot}</span>
-                          </div>
+                          {/* Individual Extra Charges list */}
+                          {appExtras.length > 0 ? (
+                            <div className="space-y-1 border-t border-border/40 pt-2">
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Extra Charges</p>
+                              {appExtras.map((ec, idx) => (
+                                <div key={idx} className="flex items-center justify-between py-0.5 pl-2">
+                                  <span className="text-xs text-muted-foreground">• {ec.label}</span>
+                                  <span className="text-xs font-semibold text-foreground">₹{ec.amount}</span>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between py-1 border-t border-border/40 font-semibold">
+                                <span className="text-sm text-muted-foreground">Extras Sub-total:</span>
+                                <span className="text-sm font-bold text-foreground">₹{extrasTot}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between py-1">
+                              <span className="text-sm text-muted-foreground font-semibold">Extra Charges:</span>
+                              <span className="text-sm font-bold text-muted-foreground">₹0</span>
+                            </div>
+                          )}
 
-                          <div className="flex items-center justify-between py-1 border-b border-border pb-3">
-                            <span className="text-sm text-muted-foreground font-semibold">Microvison Approved Extras:</span>
-                            <input 
-                              type="number" 
-                              min="0"
-                              value={mvApprovedExtras}
-                              onChange={e => setMvApprovedExtras(e.target.value)}
-                              placeholder="0"
-                              className="text-right text-sm font-bold bg-transparent border-b border-muted-foreground/30 focus:border-primary focus:outline-none w-24"
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between py-1">
+                          <div className="flex items-center justify-between py-1 border-t border-border pb-3">
                             <span className="text-sm font-bold text-foreground">Gross Total:</span>
                             <span className="text-sm font-black text-foreground">₹{gross}</span>
                           </div>
 
-                          {custToSC > 0 && (
+                           {custToSC > 0 && (
                             <div className="flex items-center justify-between py-1 text-red-600 dark:text-red-400">
-                              <span className="text-sm font-semibold">- Customer Paid to SC:</span>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-semibold">- Customer Paid to SC (Deducted):</span>
+                                {activeReason && <span className="text-[10px] italic text-red-400">{activeReason}</span>}
+                              </div>
                               <span className="text-sm font-bold">- ₹{custToSC}</span>
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between py-1">
-                            <span className="text-xs text-green-700 dark:text-green-500 font-semibold italic">Customer Paid directly to Microvison (Info Only):</span>
-                            <input 
-                              type="number" 
-                              min="0"
-                              value={customerPaymentToMicrovison}
-                              onChange={e => setCustomerPaymentToMicrovison(e.target.value)}
-                              placeholder="0"
-                              className="text-right text-xs font-bold bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-b border-green-300 focus:border-green-600 focus:outline-none w-20 px-1"
-                            />
-                          </div>
+                          {(() => {
+                            const paidToMV = criticalActionEnabled
+                              ? (customerChargePaymentMode === 'paid_to_microvison' ? Number(customerExtraCharge || 0) : 0)
+                              : (c?.customerPaymentToMicrovison || 0);
+                            
+                            if (paidToMV > 0) {
+                              return (
+                                <div className="flex items-center justify-between py-1 text-green-700 dark:text-green-400">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-semibold italic">Customer Paid to Microvison (Internal Record — No SC Effect):</span>
+                                    {activeReason && <span className="text-[10px] italic text-green-500">{activeReason}</span>}
+                                  </div>
+                                  <span className="text-xs font-bold">₹{paidToMV}</span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
 
-                          <div className="flex items-center justify-between pt-3 border-t-2 border-primary/20">
-                            <span className="text-base font-black text-primary uppercase tracking-wide">Net Total Payable to SC:</span>
-                            <span className="text-xl font-black text-primary">₹{net}</span>
+                          <div className={`flex items-center justify-between pt-3 border-t-2 ${net < 0 ? 'border-red-300' : 'border-primary/20'}`}>
+                            <span className={`text-base font-black uppercase tracking-wide ${net < 0 ? 'text-red-600' : 'text-primary'}`}>
+                              {net < 0 ? '⚠ SC Owes Microvison:' : 'Net Total Payable to SC:'}
+                            </span>
+                            <span className={`text-xl font-black ${net < 0 ? 'text-red-600' : 'text-primary'}`}>₹{net}</span>
                           </div>
+                          {net < 0 && (
+                            <p className="text-[10px] text-red-500 text-right italic">Customer paid more to SC than SC's bill — SC must return the difference to Microvison.</p>
+                          )}
 
                         </div>
                       </div>
@@ -2230,24 +2396,43 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 </div>
               )}
 
-              {/* Note and Confirm Trigger */}
+              {/* Note and Confirm Trigger — ONLY for done status (bill is generated) */}
+              {c.status === 'done' && (
               <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3">
                 <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
                   📝 Confirmation & Closure
                 </span>
-                <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
-                  <input
-                    type="checkbox"
-                    checked={markAsPaidImmediately}
-                    onChange={(e) => setMarkAsPaidImmediately(e.target.checked)}
-                    className="w-4 h-4 accent-green-600 rounded cursor-pointer"
-                    id="markAsPaidCheckbox"
-                  />
-                  <span className="text-sm font-semibold text-foreground">Mark as Paid immediately</span>
-                  <span className="text-xs text-muted-foreground">
-                    — Sets payment status to Paid at the moment this bill is generated.
-                  </span>
-                </label>
+                {/* Mark as Paid only makes sense when a bill is generated — i.e. status = done */}
+                {c.status === 'done' && (
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
+                    <input
+                      type="checkbox"
+                      checked={markAsPaidImmediately}
+                      onChange={(e) => setMarkAsPaidImmediately(e.target.checked)}
+                      className="w-4 h-4 accent-green-600 rounded cursor-pointer"
+                      id="markAsPaidCheckbox"
+                    />
+                    <span className="text-sm font-semibold text-foreground">Mark as Paid immediately</span>
+                    <span className="text-xs text-muted-foreground">
+                      — Sets payment status to Paid at the moment this bill is generated.
+                    </span>
+                  </label>
+                )}
+                {criticalActionEnabled && (
+                  <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-300 dark:border-rose-900/50 rounded-xl p-3.5 space-y-2">
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={criticalActionAcknowledged}
+                        onChange={(e) => setCriticalActionAcknowledged(e.target.checked)}
+                        className="w-4 h-4 accent-rose-600 rounded cursor-pointer mt-0.5"
+                      />
+                      <span className="text-xs font-bold text-rose-900 dark:text-rose-400 leading-normal">
+                        I have reviewed the Critical Action section and confirm this complaint can be closed.
+                      </span>
+                    </label>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
                   <input
                     type="text"
@@ -2269,6 +2454,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   </button>
                 </div>
               </div>
+              )}
 
               {/* Separation boundary & Dispute row */}
               <div className="bg-red-50/50 dark:bg-red-950/10 border border-red-200 dark:border-red-900/40 p-4 rounded-xl shadow-sm space-y-3">
