@@ -136,11 +136,17 @@ All project documentation lives inside the [files/](file:///e:/Projects/MV_servi
    - **Description**: Detailed state-machine logic mapping Service Centre portal behaviors (Accept, Reject, Mark Going, Done, Part Pending, Part Received) and billing aggregates.
 8. **[files/Microvison_System_Changes_v1.3.md](file:///e:/Projects/MV_service/Project/files/Microvison_System_Changes_v1.3.md)** & **[files/Microvison_System_Changes_v1.3.pdf](file:///e:/Projects/MV_service/Project/files/Microvison_System_Changes_v1.3.pdf)**:
    - **Type**: Markdown & PDF Files
-   - **Description**: Specification addendum describing recent architectural system updates (Change 1: Unassigned complaints queue, Change 2: Unregistered SC registry, Change 3: Step 2 Product Info layout, Change 4: Invoicing payments overhaul).
-9. **[walkthrough.md](file:///e:/Projects/MV_service/Project/walkthrough.md)**:
-   - **Type**: Markdown File (Root directory)
-   - **Description**: A comprehensive chronicle of all development iterations. Describes specific bug fixes, layout overrides, refactoring logic, and contains verification reports for past phases.
-10. **[action_centre_research.md](file:///e:/Projects/MV_service/Project/action_centre_research.md)**:
+   - **Description**: Specification addendum describing system updates (Change 1: Unassigned complaints queue, Change 2: Unregistered SC registry, Change 3: Step 2 Product Info layout, Change 4: Invoicing payments overhaul).
+9. **[files/Microvison_Change5_Warranty_Edge_Case_v1.0.md](file:///e:/Projects/MV_service/Project/files/Microvison_Change5_Warranty_Edge_Case_v1.0.md)** & **[files/Microvison_Change5_Warranty_Edge_Case_v1.0.pdf](file:///e:/Projects/MV_service/Project/files/Microvison_Change5_Warranty_Edge_Case_v1.0.pdf)**:
+   - **Type**: Markdown & PDF Files
+   - **Description**: Detailed workflow for handling in-warranty edge cases (such as physical damage, unauthorized 3rd party repairs, or misuse) including the admin-only Critical Action panel, customer extra charge payment options, and future warranty revocation rules.
+10. **[files/Microvison_Change6_v1.0.md](file:///e:/Projects/MV_service/Project/files/Microvison_Change6_v1.0.md)** & **[files/Microvison_Change6_v1.0.pdf](file:///e:/Projects/MV_service/Project/files/Microvison_Change6_v1.0.pdf)**:
+    - **Type**: Markdown & PDF Files
+    - **Description**: Comprehensive specifications mapping the out-of-warranty money flow calculations, the removal of the linked "Reopen" flow (every complaint is a new ticket), making all billing fields editable before closing, and adding the optional complaint-specific Engineer Name field.
+11. **[walkthrough.md](file:///e:/Projects/MV_service/Project/walkthrough.md)**:
+    - **Type**: Markdown File (Root directory)
+    - **Description**: A comprehensive chronicle of all development iterations. Describes specific bug fixes, layout overrides, refactoring logic, and contains verification reports for past phases.
+12. **[action_centre_research.md](file:///e:/Projects/MV_service/Project/action_centre_research.md)**:
     - **Type**: Markdown File (Root directory)
     - **Description**: Exhaustive catalog of every warning notification, list view, and pending request displayed on the Action Centres of both the Admin side and Service Centre side.
 
@@ -157,6 +163,9 @@ All project documentation lives inside the [files/](file:///e:/Projects/MV_servi
 * **Phase 26**: Synchronized `shopName`, `modelNumber`, and `serialNumber` updates back to the complaint snapshots upon save, and fixed profile renders.
 * **Phase 27**: Configured forced-warranty states to reset automatically upon new `billDate` entries.
 * **Phase 28**: Created a persistent, database-backed **Complaint Draft System** auto-saving admin's Wizard progress to MongoDB, allowing seamless device-switching and tab closing. Resuming pre-fills form data up to Step 5, and successful submission cleans up the draft record.
+* **Phase 29**: Implemented the **Service Centre Complaints History tab** on the SC detail page. Replaced the static placeholder layout with a fully functional paginated complaints list view (supporting desktop tables, mobile card lists, and page limit adjustments) linking to the slide-over admin review drawer.
+* **Phase 30**: Upgraded the **Reassignment Panel in the Complaint Detail Drawer** (`AdminComplaintDetail.jsx`). Brought it to complete feature parity with wizard Step 5 (shows recommended SC card loads, inline unregistered SC creation modal, and advanced search/filters directory).
+* **Phase 31**: Added the **Admin Force Close Panel for Complaints** (`AdminComplaintDetail.jsx`). Allows the admin to close complaints directly with a custom cancel/error reason note (without generating invoices or requiring Step 2 product updates) if the SC has not yet started work.
 
 ---
 

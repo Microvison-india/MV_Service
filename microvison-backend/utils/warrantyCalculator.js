@@ -8,6 +8,7 @@
  * @param {String|null} options.manualReason - reason text for manual selection
  * @param {Boolean|null} options.forceOverride - whether admin overrides calculated status
  * @param {String|null} options.forceReason - reason text for force override
+ * @param {String|null} options.warrantySource - existing warranty source on the product (for revocation check)
  * @returns {Object} { warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }
  */
 const calculateWarranty = ({
@@ -17,7 +18,18 @@ const calculateWarranty = ({
   manualReason,
   forceOverride,
   forceReason,
+  warrantySource,
 }) => {
+  // Rule 0: Revoked status is permanent — overrides everything including force
+  if (warrantySource === 'revoked') {
+    return {
+      warrantyStatus: 'out_of_warranty',
+      warrantyExpiryDate: null,
+      warrantySource: 'revoked',
+      warrantyForceReason: '',
+    };
+  }
+
   // Rule 4 (Force override) takes precedence over all other rules
   if (forceOverride === true || forceOverride === 'true') {
     return {

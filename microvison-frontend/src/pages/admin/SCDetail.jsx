@@ -2,10 +2,33 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { X } from 'lucide-react';
+import useComplaints from '../../hooks/useComplaints';
+import AdminComplaintDetail from '../../components/complaint/AdminComplaintDetail';
+import Pagination from '../../components/ui/Pagination';
 
 const CAPABILITY_LABELS = {
   led_only: 'LED Only',
   cooler_only: 'Cooler Only',
+  both: 'LED + Cooler',
+};
+
+const STATUS_BADGE_STYLES = {
+  new: 'bg-blue-100 text-blue-800 border-blue-200',
+  unassigned: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  assigned: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  accepted: 'bg-purple-100 text-purple-800 border-purple-200',
+  rejected_by_sc: 'bg-red-100 text-red-800 border-red-200',
+  going: 'bg-pink-100 text-pink-800 border-pink-200',
+  done: 'bg-green-100 text-green-800 border-green-200',
+  not_done: 'bg-red-100 text-red-800 border-red-200',
+  part_pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  reopened: 'bg-amber-100 text-amber-800 border-amber-200',
+  closed: 'bg-gray-100 text-gray-800 border-gray-200',
+};
+
+const PRODUCT_LABELS = {
+  led: 'LED',
+  cooler: 'Cooler',
   both: 'LED + Cooler',
 };
 
@@ -38,6 +61,25 @@ export default function SCDetail() {
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
+
+  // Complaints history state
+  const [complaintFilters, setComplaintFilters] = useState({
+    assignedCentreId: id,
+    page: 1,
+    limit: 10,
+  });
+
+  const { complaints, loading: complaintsLoading, error: complaintsError, pagination, refresh: refreshComplaints } = useComplaints(complaintFilters);
+  const [selectedComplaintId, setSelectedComplaintId] = useState(null);
+
+  // Sync filters when ID parameter changes
+  useEffect(() => {
+    setComplaintFilters((prev) => ({
+      ...prev,
+      assignedCentreId: id,
+      page: 1,
+    }));
+  }, [id]);
 
   useEffect(() => {
     let active = true;
@@ -285,7 +327,7 @@ export default function SCDetail() {
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tab === 'complaints' ? 'Complaints (Phase 7)' : tab}
+              {tab === 'complaints' ? 'Complaints' : tab}
             </button>
           ))}
         </div>
@@ -390,10 +432,197 @@ export default function SCDetail() {
         )}
 
         {activeTab === 'complaints' && (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
-            <p className="text-muted-foreground text-sm">
-              Complaint history for this service centre will be shown here once Phase 7 is complete.
-            </p>
+          <div className="space-y-4">
+            {complaintsError && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+                {complaintsError}
+              </div>
+            )}
+
+            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm text-left text-foreground">
+                  <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Complaint ID</th>
+                      <th className="px-4 py-3 font-semibold">Customer</th>
+                      <th className="px-4 py-3 font-semibold">Location</th>
+                      <th className="px-4 py-3 font-semibold">Product</th>
+                      <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Warranty</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Created Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {complaintsLoading ? (
+                      // Skeleton rows
+                      Array.from({ length: 5 }).map((_, idx) => (
+                        <tr key={idx} className="border-b border-border">
+                          {Array.from({ length: 8 }).map((_, cellIdx) => (
+                            <td key={cellIdx} className="px-4 py-3">
+                              <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : complaints.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="px-4 py-12 text-center text-muted-foreground">
+                          No complaints assigned to this service centre.
+                        </td>
+                      </tr>
+                    ) : (
+                      complaints.map((c) => (
+                        <tr
+                          key={c._id}
+                          onClick={() => setSelectedComplaintId(c._id)}
+                          className="border-b border-border hover:bg-muted/40 cursor-pointer transition"
+                        >
+                          <td className="px-4 py-3 font-mono text-xs font-semibold text-muted-foreground">
+                            {c.complaintId}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            {c.customerName}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span>{c.city}</span>
+                            <span className="text-muted-foreground text-xs">, {c.district}</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs font-medium uppercase">
+                            {PRODUCT_LABELS[c.product] || c.product}
+                          </td>
+                          <td className="px-4 py-3 capitalize">
+                            {c.complaintType}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                                c.warrantyStatus === 'in_warranty'
+                                  ? 'bg-green-50 text-green-700 border border-green-200'
+                                  : 'bg-orange-50 text-orange-700 border border-orange-200'
+                              }`}
+                            >
+                              {c.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out Warranty'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border capitalize ${
+                                STATUS_BADGE_STYLES[c.status] || 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {c.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {new Date(c.createdAt).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View */}
+              <div className="block md:hidden divide-y divide-border">
+                {complaintsLoading ? (
+                  // Mobile skeleton card
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <div key={idx} className="p-4 space-y-3 bg-card">
+                      <div className="flex justify-between items-center">
+                        <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
+                        <div className="h-5 bg-muted rounded animate-pulse w-1/4" />
+                      </div>
+                      <div className="h-4 bg-muted rounded animate-pulse w-2/3" />
+                      <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
+                    </div>
+                  ))
+                ) : complaints.length === 0 ? (
+                  <div className="p-12 text-center text-muted-foreground bg-card">
+                    No complaints assigned to this service centre.
+                  </div>
+                ) : (
+                  complaints.map((c) => (
+                    <div
+                      key={c._id}
+                      onClick={() => setSelectedComplaintId(c._id)}
+                      className="p-4 hover:bg-muted/30 cursor-pointer transition bg-card flex flex-col gap-2.5"
+                    >
+                      {/* Top Row: ID & Status */}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-muted-foreground bg-muted/65 px-2 py-0.5 rounded border border-border/40">
+                          {c.complaintId}
+                        </span>
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize ${
+                            STATUS_BADGE_STYLES[c.status] || 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {c.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+
+                      {/* Customer & Location */}
+                      <div>
+                        <h3 className="font-bold text-foreground text-sm leading-tight">{c.customerName}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          📍 {c.city}, {c.district}
+                        </p>
+                      </div>
+
+                      {/* Product & Warranty */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="bg-secondary text-secondary-foreground px-2 py-0.5 rounded font-medium uppercase">
+                          {PRODUCT_LABELS[c.product] || c.product}
+                        </span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="capitalize">{c.complaintType}</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap ${
+                            c.warrantyStatus === 'in_warranty'
+                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              : 'bg-orange-50 text-orange-700 border border-orange-200'
+                          }`}
+                        >
+                          {c.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out Warranty'}
+                        </span>
+                      </div>
+
+                      {/* Date Row */}
+                      <div className="flex justify-end text-xs border-t border-border/30 pt-2 mt-0.5">
+                        <div className="text-muted-foreground font-medium text-[10px]">
+                          {new Date(c.createdAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Pagination Controls */}
+              {!complaintsLoading && pagination && (
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.total}
+                  limit={pagination.limit || complaintFilters.limit}
+                  onPageChange={(newPage) => setComplaintFilters((prev) => ({ ...prev, page: newPage }))}
+                  onLimitChange={(newLimit) => setComplaintFilters((prev) => ({ ...prev, limit: newLimit, page: 1 }))}
+                />
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -482,6 +711,18 @@ export default function SCDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Slide-over Review Panel */}
+      {selectedComplaintId && (
+        <AdminComplaintDetail
+          complaintId={selectedComplaintId}
+          onClose={() => setSelectedComplaintId(null)}
+          onUpdated={() => {
+            setSelectedComplaintId(null);
+            refreshComplaints();
+          }}
+        />
       )}
     </div>
   );

@@ -30,7 +30,7 @@ const complaintSchema = new mongoose.Schema(
     complaintType: { type: String, enum: ['installation', 'complaint'], required: true },
     warrantyStatus: { type: String, enum: ['in_warranty', 'out_of_warranty'], required: true },
     warrantyExpiryDate: { type: Date, default: null },
-    warrantySource: { type: String, enum: ['auto_calculated', 'manual', 'forced'], default: 'manual' },
+    warrantySource: { type: String, enum: ['auto_calculated', 'manual', 'forced', 'revoked'], default: 'manual' },
     billPhoto: { type: String, default: '' },
     billDate: { type: Date, default: null },
     shopName: { type: String, default: '' },
@@ -57,8 +57,39 @@ const complaintSchema = new mongoose.Schema(
     // ── Extra Charges (both warranty types) ──────────────────
     extraCharges: [extraChargeSchema],
 
-    // ── Customer Payment (out-of-warranty only, record only) ──
+    // ── Customer Payment Split (Change 6A) ────────────────────────
+    // customerPaymentAmount = amount SC collected directly (deducted from SC bill)
     customerPaymentAmount: { type: Number, default: null },
+    // customerPaymentToMicrovison = amount paid to Microvison directly (tracked only)
+    customerPaymentToMicrovison: { type: Number, default: null },
+
+    // ── Preset Price Override (Change 6B) ─────────────────────────
+    // presetPrice is the snapshot (NEVER changes).
+    // presetPriceOverride is what admin sets before closing (for this complaint only).
+    presetPriceOverride: { type: Number, default: null },
+    presetPriceOverrideReason: { type: String, default: '' },
+
+    // ── Microvison-Approved Extras (Change 6A) ────────────────────
+    mvApprovedExtras: { type: Number, default: null },
+
+    // ── Engineer Name (Change 6C) ─────────────────────────────────
+    engineerName: { type: String, default: '' },
+
+    // ── Critical Action (Change 5) ────────────────────────────────
+    criticalActionEnabled: { type: Boolean, default: false },
+    customerExtraCharge: { type: Number, default: null },
+    customerChargePaymentMode: {
+      type: String,
+      enum: ['not_applicable', 'paid_to_sc', 'paid_to_microvison'],
+      default: null,
+    },
+    customerChargeReason: { type: String, default: '' },
+    customerChargePaidToSCAmount: { type: Number, default: null },
+    warrantyRevoked: { type: Boolean, default: false },
+    warrantyRevocationReason: { type: String, default: '' },
+    warrantyRevocationDate: { type: Date, default: null },
+    criticalActionLastEditedAt: { type: Date, default: null },
+    criticalActionAcknowledgedAt: { type: Date, default: null },
 
     // ── Notes & Media (admin registration stage) ──────────────
     notes: { type: String, default: '' },         // Admin writes at registration — shown to SC on request card

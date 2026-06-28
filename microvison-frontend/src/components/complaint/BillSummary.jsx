@@ -4,7 +4,11 @@ export default function BillSummary({ complaint }) {
   const isWarranty = complaint.warrantyStatus === 'in_warranty';
 
   // 1. Preset base price
-  const presetPrice = isWarranty ? (complaint.presetPrice ?? 0) : 0;
+  const presetOriginal = isWarranty ? (complaint.presetPrice ?? 0) : 0;
+  const presetPrice =
+    complaint.presetPriceOverride !== null && complaint.presetPriceOverride !== undefined
+      ? complaint.presetPriceOverride
+      : presetOriginal;
   const presetName = isWarranty ? (complaint.presetName || 'Default Preset') : '';
 
   // 2. Petrol logic (strict null checks to preserve 0)
@@ -20,21 +24,35 @@ export default function BillSummary({ complaint }) {
   }
 
   // 3. Approved Extra charges
-  const approvedExtras = (complaint.extraCharges || [])
-    .filter((ec) => ec.status === 'approved');
-  
+  const approvedExtras = (complaint.extraCharges || []).filter((ec) => ec.status === 'approved');
   const extrasTotal = approvedExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
 
-  // 4. Calculate total
-  const total = isWarranty 
-    ? presetPrice + petrol + extrasTotal 
-    : extrasTotal;
+  // 4. Microvison-approved extras (Change 6A)
+  const mvExtras = complaint.mvApprovedExtras || 0;
+
+  // 5. Gross total
+  const grossTotal = isWarranty
+    ? presetPrice + petrol + extrasTotal + mvExtras
+    : extrasTotal + mvExtras;
+
+  // 6. Deductions: Customer paid to SC
+  const customerPaidToSC = (complaint.customerPaymentAmount || 0) + (complaint.customerChargePaidToSCAmount || 0);
+
+  // 7. Net total owed to SC
+  const total = Math.max(0, grossTotal - customerPaidToSC);
 
   return (
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
       <div className="border-b border-border pb-2">
-        <h4 className="font-bold text-foreground">Bill Summary</h4>
-        <p className="text-xs text-muted-foreground">
+        <div className="flex justify-between items-start">
+          <h4 className="font-bold text-foreground">Bill Summary</h4>
+          {complaint.engineerName && (
+            <span className="text-xs px-2 py-0.5 bg-secondary text-secondary-foreground rounded font-medium">
+              Engineer: {complaint.engineerName}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
           Generated on {complaint.billLockedAt ? new Date(complaint.billLockedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Closed Date'}
         </p>
       </div>
@@ -45,13 +63,31 @@ export default function BillSummary({ complaint }) {
           <>
             <div className="flex justify-between text-foreground">
               <span className="text-muted-foreground">Preset: <span className="text-xs text-foreground font-medium">({presetName})</span></span>
-              <span className="font-medium">₹{presetPrice}</span>
+              <span className="font-medium">
+                {complaint.presetPriceOverride !== null && complaint.presetPriceOverride !== undefined && (
+                  <span className="line-through text-muted-foreground mr-2 text-xs">₹{presetOriginal}</span>
+                )}
+                ₹{presetPrice}
+              </span>
             </div>
+            {complaint.presetPriceOverrideReason && (
+              <div className="text-[10px] text-muted-foreground -mt-1 ml-4 italic">
+                Override reason: {complaint.presetPriceOverrideReason}
+              </div>
+            )}
             <div className="flex justify-between text-foreground">
               <span className="text-muted-foreground">Petrol Allowance:</span>
               <span className="font-medium">₹{petrol}</span>
             </div>
           </>
+        )}
+
+        {/* Microvision Extras */}
+        {mvExtras > 0 && (
+          <div className="flex justify-between text-foreground">
+            <span className="text-muted-foreground">Microvision Approved Extras:</span>
+            <span className="font-medium">₹{mvExtras}</span>
+          </div>
         )}
 
         {/* Approved Extras list */}
@@ -71,19 +107,53 @@ export default function BillSummary({ complaint }) {
           </div>
         )}
 
+        {/* Gross Total (if deductions exist) */}
+        {customerPaidToSC > 0 && (
+          <div className="flex justify-between text-muted-foreground font-medium text-xs pt-1.5 border-t border-border">
+            <span>Gross Total:</span>
+            <span>₹{grossTotal}</span>
+          </div>
+        )}
+
+        {/* Deductions */}
+        {customerPaidToSC > 0 && (
+          <div className="flex justify-between text-red-600 dark:text-red-400 font-medium text-xs">
+            <span>- Customer paid to SC:</span>
+            <span>-₹{customerPaidToSC}</span>
+          </div>
+        )}
+
         {/* Final Total Owed by MV */}
         <div className="flex justify-between text-foreground font-bold text-base pt-3 border-t border-border">
           <span>Total Owed by Microvision:</span>
           <span className="text-primary">₹{total}</span>
         </div>
 
-        {/* Out of Warranty direct collection */}
-        {!isWarranty && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center text-green-900 font-medium">
-            <span className="text-xs">Collected from Customer directly:</span>
-            <span className="text-base font-bold">₹{complaint.customerPaymentAmount || 0}</span>
+        {/* Informational: Customer Paid Microvison Directly */}
+        {complaint.customerPaymentToMicrovison > 0 && (
+          <div className="mt-2 p-2 bg-green-50/50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30 rounded flex justify-between items-center text-green-700 dark:text-green-400">
+            <span className="text-[11px] font-medium">For record: Customer paid Microvison</span>
+            <span className="text-sm font-bold">₹{complaint.customerPaymentToMicrovison}</span>
           </div>
         )}
+
+        {/* Informational: Critical Action Notes */}
+        {complaint.criticalActionEnabled && (
+          <div className="mt-2 space-y-1.5 p-2 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-800/30 rounded text-rose-700 dark:text-rose-400">
+            {complaint.warrantyRevoked && (
+              <div className="text-[11px] font-medium flex gap-1 items-center">
+                <span>⚠ Warranty revoked from {new Date(complaint.warrantyRevocationDate).toLocaleDateString('en-IN')}</span>
+              </div>
+            )}
+            {complaint.customerChargePaymentMode === 'paid_to_microvison' && (
+              <div className="text-[11px] font-medium flex justify-between items-center">
+                <span>For record: Customer paid Microvison (critical action)</span>
+                <span className="font-bold">₹{complaint.customerExtraCharge}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Payment Status Row */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-3 border-t border-border/80 text-sm">
           <span className="text-muted-foreground font-semibold">Payment Status:</span>

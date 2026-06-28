@@ -638,3 +638,10 @@
     - [x] Resolve text-wrapping issue in tables by adding `whitespace-nowrap` to the Warranty status badges.
     - [x] Fix potential crash in backend `part_pending` updates when `scNotes` is empty for admin proxy.
 
+---
+
+- [ ] **Phase 32 — Reopen Flow Correction & Billing Adjustments**
+  - [ ] Investigate and fix Reopen Flow bugs (ensure status transitions and state changes work correctly on backend and frontend).
+  - [ ] Implement Reopen Flow billing adjustments (define how existing invoice charges are reversed, adjusted, or locked upon reopening).
+  - [ ] Add reopen audit logging and timeline checks to trace cost changes during successive closures.
+

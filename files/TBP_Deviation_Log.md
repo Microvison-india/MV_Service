@@ -614,5 +614,55 @@ Each entry follows this structure:
 
 ---
 
+## Phase 29 — Service Centre Complaints History Tab
+
+### DEV-TBP-070
+- **Phase:** 29
+- **TBP Section / File:** `pages/admin/SCDetail.jsx`
+- **Type:** CHANGED
+- **Summary:** Replaced the static placeholder layout under `activeTab === 'complaints'` with a fully functional paginated view:
+  - Uses the `useComplaints` hook to fetch complaints with filters `{ assignedCentreId: id, page: 1, limit: 10 }`.
+  - Added list synchronization via `useEffect` tracking URL param `id` changes.
+  - Rendered a responsive layout featuring a desktop `<table>` and a mobile card list stack.
+  - Integrated the reusable `<Pagination>` component.
+  - Linked row clicks to open the slide-over `<AdminComplaintDetail>` review drawer.
+
+---
+
+## Phase 30 — Upgraded Reassignment Panel in Complaint Detail Drawer
+
+### DEV-TBP-071
+- **Phase:** 30
+- **TBP Section / File:** `components/complaint/AdminComplaintDetail.jsx`
+- **Type:** CHANGED
+- **Summary:** Upgraded the simple dropdown assignment component inside the drawer to bring it to feature parity with Wizard Step 5:
+  - Imported `InlineCitySelect` and `InlineSelect` inputs.
+  - Copied search states, modal states, cities lookup list query, and cascading location helpers.
+  - Integrated debounced `useEffect` querying search results matching name/phone/location/capability/registration type constraints.
+  - Updated candidates `useEffect` to fetch service centres matching the complaint's active `district` parameter.
+  - Rebuilt JSX template under `c?.status` checks to render candidates card layout with load stats, unregistered SC modal dialog, search forms, and search results lists.
+
+---
+
+## Phase 31 — Admin Force Close Panel for Complaints
+
+### DEV-TBP-072
+- **Phase:** 31
+- **TBP Section / File:** `controllers/complaint.controller.js` + `routes/complaint.routes.js`
+- **Type:** ADDED
+- **Summary:** Created a dedicated backend endpoint for force closing complaints prior to SC actions:
+  - **`controllers/complaint.controller.js`**: Added `forceClose` handler validating that complaint status is in `['new', 'unassigned', 'assigned', 'accepted', 'rejected_by_sc']`. Sets status to `closed`, `billGenerated` to `false` (bypasses billing calculations), and `petrolFinal` to 0. Records log entry in `ComplaintUpdate` collection.
+  - **`routes/complaint.routes.js`**: Registered `PATCH /api/complaints/:id/force-close` mapping to the new handler (auth + isAdmin rbac checks).
+
+### DEV-TBP-073
+- **Phase:** 31
+- **TBP Section / File:** `components/complaint/AdminComplaintDetail.jsx`
+- **Type:** ADDED
+- **Summary:** Integrated force-close control panel into the Admin Complaint Detail drawer:
+  - Added `forceCloseNote` text input state and `handleForceClose` asynchronous API call method.
+  - Rendered a dedicated "Close Complaint (No Work Done)" section card containing the reason text input and the red "Close Complaint" action button, conditionalized to display only when complaint status is in `['new', 'unassigned', 'assigned', 'accepted', 'rejected_by_sc']`.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

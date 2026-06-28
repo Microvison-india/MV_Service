@@ -23,6 +23,8 @@ const {
   markPartReceived,
   updateExtraCharges,
   updateSingleExtraCharge,
+  forceClose,
+  saveCriticalAction,
 } = require('../controllers/complaint.controller');
 
 const {
@@ -61,6 +63,9 @@ router.get('/action-items', auth, isAdmin, getActionItems);
 // PATCH /api/complaints/:id/confirm-done — Confirm SC job
 router.patch('/:id/confirm-done', auth, isAdmin, confirmDone);
 
+// PATCH /api/complaints/:id/force-close — Force close complaint without SC action
+router.patch('/:id/force-close', auth, isAdmin, forceClose);
+
 // PATCH /api/complaints/:id/dispute-done — Dispute SC job
 router.patch('/:id/dispute-done', auth, isAdmin, disputeDone);
 
@@ -79,7 +84,8 @@ router.patch('/:id/extra-charges', auth, isAdmin, updateExtraCharges);
 // PATCH /api/complaints/:id/mark-delivered — Admin marks part delivered (SC Flow v1.1)
 router.patch('/:id/mark-delivered', auth, isAdmin, markPartDelivered);
 
-
+// PATCH /api/complaints/:id/critical-action — Admin saves critical action (Change 5)
+router.patch('/:id/critical-action', auth, isAdmin, saveCriticalAction);
 
 // ── SC Routes (all require auth + isSC) ────────────────────────
 // GET  /api/complaints/my — SC's own complaints (filtered)

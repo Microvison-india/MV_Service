@@ -40,23 +40,6 @@ const makeComplaintIdPattern = (term) => {
 // Query params: phone1, product, complaintType
 // ─────────────────────────────────────────────────────────────
 const reopenCheck = async (req, res) => {
-  const { phone1, product, complaintType } = req.query;
-
-  if (!phone1 || !product || !complaintType) {
-    return res
-      .status(400)
-      .json({ message: 'phone1, product, and complaintType are required.' });
-  }
-
-  const existing = await findReopenEligible(phone1, product, complaintType);
-
-  if (existing) {
-    return res.status(200).json({
-      reopenEligible: true,
-      existingComplaint: existing,
-    });
-  }
-
   return res.status(200).json({ reopenEligible: false, existingComplaint: null });
 };
 
@@ -66,142 +49,7 @@ const reopenCheck = async (req, res) => {
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
 const reopenComplaint = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { reopenNotes, reopenPhotos } = req.body;
-
-    if (!reopenNotes || !reopenNotes.trim()) {
-      return res.status(400).json({ message: 'Reopen notes are required.' });
-    }
-
-    const parent = await Complaint.findById(id);
-    if (!parent) {
-      return res.status(404).json({ message: 'Original complaint not found.' });
-    }
-
-    // Strict eligibility checks:
-    // 1. Current status must be 'closed'
-    if (parent.status !== 'closed') {
-      return res.status(400).json({ message: 'Only closed complaints can be reopened.' });
-    }
-
-    // 2. Created within the last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    if (parent.createdAt < thirtyDaysAgo) {
-      return res.status(400).json({ message: 'Complaint cannot be reopened after 30 days.' });
-    }
-
-    // 3. Pre-closed resolution must be done or not_done
-    const updateLog = await ComplaintUpdate.findOne({
-      complaintId: parent._id,
-      newStatus: 'closed',
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    if (!updateLog || !['done', 'not_done'].includes(updateLog.oldStatus)) {
-      return res.status(400).json({
-        message: 'Only complaints resolved as Done or Not Done can be reopened.',
-      });
-    }
-
-    // 4. Generate new complaint ID
-    const newComplaintId = await generateComplaintId(parent.complaintType, parent.warrantyStatus);
-
-    // 5. Create the reopened complaint record
-    const reopened = await Complaint.create({
-      complaintId: newComplaintId,
-      customerName: parent.customerName,
-      phone1: parent.phone1,
-      phone2: parent.phone2,
-      localAddress: parent.localAddress,
-      city: parent.city,
-      district: parent.district,
-      state: parent.state,
-      product: parent.product,
-      complaintType: parent.complaintType,
-      warrantyStatus: parent.warrantyStatus,
-      trackingId: parent.trackingId,
-      serialNumber: parent.serialNumber || null,
-      billPhoto: parent.billPhoto || '',
-      billDate: parent.billDate || null,
-      shopName: parent.shopName || '',
-      modelNumber: parent.modelNumber || '',
-      locationText: parent.locationText || '',
-      presetId: parent.presetId,
-      presetName: parent.presetName,
-      presetPrice: parent.presetPrice,
-      petrolAdmin: parent.petrolAdmin,
-      petrolSC: null,
-      petrolFinal: null,
-      petrolEditCount: 0,
-      petrolLocked: false,
-      extraCharges: [],
-      customerPaymentAmount: null,
-      notes: parent.notes,
-      adminPhotos: parent.adminPhotos,
-      voiceNoteUrl: parent.voiceNoteUrl,
-      
-      // Reopen flags
-      isReopened: true,
-      reopenedAt: new Date(),
-      reopenParentId: parent._id,
-      reopenNotes: reopenNotes.trim(),
-      reopenPhotos: reopenPhotos || [],
-      
-      status: 'unassigned',
-      createdBy: req.user.id,
-    });
-
-    // Link to Product record and add to history if trackingId exists
-    if (parent.trackingId) {
-      const productRecord = await Product.findById(parent.trackingId);
-      if (productRecord) {
-        productRecord.complaintHistory.push({
-          complaintId: reopened._id,
-          mvId: reopened.complaintId,
-          type: reopened.complaintType || 'complaint',
-          status: reopened.status,
-          date: reopened.createdAt,
-          assignedCentreId: reopened.assignedCentreId || null
-        });
-        productRecord.complaintHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
-        productRecord.lastComplaintId = reopened._id;
-        productRecord.lastComplaintDate = reopened.createdAt;
-        await productRecord.save();
-      }
-    }
-
-    // Create ComplaintUpdate log for the new reopened complaint
-    await ComplaintUpdate.create({
-      complaintId: reopened._id,
-      updatedBy: req.user.id,
-      role: 'admin',
-      oldStatus: '',
-      newStatus: 'unassigned',
-      note: `Complaint reopened from ${parent.complaintId}. Reopen notes: ${reopenNotes.trim()}`,
-    });
-
-    // TODO (Phase 14): Send WhatsApp template 'complaint_reopened' to SC on assignment
-
-    res.status(201).json({
-      message: 'Complaint reopened successfully.',
-      complaint: reopened,
-    });
-
-    // Trigger 4: Send "Complaint Reopened" msg to Customer
-    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED || 'complaint_reopened';
-    sendWhatsApp(reopened.phone1, templateReopened, [
-      reopened.customerName,
-      reopened.complaintId,
-      reopenNotes.trim(),
-      new Date(reopened.createdAt).toLocaleDateString('en-IN')
-    ]);
-  } catch (error) {
-    console.error('Error in reopenComplaint:', error);
-    res.status(500).json({ message: 'Server error while reopening complaint.' });
-  }
+  return res.status(410).json({ message: 'Reopen is no longer supported. Register a new complaint instead.' });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -819,6 +667,7 @@ const updateStatus = async (req, res) => {
     scBillPhotoUrl,
     scSerialSlipPhotoUrl,
     scMissingBypass,
+    engineerName,
   } = req.body;
 
   const ALLOWED_FINAL_STATUSES = ['done', 'not_done', 'part_pending'];
@@ -879,6 +728,9 @@ const updateStatus = async (req, res) => {
     }
     if (doneVoiceUrl) {
       complaint.doneVoiceUrl = doneVoiceUrl;
+    }
+    if (engineerName !== undefined) {
+      complaint.engineerName = engineerName ? engineerName.trim() : '';
     }
 
     // Petrol Edit 2 — SC's turn as long as admin has not locked it (GRD 6.3)
@@ -1073,6 +925,25 @@ const updateStatus = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 const confirmDone = async (req, res) => {
   const { id } = req.params;
+  const {
+    billDate, billPhoto, shopName, serialNumber, modelNumber,
+    note, extraCharges, markAsPaidImmediately, petrolAdmin, petrolSC, petrolFinal,
+    missingFieldsBypassed,
+    criticalActionEnabled,
+    customerExtraCharge,
+    customerChargePaymentMode,
+    customerChargeReason,
+    customerChargePaidToSCAmount,
+    warrantyRevoked,
+    warrantyRevocationReason,
+    criticalActionAcknowledgedAt,
+    presetPriceOverride,
+    presetPriceOverrideReason,
+    mvApprovedExtras,
+    customerPaymentToMicrovison,
+    engineerName,
+  } = req.body;
+
   const complaint = await Complaint.findById(id);
 
   if (!complaint) {
@@ -1081,6 +952,13 @@ const confirmDone = async (req, res) => {
 
   if (complaint.status !== 'done') {
     return res.status(400).json({ message: 'Complaint is not in Done status. Admin can only confirm completed Done jobs.' });
+  }
+
+  // Change 5: If critical action was enabled, admin MUST have acknowledged before closing
+  if (criticalActionEnabled && !criticalActionAcknowledgedAt) {
+    return res.status(400).json({
+      message: 'This complaint has a critical action recorded. You must acknowledge it before closing.',
+    });
   }
 
   // Check linked Product's 5 Step 2 fields if trackingId exists
@@ -1096,13 +974,14 @@ const confirmDone = async (req, res) => {
       if (serialNumber !== undefined) { product.serialNumber = serialNumber || ''; productUpdated = true; }
       if (modelNumber !== undefined) { product.modelNumber = modelNumber || ''; productUpdated = true; }
       if (productUpdated) {
-        // Re-run warranty calculator
+        // Re-run warranty calculator — pass warrantySource so revoked guard fires
         const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty({
           billDate: product.billDate,
           complaintType: complaint.complaintType || 'complaint',
           manualSelection: product.warrantyStatus,
           forceOverride: billDate ? false : (product.warrantySource === 'forced'),
           forceReason: product.warrantyForceReason,
+          warrantySource: product.warrantySource,   // CRITICAL: passes 'revoked' so Rule 0 fires
         });
         product.warrantyStatus = calcStatus;
         product.warrantyExpiryDate = warrantyExpiryDate;
@@ -1150,6 +1029,55 @@ const confirmDone = async (req, res) => {
         await product.save();
       }
     }
+  }
+
+  // Change 5: Save Critical Action data
+  complaint.criticalActionEnabled = !!criticalActionEnabled;
+  if (criticalActionEnabled) {
+    complaint.customerExtraCharge = customerExtraCharge ?? null;
+    complaint.customerChargePaymentMode = customerChargePaymentMode || null;
+    complaint.customerChargeReason = customerChargeReason || '';
+    // Only store SC amount when mode is paid_to_sc
+    complaint.customerChargePaidToSCAmount =
+      customerChargePaymentMode === 'paid_to_sc'
+        ? (Number(customerChargePaidToSCAmount) || 0)
+        : null;
+    complaint.warrantyRevoked = !!warrantyRevoked;
+    complaint.warrantyRevocationReason = warrantyRevoked ? (warrantyRevocationReason || '') : '';
+    complaint.warrantyRevocationDate = warrantyRevoked ? new Date() : null;
+    complaint.criticalActionAcknowledgedAt = criticalActionAcknowledgedAt ? new Date() : null;
+
+    // Revoke warranty on Product record (Change 5)
+    if (warrantyRevoked && complaint.trackingId) {
+      await Product.findByIdAndUpdate(complaint.trackingId, {
+        $set: {
+          warrantyStatus: 'out_of_warranty',
+          warrantySource: 'revoked',
+          revocationReason: warrantyRevocationReason || '',
+          revocationDate: new Date(),
+          revocationComplaintId: complaint._id,
+        },
+      });
+    }
+  }
+
+  // Change 6B: Preset price override
+  if (presetPriceOverride !== undefined && presetPriceOverride !== null && presetPriceOverride !== '') {
+    complaint.presetPriceOverride = Number(presetPriceOverride);
+    complaint.presetPriceOverrideReason = presetPriceOverrideReason || '';
+  }
+
+  // Change 6A: Microvison-approved extras and customer payment to Microvison
+  if (mvApprovedExtras !== undefined && mvApprovedExtras !== null && mvApprovedExtras !== '') {
+    complaint.mvApprovedExtras = Number(mvApprovedExtras);
+  }
+  if (customerPaymentToMicrovison !== undefined && customerPaymentToMicrovison !== null) {
+    complaint.customerPaymentToMicrovison = Number(customerPaymentToMicrovison) || null;
+  }
+
+  // Change 6C: Engineer name
+  if (engineerName !== undefined) {
+    complaint.engineerName = engineerName ? engineerName.trim() : '';
   }
 
   // Determine if bill should be generated. Generated for all closed complaints to track in Billing.
@@ -1743,7 +1671,91 @@ const updateSingleExtraCharge = async (req, res) => {
   }
 };
 
+// @desc    Admin force closes a complaint without SC actions.
+// @route   PATCH /api/complaints/:id/force-close
+// @access  Private (Admin only)
+const forceClose = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const complaint = await Complaint.findById(id);
+
+    if (!complaint) {
+      return res.status(404).json({ message: 'Complaint not found.' });
+    }
+
+    const allowedStatuses = ['new', 'unassigned', 'assigned', 'accepted', 'rejected_by_sc'];
+    if (!allowedStatuses.includes(complaint.status)) {
+      return res.status(400).json({ message: 'Cannot force close a complaint once the Service Centre has started work.' });
+    }
+
+    const oldStatus = complaint.status;
+    complaint.status = 'closed';
+    complaint.billGenerated = false;
+    complaint.petrolLocked = true;
+    complaint.petrolFinal = 0;
+    
+    await complaint.save();
+
+    const ComplaintUpdate = require('../models/ComplaintUpdate');
+    await ComplaintUpdate.create({
+      complaintId: complaint._id,
+      updatedBy: req.user.id,
+      role: 'admin',
+      oldStatus,
+      newStatus: 'closed',
+      note: req.body.note ? req.body.note.trim() : 'Complaint force-closed by Admin.',
+    });
+
+    res.status(200).json({ message: 'Complaint force-closed successfully.', complaint });
+  } catch (error) {
+    console.error('Error in forceClose:', error);
+    res.status(500).json({ message: 'Server error while force-closing complaint.' });
+  }
+};
+
+// @desc    Admin saves Critical Action section (before closing)
+// @route   PATCH /api/complaints/:id/critical-action
+// @access  Private (Admin only)
+const saveCriticalAction = async (req, res) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+    if (complaint.status === 'closed') {
+      return res.status(400).json({ message: 'Cannot edit Critical Action on a closed complaint.' });
+    }
+
+    const {
+      criticalActionEnabled,
+      customerExtraCharge,
+      customerChargePaymentMode,
+      customerChargeReason,
+      customerChargePaidToSCAmount,
+      warrantyRevoked,
+      warrantyRevocationReason,
+    } = req.body;
+
+    complaint.criticalActionEnabled = !!criticalActionEnabled;
+    complaint.customerExtraCharge = customerExtraCharge ?? null;
+    complaint.customerChargePaymentMode = customerChargePaymentMode || null;
+    complaint.customerChargeReason = customerChargeReason || '';
+    complaint.customerChargePaidToSCAmount =
+      customerChargePaymentMode === 'paid_to_sc'
+        ? (Number(customerChargePaidToSCAmount) || 0)
+        : null;
+    complaint.warrantyRevoked = !!warrantyRevoked;
+    complaint.warrantyRevocationReason = warrantyRevoked ? (warrantyRevocationReason || '') : '';
+    complaint.criticalActionLastEditedAt = new Date();
+
+    await complaint.save();
+    res.status(200).json({ message: 'Critical action saved.', complaint });
+  } catch (err) {
+    console.error('Error in saveCriticalAction:', err);
+    res.status(500).json({ message: 'Server error saving critical action.' });
+  }
+};
+
 module.exports = {
+  saveCriticalAction,
   reopenCheck,
   reopenComplaint,
   createComplaint,
@@ -1764,4 +1776,5 @@ module.exports = {
   markPartReceived,
   updateExtraCharges,
   updateSingleExtraCharge,
+  forceClose,
 };

@@ -73,6 +73,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [scSerialSlipPhotoUrl, setScSerialSlipPhotoUrl] = useState('');
   const [skipBillPhoto, setSkipBillPhoto] = useState(false);
   const [skipSerialPhoto, setSkipSerialPhoto] = useState(false);
+  const [engineerName, setEngineerName] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -97,6 +98,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setScSerialSlipPhotoUrl('');
       setSkipBillPhoto(false);
       setSkipSerialPhoto(false);
+      setEngineerName('');
       setError('');
       setSuccess('');
     });
@@ -239,6 +241,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       body.totalVisits = totalVisits ? Number(totalVisits) : undefined;
       body.distanceTravelled = distanceTravelled ? Number(distanceTravelled) : undefined;
       body.doneVoiceUrl = doneVoiceUrl;
+      if (engineerName.trim()) body.engineerName = engineerName.trim();
 
       // Check missing fields on product
       const productObj = c?.trackingId;
@@ -636,6 +639,16 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 {/* Path 1: DONE Form */}
                 {activeForm === 'done' && (
                   <div className="space-y-4 pt-2 border-t border-border/50">
+                    <div>
+                      <label className={labelCls}>Engineer Name (optional — who visited the customer)</label>
+                      <input
+                        type="text"
+                        value={engineerName}
+                        onChange={(e) => setEngineerName(e.target.value)}
+                        className={inputCls}
+                        placeholder="e.g. Ravi Kumar"
+                      />
+                    </div>
                     {/* Demanded Bill Info Sub-section */}
                     {isBillInfoMissing && (
                       <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-xl space-y-3">

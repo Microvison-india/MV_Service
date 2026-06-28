@@ -14,11 +14,15 @@
 function calcBill(complaint) {
   const isWarranty = complaint.warrantyStatus === 'in_warranty';
 
-  // 1. Preset base price
-  const presetPrice = isWarranty ? (complaint.presetPrice ?? 0) : 0;
+  // 1. Preset — use override if explicitly set, else original snapshot
+  const presetOriginal = isWarranty ? (complaint.presetPrice ?? 0) : 0;
+  const effectivePreset =
+    (complaint.presetPriceOverride !== null && complaint.presetPriceOverride !== undefined)
+      ? complaint.presetPriceOverride
+      : presetOriginal;
   const presetName = isWarranty ? (complaint.presetName || '') : '';
 
-  // 2. Petrol logic (In warranty only, check for strict null/undefined to preserve 0)
+  // 2. Petrol — in-warranty only, strict null checks to preserve 0
   let petrol = 0;
   if (isWarranty) {
     if (complaint.petrolFinal !== null && complaint.petrolFinal !== undefined) {
@@ -30,25 +34,41 @@ function calcBill(complaint) {
     }
   }
 
-  // 3. Approved Extra charges (both warranty types)
-  const approvedExtras = (complaint.extraCharges || [])
-    .filter((ec) => ec.status === 'approved');
-  
+  // 3. Approved extra charges (both warranty types)
+  const approvedExtras = (complaint.extraCharges || []).filter((ec) => ec.status === 'approved');
   const extrasTotal = approvedExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
 
-  // 4. Calculate total
-  const total = isWarranty 
-    ? presetPrice + petrol + extrasTotal 
-    : extrasTotal;
+  // 4. Microvison-approved extras (both warranty types, optional)
+  const mvExtras = complaint.mvApprovedExtras || 0;
+
+  // 5. Gross total before deductions
+  const grossTotal = isWarranty
+    ? effectivePreset + petrol + extrasTotal + mvExtras
+    : extrasTotal + mvExtras;
+
+  // 6. Deductions from SC bill: customer amounts SC already collected
+  //    Source 1: Standard OOW customer payment (existing field)
+  //    Source 2: Critical Action in-warranty customer payment collected by SC
+  const customerPaidToSC =
+    (complaint.customerPaymentAmount || 0) +
+    (complaint.customerChargePaidToSCAmount || 0);
+
+  // 7. Net SC total (cannot go below 0)
+  const netTotal = Math.max(0, grossTotal - customerPaidToSC);
 
   return {
-    preset: presetPrice,
+    preset: effectivePreset,
+    presetOriginal,
+    presetOverrideReason: complaint.presetPriceOverrideReason || null,
     presetName,
     petrol,
     extrasTotal,
     extrasList: approvedExtras.map((ec) => ({ label: ec.label, amount: ec.amount })),
-    total,
-    customerPaymentAmount: complaint.customerPaymentAmount || 0,
+    mvExtras,
+    customerPaidToSC,         // total deducted from SC (shown on SC bill)
+    customerPaymentToMicrovison: complaint.customerPaymentToMicrovison || 0,  // record only
+    grossTotal,
+    total: netTotal,           // what Microvison actually pays SC
   };
 }
 

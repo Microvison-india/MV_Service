@@ -7,6 +7,9 @@ import StatusTimeline from './StatusTimeline';
 import PetrolEditField from './PetrolEditField';
 import BillSummary from './BillSummary';
 import SCComplaintDetail from './SCComplaintDetail';
+import InlineCitySelect from '../ui/InlineCitySelect';
+import InlineSelect from '../ui/InlineSelect';
+import { Loader2, Plus, X } from 'lucide-react';
 
 // GRD Section 11.1 / TBP Phase 9
 // Admin slide-out review panel for a complaint.
@@ -43,9 +46,142 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [selectedSCId, setSelectedSCId] = useState('');
   const [loadingCandidates, setLoadingCandidates] = useState(false);
 
+  // More options / unregistered SC creation states for reassignment
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [modalData, setModalData] = useState({
+    name: '',
+    phone1: '',
+    phone2: '',
+    city: '',
+    district: '',
+    state: '',
+    fullAddress: '',
+    productCapability: 'both',
+  });
+  const [creatingSC, setCreatingSC] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [cities, setCities] = useState([]);
+
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchState, setSearchState] = useState('');
+  const [searchDistrict, setSearchDistrict] = useState('');
+  const [searchCity, setSearchCity] = useState('');
+  const [searchCapability, setSearchCapability] = useState('');
+  const [searchUnregistered, setSearchUnregistered] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Sync candidate form data with complaint defaults
+  useEffect(() => {
+    if (c) {
+      setModalData((prev) => ({
+        ...prev,
+        city: c.city || '',
+        district: c.district || '',
+        state: c.state || '',
+      }));
+    }
+  }, [c]);
+
+  // Load cities list
+  useEffect(() => {
+    api.get('/api/cities').then(({ data }) => setCities(data)).catch(() => setCities([]));
+  }, []);
+
+  const uniqueStates = [...new Set(cities.map(ct => ct.state))].sort();
+  const filteredDistricts = [...new Set(
+    cities
+      .filter((ct) => (modalData.state ? ct.state === modalData.state : true))
+      .map((ct) => ct.district)
+  )].sort();
+
+  const searchDistricts = [...new Set(
+    cities
+      .filter((ct) => (searchState ? ct.state === searchState : true))
+      .map((ct) => ct.district)
+  )].sort();
+
+  const searchCities = [...new Set(
+    cities
+      .filter((ct) => {
+        if (searchState && ct.state !== searchState) return false;
+        if (searchDistrict && ct.district !== searchDistrict) return false;
+        return true;
+      })
+      .map((ct) => ct.name)
+  )].sort();
+
+  // Search hook
+  useEffect(() => {
+    if (!showMoreOptions) return;
+
+    const fetchSearchResults = async () => {
+      setSearchLoading(true);
+      try {
+        const params = {
+          status: 'active',
+          limit: 100,
+        };
+        if (searchQuery) params.search = searchQuery;
+        if (searchState) params.state = searchState;
+        if (searchDistrict) params.district = searchDistrict;
+        if (searchCity) params.city = searchCity;
+        if (searchCapability) params.productCapability = searchCapability;
+        if (searchUnregistered === 'registered') params.isUnregistered = 'false';
+        if (searchUnregistered === 'unregistered') params.isUnregistered = 'true';
+
+        const { data } = await api.get('/api/service-centres', { params });
+        setSearchResults(data.serviceCentres || []);
+      } catch (err) {
+        console.error('Failed to search service centres', err);
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+
+    const delayDebounce = setTimeout(() => {
+      fetchSearchResults();
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [showMoreOptions, searchQuery, searchState, searchDistrict, searchCity, searchCapability, searchUnregistered]);
+
+  const handleCreateSCSubmit = async (e) => {
+    e.preventDefault();
+    if (!modalData.name || !modalData.phone1 || !modalData.city || !modalData.state) {
+      setCreateError('Name, Phone 1, City, and State are required.');
+      return;
+    }
+    setCreatingSC(true);
+    setCreateError('');
+    try {
+      const { data } = await api.post('/api/service-centres/unregistered', modalData);
+      setCandidates((prev) => [data, ...prev]);
+      setSelectedSCId(data._id);
+      setShowCreateModal(false);
+      setModalData({
+        name: '',
+        phone1: '',
+        phone2: '',
+        city: c?.city || '',
+        district: c?.district || '',
+        state: c?.state || '',
+        fullAddress: '',
+        productCapability: 'both',
+      });
+    } catch (err) {
+      setCreateError(err.response?.data?.message || 'Failed to create unregistered SC.');
+    } finally {
+      setCreatingSC(false);
+    }
+  };
+
   // Reopen states
   const [reopenNotes, setReopenNotes] = useState('');
   const reopenPhotos = [];
+
+  const [forceCloseNote, setForceCloseNote] = useState('');
 
   // Unregistered SC Action States
   const [unregActionForm, setUnregActionForm] = useState('');
@@ -193,7 +329,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       Promise.resolve().then(() => {
         if (active) setLoadingCandidates(true);
       });
-      api.get('/api/service-centres', { params: { status: 'active', limit: 100 } })
+      api.get('/api/service-centres', {
+        params: {
+          status: 'active',
+          district: c.district,
+          page: 1,
+          limit: 100,
+        }
+      })
         .then(({ data }) => {
           if (!active) return;
           const allSCs = data.serviceCentres || [];
@@ -205,19 +348,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
           };
           const required = getRequiredCapabilities(c.product);
           
-          let matches = allSCs.filter(
+          const matches = allSCs.filter(
             (sc) =>
-              sc.city?.toLowerCase() === c.city?.toLowerCase() &&
-              required.includes(sc.productCapability)
+              sc.isUnregistered === true || required.includes(sc.productCapability)
           );
-          
-          if (matches.length === 0) {
-            matches = allSCs.filter(
-              (sc) =>
-                sc.district?.toLowerCase() === c.district?.toLowerCase() &&
-                required.includes(sc.productCapability)
-            );
-          }
           setCandidates(matches);
         })
         .catch((err) => console.error('Failed to fetch SC candidates:', err))
@@ -226,7 +360,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         });
     }
     return () => { active = false; };
-  }, [c]);
+  }, [c?.district, c?.product, c?.status]);
 
   if (loading) {
     return (
@@ -442,6 +576,23 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       }, 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reopen complaint.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleForceClose = async () => {
+    setActionLoading('force_close');
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/force-close`, {
+        note: forceCloseNote.trim() || 'Complaint force-closed by Admin.'
+      });
+      setSuccess('Complaint closed successfully!');
+      setForceCloseNote('');
+      setTimeout(onUpdated, 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to close complaint.');
     } finally {
       setActionLoading(false);
     }
@@ -1816,42 +1967,282 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             /* Unregistered SC action is handled by the panel above — show nothing extra here */
             null
           ) : ['unassigned', 'new', 'assigned', 'rejected_by_sc'].includes(c?.status) ? (
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-foreground uppercase tracking-wider">
-                {c?.status === 'unassigned' ? 'Assign Service Centre' : 'Assign Service Centre (Current Job)'}
-              </p>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
+                <div>
+                  <p className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    {c?.status === 'unassigned' ? 'Assign Service Centre' : 'Assign Service Centre (Current Job)'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Matching SCs in <strong>{c?.district}</strong> district · Product: <strong>{c?.product?.toUpperCase()}</strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="h-8 px-3 rounded-lg border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Unregistered SC
+                </button>
+              </div>
+
               {c?.status === 'unassigned' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3.5 text-yellow-800 text-sm font-medium flex items-center gap-2">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3.5 text-yellow-800 text-xs font-medium flex items-center gap-2">
                   <span>⚠ This complaint has no Service Centre assigned yet.</span>
                 </div>
               )}
+
               {loadingCandidates ? (
-                <p className="text-sm text-muted-foreground animate-pulse">Loading matching service centres...</p>
+                <div className="space-y-2.5">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
+                  ))}
+                </div>
               ) : candidates.length === 0 ? (
-                <p className="text-sm text-yellow-800 bg-yellow-50 p-3 rounded-xl border border-yellow-100">No active service centres found for this area.</p>
+                <div className="rounded-xl border border-border bg-card px-4 py-6 text-center">
+                  <p className="text-muted-foreground text-xs font-medium">
+                    No active service centres recommended in <strong>{c?.district}</strong> district for product <strong>{c?.product?.toUpperCase()}</strong>.
+                  </p>
+                  <p className="text-muted-foreground text-[11px] mt-1.5">
+                    Use "More Options" below to search for centres in other cities or districts.
+                  </p>
+                </div>
               ) : (
-                <div className="flex gap-2.5">
-                  <select
-                    value={selectedSCId}
-                    onChange={(e) => setSelectedSCId(e.target.value)}
-                    className={`${inputCls} text-sm py-2.5 px-4 flex-1`}
-                  >
-                    <option value="">-- Select Service Centre --</option>
-                    {candidates.map((sc) => (
-                      <option key={sc._id} value={sc._id}>
-                        {sc.businessName} ({sc.city} - {sc.ownerName})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleReassign}
-                    disabled={!!actionLoading || !selectedSCId}
-                    className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:opacity-90 disabled:opacity-50 transition text-xs uppercase tracking-wider"
-                  >
-                    {actionLoading === 'reassign' ? '...' : 'Assign'}
-                  </button>
+                <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+                  {candidates.map((sc) => {
+                    const isSelected = selectedSCId === sc._id;
+                    const CAPABILITY_LABELS = {
+                      led_only: 'LED Only',
+                      cooler_only: 'Cooler Only',
+                      both: 'LED + Cooler',
+                    };
+                    return (
+                      <div
+                        key={sc._id}
+                        onClick={() => setSelectedSCId(sc._id)}
+                        className={`rounded-xl border-2 p-3 cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/5 shadow-md'
+                            : 'border-border bg-card hover:border-ring'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold text-foreground text-xs">{sc.businessName}</p>
+                              {sc.isUnregistered && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                  UNREGISTERED SC
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {sc.ownerName || 'Admin Maintained'} · {sc.city}, {sc.district}
+                            </p>
+                            <div className="flex gap-3 mt-1.5 text-[10px] text-muted-foreground">
+                              <span>📞 {sc.phone1}</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                {sc.isUnregistered ? 'LED + Cooler' : CAPABILITY_LABELS[sc.productCapability]}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Live stats */}
+                          <div className="text-right text-[10px] text-muted-foreground shrink-0 leading-normal">
+                            <p className="font-bold text-foreground text-[11px] mb-0.5">Load Stats</p>
+                            <p>Assigned: <strong>{sc.stats?.assigned ?? 0}</strong></p>
+                            <p>Pending: <strong>{sc.stats?.pending ?? 0}</strong></p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* ── More Options Advanced Search ── */}
+              <div className="border-t border-border pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowMoreOptions(!showMoreOptions)}
+                  className="flex items-center justify-between w-full px-3 py-2 bg-muted/40 hover:bg-muted/70 border border-border/80 rounded-xl font-bold text-[10px] text-foreground transition select-none"
+                >
+                  <span>🔍 {showMoreOptions ? 'Hide Search Options' : 'Show More Options (Search All SCs)'}</span>
+                  <span className="text-muted-foreground text-[9px]">
+                    {showMoreOptions ? '▲' : '▼'}
+                  </span>
+                </button>
+
+                {showMoreOptions && (
+                  <div className="mt-3 p-3 border border-border/60 bg-muted/10 rounded-xl space-y-3">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Search & Filter Directory</p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] font-semibold block mb-0.5 text-muted-foreground">Search by Name/Phone/City</label>
+                        <input
+                          type="text"
+                          placeholder="Type to search..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="flex h-8 w-full rounded-lg border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-semibold block mb-0.5 text-muted-foreground">State</label>
+                        <select
+                          value={searchState}
+                          onChange={(e) => {
+                            setSearchState(e.target.value);
+                            setSearchDistrict('');
+                            setSearchCity('');
+                          }}
+                          className="flex h-8 w-full rounded-lg border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">All States</option>
+                          {uniqueStates.map(st => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-semibold block mb-0.5 text-muted-foreground">District</label>
+                        <select
+                          value={searchDistrict}
+                          onChange={(e) => {
+                            setSearchDistrict(e.target.value);
+                            setSearchCity('');
+                          }}
+                          className="flex h-8 w-full rounded-lg border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">All Districts</option>
+                          {searchDistricts.map(dt => (
+                            <option key={dt} value={dt}>{dt}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-semibold block mb-0.5 text-muted-foreground">City</label>
+                        <select
+                          value={searchCity}
+                          onChange={(e) => setSearchCity(e.target.value)}
+                          className="flex h-8 w-full rounded-lg border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">All Cities</option>
+                          {searchCities.map(ct => (
+                            <option key={ct} value={ct}>{ct}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-semibold block mb-0.5 text-muted-foreground">Product Capability</label>
+                        <select
+                          value={searchCapability}
+                          onChange={(e) => setSearchCapability(e.target.value)}
+                          className="flex h-8 w-full rounded-lg border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">All Capabilities</option>
+                          <option value="led_only">LED Only</option>
+                          <option value="cooler_only">Cooler Only</option>
+                          <option value="both">LED + Cooler</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] font-semibold block mb-0.5 text-muted-foreground">Registration Type</label>
+                        <select
+                          value={searchUnregistered}
+                          onChange={(e) => setSearchUnregistered(e.target.value)}
+                          className="flex h-8 w-full rounded-lg border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">All Types</option>
+                          <option value="registered">Registered Only</option>
+                          <option value="unregistered">Unregistered Only</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-1.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Search Results</span>
+                      
+                      {searchLoading ? (
+                        <div className="py-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          Searching directory...
+                        </div>
+                      ) : searchResults.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-muted-foreground bg-background rounded-lg border border-border border-dashed">
+                          No service centres match your search filters.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                          {searchResults.map((sc) => {
+                            const isSelected = selectedSCId === sc._id;
+                            const CAPABILITY_LABELS = {
+                              led_only: 'LED Only',
+                              cooler_only: 'Cooler Only',
+                              both: 'LED + Cooler',
+                            };
+                            return (
+                              <div
+                                key={sc._id}
+                                onClick={() => setSelectedSCId(sc._id)}
+                                className={`rounded-xl border-2 p-3 cursor-pointer bg-background transition-all ${
+                                  isSelected
+                                    ? 'border-primary bg-primary/5 shadow-md'
+                                    : 'border-border hover:border-ring'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="font-semibold text-foreground text-xs">{sc.businessName}</p>
+                                      {sc.isUnregistered && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                          UNREGISTERED SC
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                      {sc.ownerName || 'Admin Maintained'} · {sc.city}, {sc.district}
+                                    </p>
+                                    <div className="flex gap-3 mt-1.5 text-[10px] text-muted-foreground">
+                                      <span>📞 {sc.phone1}</span>
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                        {sc.isUnregistered ? 'LED + Cooler' : CAPABILITY_LABELS[sc.productCapability]}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right text-[10px] text-muted-foreground shrink-0 leading-normal">
+                                    <p className="font-bold text-foreground text-[11px] mb-0.5">Load Stats</p>
+                                    <p>Assigned: <strong>{sc.stats?.assigned ?? 0}</strong></p>
+                                    <p>Pending: <strong>{sc.stats?.pending ?? 0}</strong></p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={handleReassign}
+                disabled={!!actionLoading || !selectedSCId}
+                className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:opacity-90 disabled:opacity-50 transition text-xs uppercase tracking-wider text-center"
+              >
+                {actionLoading === 'reassign' ? 'Reassigning...' : 'Confirm Reassignment'}
+              </button>
             </div>
           ) : isReopenEligible ? (
             <div className="space-y-3">
@@ -1881,6 +2272,35 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
           {error && <p className="text-xs font-semibold text-red-600 bg-red-50 p-3 rounded-xl border border-red-200 mt-2">{error}</p>}
           {success && <p className="text-xs font-semibold text-green-600 bg-green-50 p-3 rounded-xl border border-green-200 mt-2">{success}</p>}
+
+          {/* Admin Force Close Panel (Only shown when no work has been done yet) */}
+          {['new', 'unassigned', 'assigned', 'accepted', 'rejected_by_sc'].includes(c?.status) && (
+            <div className="border-t border-border pt-4 mt-4 space-y-3">
+              <p className="text-xs font-bold text-foreground uppercase tracking-wider">Close Complaint (No Work Done)</p>
+              <div className="bg-red-50/50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/30 rounded-xl p-3.5 space-y-3">
+                <p className="text-[11px] text-muted-foreground">
+                  You can close this complaint directly if it was created in error or cancelled by the customer. No bill will be generated.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter reason to close (e.g. Cancelled by customer)..."
+                    value={forceCloseNote}
+                    onChange={(e) => setForceCloseNote(e.target.value)}
+                    className={`${inputCls} text-xs py-2 px-3 flex-1 bg-background`}
+                  />
+                  <button
+                    onClick={handleForceClose}
+                    disabled={!!actionLoading}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+                  >
+                    {actionLoading === 'force_close' ? 'Closing...' : 'Close Complaint'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           </div>
         </div>
       </div>
@@ -2030,6 +2450,152 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             if (onUpdated) onUpdated();
           }}
         />
+      )}
+
+      {/* Unregistered SC Creation Dialog Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-card p-6 border border-border shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold mb-1">Create Unregistered Service Centre</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              This service centre will not have a login portal. Updates are maintained manually by admins.
+            </p>
+
+            <form onSubmit={handleCreateSCSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold block mb-1">Business Name / Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={modalData.name}
+                  onChange={(e) => setModalData(prev => ({ ...prev, name: e.target.value }))}
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  required
+                  placeholder="e.g. Apex Electronics"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold block mb-1">Phone Number 1 <span className="text-red-500">*</span></label>
+                  <input
+                    type="tel"
+                    value={modalData.phone1}
+                    onChange={(e) => setModalData(prev => ({ ...prev, phone1: e.target.value }))}
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    required
+                    placeholder="10-digit number"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1">Phone Number 2 (optional)</label>
+                  <input
+                    type="tel"
+                    value={modalData.phone2}
+                    onChange={(e) => setModalData(prev => ({ ...prev, phone2: e.target.value }))}
+                    className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Alternate contact"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-xs font-semibold block mb-1">City <span className="text-red-500">*</span></label>
+                <InlineCitySelect
+                  value={modalData.city}
+                  filterState={modalData.state}
+                  filterDistrict={modalData.district}
+                  onChange={({ city, district, state }) => {
+                    setModalData(prev => ({
+                      ...prev,
+                      city,
+                      district,
+                      state
+                    }));
+                  }}
+                  onCityCreated={(newCity) => {
+                    setCities(prev => [...prev, newCity]);
+                  }}
+                  placeholder="Select city"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold block mb-1">District <span className="text-red-500">*</span></label>
+                  <InlineSelect
+                    value={modalData.district}
+                    options={filteredDistricts}
+                    onChange={(newDistrict) => {
+                      const match = cities.find(ct => ct.district === newDistrict);
+                      setModalData(prev => ({ 
+                        ...prev, 
+                        district: newDistrict,
+                        state: match ? match.state : prev.state
+                      }));
+                    }}
+                    placeholder="Select district"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1">State <span className="text-red-500">*</span></label>
+                  <InlineSelect
+                    value={modalData.state}
+                    options={uniqueStates}
+                    onChange={(newState) => setModalData(prev => ({ ...prev, state: newState, district: '', city: '' }))}
+                    placeholder="Select state"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold block mb-1">Full Address (optional)</label>
+                <textarea
+                  value={modalData.fullAddress}
+                  onChange={(e) => setModalData(prev => ({ ...prev, fullAddress: e.target.value }))}
+                  className="flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  rows={2}
+                  placeholder="Complete postal address"
+                />
+              </div>
+
+              {createError && <p className="text-xs text-destructive">{createError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="h-9 px-4 rounded-lg border border-input hover:bg-accent text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingSC}
+                  className="h-9 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 text-sm flex items-center justify-center"
+                >
+                  {creatingSC ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Service Centre'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </>
   );

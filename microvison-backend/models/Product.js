@@ -34,10 +34,15 @@ const productSchema = new mongoose.Schema(
     warrantyExpiryDate: { type: Date, default: null },
     warrantySource: {
       type: String,
-      enum: ['auto_calculated', 'manual', 'forced'],
+      enum: ['auto_calculated', 'manual', 'forced', 'revoked'],
       required: true,
     },
     warrantyForceReason: { type: String, default: '' },
+
+    // ── Revocation (set when admin revokes from a complaint — Change 5) ─────
+    revocationReason: { type: String, default: '' },
+    revocationDate: { type: Date, default: null },
+    revocationComplaintId: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint', default: null },
     missingFieldsWarning: [{ type: String }],
 
     // Timeline History

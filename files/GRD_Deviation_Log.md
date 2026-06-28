@@ -534,5 +534,42 @@ graph TD
 
 ---
 
+## Phase 29 — Service Centre Complaints History Tab
+
+### DEV-GRD-051
+- **Phase:** 29
+- **GRD Section:** 11.2 (Service Centres Tab -> Details Page)
+- **Type:** ADDED
+- **Summary:** Implemented the "Complaints" history tab inside the Service Centre Details page (`SCDetail.jsx`). Previously, this tab rendered a static placeholder text "Complaint history for this service centre will be shown here once Phase 7 is complete". It now shows the full paginated list of complaints assigned to the selected service centre (both desktop table and mobile list card layouts). Clicking any complaint in this list opens the admin details slide-over drawer (`AdminComplaintDetail.jsx`) so the admin can review it.
+
+---
+
+## Phase 30 — Upgraded Reassignment Panel in Complaint Detail Drawer
+
+### DEV-GRD-052
+- **Phase:** 30
+- **GRD Section:** 11.1 (Complaint Details Drawer) / 6.4 (Assignment / Step 5)
+- **Type:** CHANGED
+- **Summary:** Upgraded the "Assign Service Centre" panel at the bottom of the Admin Complaint Details drawer (`AdminComplaintDetail.jsx`) from a simple dropdown select list to the full feature-rich interface used in Wizard Step 5.
+  - Recommended service centres in the customer's district are displayed as selectable cards showing business name, owner name, city, contact number, capabilities, and live Load Stats (Assigned & Pending jobs).
+  - Admins can select cards directly to bind the active service centre choice.
+  - Added an inline "Create Unregistered SC" button opening a form dialog to register unregistered SCs on the fly.
+  - Integrated the advanced "More Options" search and filtering panel to search the entire system directory by name, phone, city, state, district, capability, and registration type.
+
+---
+
+## Phase 31 — Admin Force Close Panel for Complaints
+
+### DEV-GRD-053
+- **Phase:** 31
+- **GRD Section:** 11.1 (Complaint Details Drawer) / 7.3 (Status Transitions)
+- **Type:** ADDED
+- **Summary:** Added a dedicated "Close Complaint (No Work Done)" section in the Admin Complaint Details drawer (`AdminComplaintDetail.jsx`). 
+  - This section only appears when no work has been done yet by the Service Centre (complaint status is in `['new', 'unassigned', 'assigned', 'accepted', 'rejected_by_sc']`).
+  - It allows the admin to close the complaint directly (e.g. if cancelled by the customer or created by mistake) by typing a reason/note and clicking "Close Complaint".
+  - This flow is independent of the normal closing flow (which requires completing missing Step 2 product details and generates billing charges). No bill is generated for complaints closed via this force-close action.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
