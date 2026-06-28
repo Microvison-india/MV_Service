@@ -114,13 +114,6 @@ export default function NewComplaint() {
     selectedSCId: '',
   });
 
-  // Reopen flow state (managed separately — passed down to Step 1)
-  const [reopenData, setReopenData] = useState({
-    isReopened: false,
-    reopenParentId: null,
-    reopenNotes: '',
-    reopenPhotos: [],
-  });
 
   const [draftsList, setDraftsList] = useState([]);
   const [loadingDrafts, setLoadingDrafts] = useState(!hasPrefill);
@@ -274,11 +267,6 @@ export default function NewComplaint() {
         notes: formData.notes || '',
         voiceNoteUrl: formData.voiceNoteUrl || '',
         adminPhotos: formData.adminPhotos || [],
-        // Reopen flow
-        isReopened: reopenData.isReopened,
-        reopenParentId: reopenData.reopenParentId,
-        reopenNotes: reopenData.reopenNotes,
-        reopenPhotos: reopenData.reopenPhotos,
       };
 
       // Step A: Create the complaint (status = 'unassigned')
@@ -455,11 +443,6 @@ export default function NewComplaint() {
             <Step1CustomerInfo
               formData={formData}
               setFormData={setFormData}
-              reopenData={reopenData}
-              setReopenData={setReopenData}
-              onReopenSuccess={(newC) => {
-                navigate('/admin', { state: { successMessage: `Complaint ${newC.complaintId} reopened successfully! Please assign it below.` } });
-              }}
             />
           )}
           {/* Step 2 — Product Info (Bill Date, Shop Name, Serial, Model, Warranty) */}

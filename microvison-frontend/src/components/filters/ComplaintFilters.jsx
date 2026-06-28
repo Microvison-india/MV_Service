@@ -26,7 +26,6 @@ const STATUS_OPTIONS = [
   { value: 'not_done', label: 'Not Done' },
   { value: 'part_pending', label: 'Part Pending' },
   { value: 'part_received', label: 'Part Received' },
-  { value: 'reopened', label: 'Reopened' },
   { value: 'closed', label: 'Closed' },
 ];
 
@@ -223,8 +222,6 @@ export default function ComplaintFilters({ filters, onChange }) {
       scCapability: '',
       dateFrom: '',
       dateTo: '',
-      reopenedOnly: '',
-      originalOnly: '',
       trackingId: '',
       serialNumber: '',
       page: 1,
@@ -243,7 +240,6 @@ export default function ComplaintFilters({ filters, onChange }) {
     if (filters.warrantyStatus) count++;
     if (filters.scCapability) count++;
     if (filters.assignedCentreId) count++;
-    if (filters.reopenedOnly || filters.originalOnly) count++;
     if (filters.dateFrom || filters.dateTo) count++;
     return count;
   };
@@ -487,30 +483,6 @@ export default function ComplaintFilters({ filters, onChange }) {
               {scs.map((sc) => (
                 <option key={sc._id} value={sc._id}>{sc.businessName}</option>
               ))}
-            </select>
-          </div>
-
-          {/* Reopened Toggle */}
-          <div className="space-y-1.5">
-            <label className={labelCls}>Reopen Status</label>
-            <select
-              name="reopenStatus"
-              value={filters.reopenedOnly === 'true' ? 'reopened' : filters.originalOnly === 'true' ? 'original' : ''}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === 'reopened') {
-                  onChange({ ...filters, reopenedOnly: 'true', originalOnly: '', page: 1 });
-                } else if (val === 'original') {
-                  onChange({ ...filters, reopenedOnly: '', originalOnly: 'true', page: 1 });
-                } else {
-                  onChange({ ...filters, reopenedOnly: '', originalOnly: '', page: 1 });
-                }
-              }}
-              className={selectCls}
-            >
-              <option value="">All Complaints</option>
-              <option value="reopened">Reopened Only</option>
-              <option value="original">Original Only</option>
             </select>
           </div>
 

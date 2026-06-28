@@ -12,9 +12,7 @@ import { Button } from '../ui/button';
 import InlineCitySelect from '../ui/InlineCitySelect';
 import InlineSelect from '../ui/InlineSelect';
 
-import ReopenBanner from '../complaint/ReopenBanner';
-
-export default function Step1CustomerInfo({ formData, setFormData, reopenData, setReopenData, onReopenSuccess }) {
+export default function Step1CustomerInfo({ formData, setFormData }) {
   const [cities, setCities] = useState([]);
 
   // Product Tracking States
@@ -27,10 +25,6 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-
-  // Reopen States
-  const [reopenResult, setReopenResult] = useState(null);
-  const [showReopenBanner, setShowReopenBanner] = useState(false);
 
   // Fetch all cities for the dropdown
   useEffect(() => {
@@ -150,17 +144,6 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
     setShowSingleMatchBanner(null);
     setShowMatchesModal(false);
     setShowManualSearch(false);
-
-    // Check Reopen Eligibility
-    try {
-      const { data } = await api.get(`/api/products/${product.trackingId}/reopen-check`);
-      if (data.reopenEligible) {
-        setReopenResult(data);
-        setShowReopenBanner(true);
-      }
-    } catch (err) {
-      console.error('Reopen check failed', err);
-    }
   };
 
   const unlinkProduct = () => {
@@ -169,25 +152,6 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
       trackingId: null,
       linkedProductType: null,
     }));
-    setShowReopenBanner(false);
-    setReopenResult(null);
-    if (setReopenData) {
-      setReopenData({ isReopened: false, reopenParentId: null, reopenNotes: '', reopenPhotos: [] });
-    }
-  };
-
-  const handleReopenConfirm = (newComplaint) => {
-    setShowReopenBanner(false);
-    if (onReopenSuccess) {
-      onReopenSuccess(newComplaint);
-    }
-  };
-
-  const handleReopenDismiss = () => {
-    if (setReopenData) {
-      setReopenData({ isReopened: false, reopenParentId: null, reopenNotes: '', reopenPhotos: [] });
-    }
-    setShowReopenBanner(false);
   };
 
   // Compute dropdown options based on current selection
@@ -207,23 +171,6 @@ export default function Step1CustomerInfo({ formData, setFormData, reopenData, s
   return (
     <div className="space-y-5 relative">
       
-      {/* Reopen Badge if confirmed */}
-      {reopenData?.isReopened && (
-        <div className="rounded-lg bg-yellow-50 border border-yellow-300 px-4 py-2 text-sm text-yellow-800 font-medium">
-          ✓ This will be logged as a <strong>Reopened Complaint</strong> referencing{' '}
-          {reopenResult?.lastComplaint?.complaintId || 'previous complaint'}.
-        </div>
-      )}
-
-      {/* ReopenBanner */}
-      {showReopenBanner && reopenResult?.lastComplaint && (
-        <ReopenBanner
-          existingComplaint={reopenResult.lastComplaint}
-          onReopen={handleReopenConfirm}
-          onDismiss={handleReopenDismiss}
-        />
-      )}
-
       {/* Linked Product Badge */}
       {formData.trackingId && (
         <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 flex items-start justify-between">

@@ -177,12 +177,6 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     }
   };
 
-  // Reopen states
-  const [reopenNotes, setReopenNotes] = useState('');
-  const reopenPhotos = [];
-
-  const [forceCloseNote, setForceCloseNote] = useState('');
-
   // Unregistered SC Action States
   const [unregActionForm, setUnregActionForm] = useState('');
   const [unregNotes, setUnregNotes] = useState('');
@@ -214,6 +208,25 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     modelNumber: false,
   });
   const [modalError, setModalError] = useState('');
+
+  // Phase 8 States
+  const [criticalActionEnabled, setCriticalActionEnabled] = useState(c?.criticalActionEnabled || false);
+  const [customerExtraCharge, setCustomerExtraCharge] = useState(c?.customerExtraCharge ?? '');
+  const [customerChargePaymentMode, setCustomerChargePaymentMode] = useState(c?.customerChargePaymentMode || '');
+  const [customerChargeReason, setCustomerChargeReason] = useState(c?.customerChargeReason || '');
+  const [warrantyRevoked, setWarrantyRevoked] = useState(c?.warrantyRevoked || false);
+  const [warrantyRevocationReason, setWarrantyRevocationReason] = useState(c?.warrantyRevocationReason || '');
+  const [savingCritical, setSavingCritical] = useState(false);
+  const [showCriticalPanel, setShowCriticalPanel] = useState(false);
+
+  const [presetPriceOverride, setPresetPriceOverride] = useState(c?.presetPriceOverride ?? '');
+  const [presetPriceOverrideReason, setPresetPriceOverrideReason] = useState(c?.presetPriceOverrideReason || '');
+  const [editingPreset, setEditingPreset] = useState(false);
+  const [mvApprovedExtras, setMvApprovedExtras] = useState(c?.mvApprovedExtras ?? '');
+  const [customerPaymentToMicrovison, setCustomerPaymentToMicrovison] = useState(c?.customerPaymentToMicrovison ?? '');
+  const [criticalActionAcknowledged, setCriticalActionAcknowledged] = useState(false);
+  
+  const [adminEngineerName, setAdminEngineerName] = useState(c?.engineerName || '');
 
   // Edit states for Product Registry (Phase 21)
   const [editSerialNumber, setEditSerialNumber] = useState('');
@@ -384,13 +397,46 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     return closedUpdate ? closedUpdate.oldStatus : null;
   };
   const preCloseStatus = getPreCloseStatus();
-  const isReopenEligible = c.status === 'closed' && 
-    (new Date() - new Date(c.createdAt)) / (1000 * 60 * 60 * 24) <= 30 &&
-    ['done', 'not_done'].includes(preCloseStatus);
+
+  const handleSaveCriticalAction = async () => {
+    setSavingCritical(true);
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/critical-action`, {
+        criticalActionEnabled,
+        customerExtraCharge,
+        customerChargePaymentMode,
+        customerChargeReason,
+        customerChargePaidToSCAmount: customerChargePaymentMode === 'paid_to_sc' ? customerExtraCharge : null,
+        warrantyRevoked,
+        warrantyRevocationReason,
+      });
+      setSuccess('Critical action saved.');
+      // Refresh to update edited date
+      setTimeout(() => onUpdated(), 500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save critical action.');
+    } finally {
+      setSavingCritical(false);
+    }
+  };
 
   const handleConfirm = async () => {
     setActionLoading('confirm');
     setError('');
+
+    // Critical Action Guards
+    if (criticalActionEnabled && !criticalActionAcknowledged) {
+      setError('You must acknowledge the Critical Action section before closing.');
+      setActionLoading(false);
+      return;
+    }
+    if (criticalActionEnabled && warrantyRevoked && !warrantyRevocationReason.trim()) {
+      setError('Revocation reason is required when revoking warranty.');
+      setActionLoading(false);
+      return;
+    }
+
     try {
       // 1. Get latest complaint details to check product fields
       const { data: latestData } = await api.get(`/api/complaints/${c._id}`);
@@ -449,8 +495,29 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       const body = { 
         note: adminNote,
         extraCharges: adminExtraCharges,
-        markAsPaidImmediately: markAsPaidImmediately
+        markAsPaidImmediately: markAsPaidImmediately,
+        
+        // Phase 8: Billing and Engineer Additions
+        presetPriceOverride,
+        presetPriceOverrideReason,
+        mvApprovedExtras,
+        customerPaymentToMicrovison,
+        engineerName: adminEngineerName,
       };
+
+      // Phase 8: Critical Action Data
+      if (criticalActionEnabled) {
+        body.criticalActionEnabled = true;
+        body.customerExtraCharge = customerExtraCharge;
+        body.customerChargePaymentMode = customerChargePaymentMode;
+        body.customerChargeReason = customerChargeReason;
+        if (customerChargePaymentMode === 'paid_to_sc') {
+          body.customerChargePaidToSCAmount = customerExtraCharge;
+        }
+        body.warrantyRevoked = warrantyRevoked;
+        body.warrantyRevocationReason = warrantyRevocationReason;
+        body.criticalActionAcknowledgedAt = new Date().toISOString();
+      }
       if (isInWarranty && !c.petrolLocked) {
         if (petrolAdmin !== '' && petrolAdmin !== null && petrolAdmin !== undefined) {
           body.petrolAdmin = Number(petrolAdmin);
@@ -558,28 +625,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
 
 
-  const handleReopen = async () => {
-    if (!reopenNotes.trim()) {
-      setError('Reopen notes are required.');
-      return;
-    }
-    setActionLoading('reopen');
-    setError('');
-    try {
-      const { data } = await api.post(`/api/complaints/${c._id}/reopen`, {
-        reopenNotes: reopenNotes.trim(),
-        reopenPhotos,
-      });
-      setSuccess(`Complaint reopened successfully as ${data.complaint.complaintId}!`);
-      setTimeout(() => {
-        onUpdated();
-      }, 1500);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reopen complaint.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+
 
   const handleForceClose = async () => {
     setActionLoading('force_close');
@@ -734,14 +780,6 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const renderExpandedDetails = (comp, compUpdates, isCurrentActiveNode) => {
     const compInWarranty = comp.warrantyStatus === 'in_warranty';
 
-    // Find parent job if it was reopened
-    const parentItem = comp.isReopened && comp.reopenParentId
-      ? productTimeline.find(item => String(item.complaintId) === String(comp.reopenParentId))
-      : null;
-
-    // Find child job if this job was reopened into another one
-    const childItem = productTimeline.find(item => String(item.reopenParentId) === String(comp._id));
-
     return (
       <div className="space-y-6 text-sm">
         {/* Status Tags */}
@@ -765,20 +803,6 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             <span className="text-base">🔍</span>
             <span className="font-bold text-xs uppercase tracking-wider text-foreground">Job Context & Admin Parameters</span>
           </div>
-
-          {/* Reopen Connections */}
-          {parentItem && (
-            <div className="bg-yellow-50/70 border border-yellow-200 rounded-xl p-3.5 flex items-center gap-2 text-yellow-800 text-xs font-semibold">
-              <span>⚠️ Reopened from Parent Job:</span>
-              <strong className="text-yellow-950 underline">{parentItem.mvId}</strong>
-            </div>
-          )}
-          {childItem && (
-            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 flex items-center gap-2 text-blue-800 text-xs font-semibold">
-              <span>🔄 Reopened as Child Job:</span>
-              <strong className="text-blue-950 underline">{childItem.mvId}</strong>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {comp.assignedCentreId && (
@@ -1128,6 +1152,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               }`}>
                 {c.status.replace(/_/g, ' ')}
               </span>
+              {c?.criticalActionEnabled && (
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                  ⚠ CRITICAL ACTION
+                </span>
+              )}
               <p className="text-xs text-muted-foreground font-mono font-semibold">
                 {displayTrackingId ? `Product: ${displayTrackingId}` : `Job ID: ${c?.complaintId}`}
               </p>
@@ -1207,6 +1236,12 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               <div className="space-y-1">
                 <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs">Serial Number</span>
                 <p className="font-mono text-foreground font-bold">{latestSerialNumber || '—'}</p>
+              </div>
+
+              {/* Engineer Name */}
+              <div className="space-y-1">
+                <span className="text-muted-foreground uppercase font-bold tracking-wider text-xs text-blue-600 dark:text-blue-400">Engineer</span>
+                <p className="font-bold text-base text-foreground">{c?.engineerName || '—'}</p>
               </div>
             </div>
 
@@ -1878,6 +1913,323 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 </div>
               </div>
 
+              {/* --- PHASE 8: CRITICAL ACTION & BILLING SUMMARY --- */}
+              {['done', 'not_done', 'part_pending', 'part_received'].includes(c?.status) && (
+                <div className="space-y-4 pt-2">
+                  
+                  {/* --- CRITICAL ACTION PANEL --- */}
+                  <div className={`border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ${criticalActionEnabled ? 'border-rose-300 ring-1 ring-rose-200' : 'border-amber-200/60 hover:border-amber-300'}`}>
+                    <button
+                      type="button"
+                      onClick={() => setShowCriticalPanel(!showCriticalPanel)}
+                      className={`w-full flex items-center justify-between p-3.5 text-sm font-bold uppercase tracking-wider ${criticalActionEnabled ? 'bg-rose-50 text-rose-800' : 'bg-amber-50/50 text-amber-800'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>⚠️ Critical Action (Admin Only)</span>
+                        {criticalActionEnabled && (
+                          <span className="px-2 py-0.5 bg-rose-200 text-rose-900 text-[10px] rounded uppercase font-extrabold tracking-widest">RECORDED</span>
+                        )}
+                      </div>
+                      <span className={`transition-transform duration-200 ${showCriticalPanel ? 'rotate-180' : ''}`}>▼</span>
+                    </button>
+                    
+                    {showCriticalPanel && (
+                      <div className="p-4 bg-amber-50/30 space-y-5">
+                        <div className="text-[11px] font-semibold text-amber-700 bg-amber-100/50 p-2 rounded flex items-center gap-2">
+                          <span>🔒</span> This section is never visible to the Service Centre.
+                        </div>
+
+                        {c?.trackingId?.warrantySource === 'revoked' && (
+                          <div className="text-[11px] font-semibold text-rose-700 bg-rose-100/50 p-2 rounded flex items-center gap-2 border border-rose-200">
+                            <span>⚠</span> Note: This product's warranty was previously revoked.
+                          </div>
+                        )}
+
+                        {c?.criticalActionLastEditedAt && (
+                          <div className="text-[10px] text-muted-foreground italic font-medium">
+                            Last edited: {new Date(c.criticalActionLastEditedAt).toLocaleString('en-IN')}
+                          </div>
+                        )}
+
+                        <label className="flex items-center gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={criticalActionEnabled}
+                            onChange={(e) => setCriticalActionEnabled(e.target.checked)}
+                            className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                          />
+                          <span className="text-sm font-bold text-foreground">Enable Critical Action (Edge Cases)</span>
+                        </label>
+
+                        {criticalActionEnabled && (
+                          <div className="pl-6 space-y-4 border-l-2 border-amber-200 ml-1">
+                            
+                            {/* Warranty Revocation */}
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={warrantyRevoked}
+                                  onChange={(e) => setWarrantyRevoked(e.target.checked)}
+                                  className="w-4 h-4 accent-rose-600 rounded cursor-pointer"
+                                />
+                                <span className="text-sm font-bold text-rose-700">Revoke Warranty Completely</span>
+                              </label>
+                              {warrantyRevoked && (
+                                <div>
+                                  <label className={labelCls}>Revocation Reason <span className="text-rose-500">*</span></label>
+                                  <textarea
+                                    value={warrantyRevocationReason}
+                                    onChange={(e) => setWarrantyRevocationReason(e.target.value)}
+                                    placeholder="Why is the warranty being revoked?"
+                                    className={`${inputCls} border-rose-200 focus:ring-rose-300`}
+                                    rows={2}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Customer Extra Charge */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className={labelCls}>Customer Extra Charge (₹)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={customerExtraCharge}
+                                  onChange={(e) => setCustomerExtraCharge(e.target.value)}
+                                  className={inputCls}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Payment Mode</label>
+                                <select
+                                  value={customerChargePaymentMode}
+                                  onChange={(e) => setCustomerChargePaymentMode(e.target.value)}
+                                  className={selectCls}
+                                  disabled={!customerExtraCharge}
+                                >
+                                  <option value="">-- Select --</option>
+                                  <option value="not_applicable">N/A</option>
+                                  <option value="paid_to_sc">Paid to SC</option>
+                                  <option value="paid_to_microvison">Paid to Microvison directly</option>
+                                </select>
+                              </div>
+                            </div>
+                            
+                            {(customerExtraCharge || customerChargePaymentMode) && (
+                              <div>
+                                <label className={labelCls}>Charge Reason</label>
+                                <input
+                                  type="text"
+                                  value={customerChargeReason}
+                                  onChange={(e) => setCustomerChargeReason(e.target.value)}
+                                  className={inputCls}
+                                  placeholder="e.g. Out of warranty mishandling"
+                                />
+                              </div>
+                            )}
+
+                            {/* Save Button */}
+                            <div className="pt-2">
+                              <button
+                                type="button"
+                                onClick={handleSaveCriticalAction}
+                                disabled={savingCritical}
+                                className="px-5 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-amber-700 transition shadow-sm disabled:opacity-50"
+                              >
+                                {savingCritical ? 'Saving...' : 'Save Critical Action'}
+                              </button>
+                            </div>
+
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* --- PRE-CLOSE BILLING SUMMARY PANEL --- */}
+                  {(() => {
+                    // Inline Billing Calculation (mirrors billingCalculator.js)
+                    const isWarr = isInWarranty;
+                    
+                    const origPreset = isWarr ? (c?.presetPrice ?? 0) : 0;
+                    const effPreset = (presetPriceOverride !== '' && presetPriceOverride !== null && presetPriceOverride !== undefined) 
+                      ? Number(presetPriceOverride) 
+                      : origPreset;
+                      
+                    let effPetrol = 0;
+                    if (isWarr) {
+                      if (petrolFinal !== '' && petrolFinal !== null && petrolFinal !== undefined) effPetrol = Number(petrolFinal);
+                      else if (petrolSC !== '' && petrolSC !== null && petrolSC !== undefined) effPetrol = Number(petrolSC);
+                      else if (petrolAdmin !== '' && petrolAdmin !== null && petrolAdmin !== undefined) effPetrol = Number(petrolAdmin);
+                    }
+
+                    const appExtras = adminExtraCharges.filter(ec => ec.status === 'approved');
+                    const extrasTot = appExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
+                    
+                    const effMvExtras = mvApprovedExtras ? Number(mvApprovedExtras) : 0;
+                    
+                    const gross = isWarr ? (effPreset + effPetrol + extrasTot + effMvExtras) : (extrasTot + effMvExtras);
+                    
+                    const custToSC = (c?.customerPaymentAmount || 0) + (criticalActionEnabled && customerChargePaymentMode === 'paid_to_sc' ? Number(customerExtraCharge || 0) : 0);
+                    
+                    const net = Math.max(0, gross - custToSC);
+
+                    return (
+                      <div className="bg-card border-2 border-primary/20 rounded-xl overflow-hidden shadow-sm mb-4">
+                        <div className="bg-primary/5 px-4 py-3 border-b border-primary/10 flex justify-between items-center">
+                          <span className="text-sm font-bold text-foreground uppercase tracking-wider">💰 Pre-Close Billing Summary</span>
+                          {criticalActionEnabled && !criticalActionAcknowledged && (
+                            <label className="flex items-center gap-2 cursor-pointer bg-rose-100 text-rose-800 px-3 py-1 rounded-full border border-rose-300">
+                              <input 
+                                type="checkbox" 
+                                checked={criticalActionAcknowledged}
+                                onChange={e => setCriticalActionAcknowledged(e.target.checked)}
+                                className="w-3.5 h-3.5 accent-rose-600 rounded cursor-pointer"
+                              />
+                              <span className="text-[10px] font-bold uppercase tracking-wider">I acknowledge Critical Action implications</span>
+                            </label>
+                          )}
+                        </div>
+                        
+                        <div className="p-4 space-y-4">
+                          {(() => {
+                            let modifiedCount = 0;
+                            if (presetPriceOverride !== '' && Number(presetPriceOverride) !== origPreset) modifiedCount++;
+                            if (mvApprovedExtras !== '' && Number(mvApprovedExtras) !== (c?.mvApprovedExtras || 0)) modifiedCount++;
+                            if (customerPaymentToMicrovison !== '' && Number(customerPaymentToMicrovison) !== (c?.customerPaymentToMicrovison || 0)) modifiedCount++;
+                            if (adminExtraCharges.length !== (c?.extraCharges || []).length || adminExtraCharges.some((ec, i) => ec.amount !== c?.extraCharges?.[i]?.amount)) modifiedCount++;
+                            
+                            if (modifiedCount > 0) {
+                              return (
+                                <div className="text-[11px] font-semibold text-yellow-800 bg-yellow-100 p-2 rounded flex items-center gap-2 mb-2">
+                                  <span>⚠</span> {modifiedCount} field(s) modified from original snapshot values.
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                          
+                          {/* Engineer Row */}
+                          <div className="flex items-center justify-between pb-3 border-b border-border border-dashed">
+                            <span className="text-sm text-muted-foreground font-semibold">Engineer Name:</span>
+                            <input 
+                              type="text" 
+                              value={adminEngineerName}
+                              onChange={e => setAdminEngineerName(e.target.value)}
+                              placeholder="e.g. Ravi Kumar"
+                              className="text-right text-sm font-bold bg-transparent border-b border-muted-foreground/30 focus:border-primary focus:outline-none w-48"
+                            />
+                          </div>
+
+                          {/* Billing Breakdown */}
+                          {isWarr && (
+                            <div className="flex items-center justify-between py-1">
+                              <div className="flex flex-col">
+                                <span className="text-sm text-muted-foreground font-semibold">Preset Price:</span>
+                                {presetPriceOverride !== '' && <span className="text-[10px] text-muted-foreground italic">Override: {presetPriceOverrideReason}</span>}
+                              </div>
+                              {editingPreset ? (
+                                <div className="flex items-center gap-2">
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    value={presetPriceOverride}
+                                    onChange={e => setPresetPriceOverride(e.target.value)}
+                                    placeholder={origPreset}
+                                    className={`${inputCls} w-20 py-1 px-2 text-right`}
+                                  />
+                                  <input 
+                                    type="text" 
+                                    value={presetPriceOverrideReason}
+                                    onChange={e => setPresetPriceOverrideReason(e.target.value)}
+                                    placeholder="Reason..."
+                                    className={`${inputCls} w-32 py-1 px-2`}
+                                  />
+                                  <button 
+                                    onClick={() => setEditingPreset(false)}
+                                    className="px-2 py-1 bg-green-100 text-green-800 text-[10px] font-bold rounded uppercase"
+                                  >Save</button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  {presetPriceOverride !== '' ? (
+                                    <>
+                                      <span className="text-xs line-through text-muted-foreground">₹{origPreset}</span>
+                                      <span className="text-sm font-bold text-foreground">₹{effPreset}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-sm font-bold text-foreground">₹{origPreset}</span>
+                                  )}
+                                  <button onClick={() => setEditingPreset(true)} className="text-[10px] font-bold text-blue-600 hover:underline uppercase">[Edit]</button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {isWarr && (
+                            <div className="flex items-center justify-between py-1">
+                              <span className="text-sm text-muted-foreground font-semibold">Petrol:</span>
+                              <span className="text-sm font-bold text-foreground">₹{effPetrol}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-sm text-muted-foreground font-semibold">Approved Extra Charges:</span>
+                            <span className="text-sm font-bold text-foreground">₹{extrasTot}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between py-1 border-b border-border pb-3">
+                            <span className="text-sm text-muted-foreground font-semibold">Microvison Approved Extras:</span>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={mvApprovedExtras}
+                              onChange={e => setMvApprovedExtras(e.target.value)}
+                              placeholder="0"
+                              className="text-right text-sm font-bold bg-transparent border-b border-muted-foreground/30 focus:border-primary focus:outline-none w-24"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-sm font-bold text-foreground">Gross Total:</span>
+                            <span className="text-sm font-black text-foreground">₹{gross}</span>
+                          </div>
+
+                          {custToSC > 0 && (
+                            <div className="flex items-center justify-between py-1 text-red-600 dark:text-red-400">
+                              <span className="text-sm font-semibold">- Customer Paid to SC:</span>
+                              <span className="text-sm font-bold">- ₹{custToSC}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-xs text-green-700 dark:text-green-500 font-semibold italic">Customer Paid directly to Microvison (Info Only):</span>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={customerPaymentToMicrovison}
+                              onChange={e => setCustomerPaymentToMicrovison(e.target.value)}
+                              placeholder="0"
+                              className="text-right text-xs font-bold bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-b border-green-300 focus:border-green-600 focus:outline-none w-20 px-1"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between pt-3 border-t-2 border-primary/20">
+                            <span className="text-base font-black text-primary uppercase tracking-wide">Net Total Payable to SC:</span>
+                            <span className="text-xl font-black text-primary">₹{net}</span>
+                          </div>
+
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                </div>
+              )}
+
               {/* Note and Confirm Trigger */}
               <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3">
                 <span className="text-xs font-bold text-foreground uppercase tracking-wider block">
@@ -1906,7 +2258,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   />
                   <button
                     onClick={handleConfirm}
-                    disabled={!!actionLoading}
+                    disabled={
+                      !!actionLoading ||
+                      (criticalActionEnabled && !criticalActionAcknowledged) ||
+                      (criticalActionEnabled && warrantyRevoked && !warrantyRevocationReason.trim())
+                    }
                     className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-green-700 disabled:opacity-50 transition shadow-md hover:shadow-lg whitespace-nowrap shrink-0 flex items-center gap-2"
                   >
                     {actionLoading === 'confirm' ? 'Processing...' : '✓ Confirm & Close Job'}
@@ -2243,26 +2599,6 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               >
                 {actionLoading === 'reassign' ? 'Reassigning...' : 'Confirm Reassignment'}
               </button>
-            </div>
-          ) : isReopenEligible ? (
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-foreground uppercase tracking-wider">Reopen Job (Current)</p>
-              <div className="flex gap-2.5">
-                <input
-                  type="text"
-                  placeholder="Describe reason to reopen (Required)..."
-                  value={reopenNotes}
-                  onChange={(e) => setReopenNotes(e.target.value)}
-                  className={`${inputCls} border-yellow-300 focus:ring-yellow-400 text-sm py-2.5 px-4 flex-1`}
-                />
-                <button
-                  onClick={handleReopen}
-                  disabled={!!actionLoading || !reopenNotes.trim()}
-                  className="px-6 py-2.5 bg-yellow-500 text-white rounded-xl font-bold disabled:opacity-50 transition text-xs uppercase tracking-wider whitespace-nowrap"
-                >
-                  {actionLoading === 'reopen' ? '...' : '⚠️ Reopen'}
-                </button>
-              </div>
             </div>
           ) : (
             <div className="bg-muted p-3.5 rounded-xl text-center text-sm text-muted-foreground font-bold">

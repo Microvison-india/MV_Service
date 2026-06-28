@@ -6,7 +6,6 @@ const Product = require('../models/Product');
 const generateComplaintId = require('../utils/generateComplaintId');
 const generateTrackingId = require('../utils/generateTrackingId');
 const { calculateWarranty } = require('../utils/warrantyCalculator');
-const { findReopenEligible } = require('../utils/reopenChecker');
 const sendWhatsApp = require('../utils/sendWhatsApp');
 
 // Helper to generate flexible regex pattern string for matching complaint IDs (e.g. MV-2026-00005, MV005, 00005)
