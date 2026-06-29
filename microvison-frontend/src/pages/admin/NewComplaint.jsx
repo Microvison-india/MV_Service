@@ -100,7 +100,7 @@ export default function NewComplaint() {
     warrantyStatus: prefill.warrantyStatus || '',
     // Step 3 (Product & Type)
     product: prefill.product || '',
-    complaintType: '',
+    complaintType: prefill.product === 'cooler' ? 'complaint' : '',
     // Step 4 (Charges)
     presetId: '',
     customPresetName: '',
@@ -257,12 +257,17 @@ export default function NewComplaint() {
         forceOverride: formData.forceOverride || false,
         warrantyForceReason: formData.warrantyForceReason?.trim() || undefined,
         manualReason: formData.manualReason?.trim() || undefined,
-        presetId: formData.warrantyStatus === 'in_warranty' && formData.presetId !== 'manual' ? formData.presetId : null,
+        presetId: formData.presetId !== 'manual' ? formData.presetId : null,
         presetName: formData.presetId === 'manual' ? formData.customPresetName.trim() : undefined,
         presetPrice: formData.presetId === 'manual' ? Number(formData.customPresetPrice) : undefined,
-        petrolAdmin: formData.warrantyStatus === 'in_warranty' && formData.petrolAdmin
-          ? Number(formData.petrolAdmin)
-          : null,
+        petrolAdmin: formData.petrolAdmin ? Number(formData.petrolAdmin) : null,
+        
+        // Change 6A Refinement: Initial customer payment (if entered for OOW)
+        initialCustomerPayment: (formData.warrantyStatus !== 'in_warranty' && formData.initialPaymentAmount) ? {
+          amount: Number(formData.initialPaymentAmount),
+          route: formData.initialPaymentRoute || 'to_sc',
+          reason: formData.initialPaymentReason?.trim() || 'Advance payment at registration'
+        } : undefined,
         extraCharges: cleanedExtras,
         notes: formData.notes || '',
         voiceNoteUrl: formData.voiceNoteUrl || '',

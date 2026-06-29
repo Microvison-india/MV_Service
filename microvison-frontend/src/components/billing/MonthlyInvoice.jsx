@@ -44,8 +44,10 @@ export default function MonthlyInvoice({ invoice }) {
       petrol: c.petrol,
       extrasTotal: c.extrasTotal,
       total: c.total,
+      // Change 6A: Use unified customerPaidToSC from billingCalculator
+      customerPaidToSC: c.customerPaidToSC,
+      // Legacy fields kept for backward compatibility
       customerPaymentAmount: c.customerPaymentAmount,
-      // Change 5: Critical Action deduction visible to SC (spec §7)
       customerChargePaidToSCAmount: c.customerChargePaidToSCAmount,
       customerChargeReason: c.customerChargeReason,
     },

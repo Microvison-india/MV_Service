@@ -4,9 +4,10 @@ import ImageUploader from './ImageUploader';
 import VoiceRecorder from './VoiceRecorder';
 
 // GRD Section 6.4 — Step 4 (was Step 3): Charges & Media
-// In-warranty: preset selector + petrol estimate + extra charges
-// Out-of-warranty: no preset, no petrol, only optional admin-added extras
-// Both warranty types: notes (text), voice note (max 60s), 2 admin photos
+// Change 6A: BOTH in-warranty AND out-of-warranty complaints use preset + petrol + extras.
+// SC gets paid preset + petrol + approved extras from Microvison in ALL cases.
+// For OOW: customer payments are recorded separately in the complaint detail panel
+// and deducted from what Microvison owes the SC.
 
 export default function Step4Charges({ formData, setFormData }) {
   const [presets, setPresets] = useState([]);
@@ -14,10 +15,10 @@ export default function Step4Charges({ formData, setFormData }) {
 
   const isInWarranty = formData.warrantyStatus === 'in_warranty';
 
-  // Fetch presets filtered by product + complaintType
+  // Fetch presets filtered by product + complaintType (for BOTH warranty types)
   useEffect(() => {
     let active = true;
-    if (!isInWarranty || !formData.product || !formData.complaintType) {
+    if (!formData.product || !formData.complaintType) {
       Promise.resolve().then(() => {
         if (active) setPresets([]);
       });
@@ -28,7 +29,6 @@ export default function Step4Charges({ formData, setFormData }) {
       setLoadingPresets(true);
       try {
         // Map product + complaintType to preset type
-        // GRD: installation_led for LED installation; complaint_led, complaint_cooler, complaint_both for others
         let presetType = '';
         if (formData.complaintType === 'installation' && (formData.product === 'led' || formData.product === 'both')) {
           presetType = 'installation_led';
@@ -53,13 +53,13 @@ export default function Step4Charges({ formData, setFormData }) {
     return () => {
       active = false;
     };
-  }, [formData.product, formData.complaintType, formData.warrantyStatus, isInWarranty]);
+  }, [formData.product, formData.complaintType, formData.warrantyStatus]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Extra Charges management (GRD 6.4)
+  // Extra Charges management
   const addExtraCharge = () => {
     setFormData((prev) => ({
       ...prev,
@@ -88,93 +88,145 @@ export default function Step4Charges({ formData, setFormData }) {
   return (
     <div className="space-y-6">
 
-      {/* ── PRESET SELECTOR (in-warranty only) ────────────────── */}
-      {isInWarranty && (
-        <div>
-          <label className={labelCls}>
-            Pricing Preset <span className="text-red-500">*</span>
-          </label>
-          <p className="text-xs text-muted-foreground mb-3">
-            Price is locked permanently after complaint creation.
-          </p>
-          {loadingPresets ? (
-            <div className="h-9 bg-muted rounded-lg animate-pulse w-full" />
-          ) : (
-            <div className="space-y-3">
-              <select
-                id="step4-preset"
-                value={formData.presetId || ''}
-                onChange={(e) => handleChange('presetId', e.target.value)}
-                className={inputCls}
-                required
-              >
-                <option value="">Select a preset...</option>
-                <option value="manual" className="font-bold">➕ Custom / Manual Entry</option>
-                {presets.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.packageName} — ₹{p.price} ({p.modelNo})
-                  </option>
-                ))}
-              </select>
-
-              {formData.presetId === 'manual' && (
-                <div className="p-4 rounded-lg bg-muted/50 border border-border flex gap-3 items-end">
-                  <div className="flex-1">
-                    <label className={labelCls}>Custom Preset Title</label>
-                    <input
-                      type="text"
-                      value={formData.customPresetName || ''}
-                      onChange={(e) => handleChange('customPresetName', e.target.value)}
-                      placeholder="e.g. Special Motor Repair"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div className="w-32">
-                    <label className={labelCls}>Price (₹)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.customPresetPrice || ''}
-                      onChange={(e) => handleChange('customPresetPrice', e.target.value)}
-                      placeholder="e.g. 500"
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── PETROL (in-warranty only) ──────────────────────────── */}
-      {isInWarranty && (
-        <div>
-          <label className={labelCls}>Petrol / Diesel Estimate (₹)</label>
-          <p className="text-xs text-muted-foreground mb-2">
-            Optional. This is Edit 1 of 3. SC adjusts actual later; admin can override once.
-          </p>
-          <input
-            id="step4-petrol"
-            type="number"
-            min="0"
-            value={formData.petrolAdmin || ''}
-            onChange={(e) => handleChange('petrolAdmin', e.target.value)}
-            placeholder="e.g. 150"
-            className={`${inputCls} max-w-xs`}
-          />
-        </div>
-      )}
-
-      {/* ── OUT-OF-WARRANTY INFO ────────────────────────────────── */}
+      {/* ── OUT-OF-WARRANTY BANNER ─────────────────────────────────── */}
       {!isInWarranty && (
-        <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
-          <strong>Out of Warranty</strong> — No preset or petrol charge from Microvison. The customer pays the SC directly.
-          You may add optional extra charges below if Microvison is covering a specific cost (e.g. a spare part).
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 space-y-1.5">
+          <p className="font-semibold">⚠ Out of Warranty — SC still gets paid normally</p>
+          <p className="text-amber-800 text-xs leading-relaxed">
+            Set the preset, petrol estimate, and any extra charges below — <strong>Microvison pays the SC</strong> all of this.
+            Customer payments (who paid, how much, at which stage) are recorded separately in the complaint detail panel after registration.
+            Amounts the customer paid <em>to SC directly</em> will be subtracted from what Microvison owes the SC.
+          </p>
         </div>
       )}
 
-      {/* ── EXTRA CHARGES (both warranty types) ─────────────────── */}
+      {/* ── PRESET SELECTOR (both warranty types) ──────────────────── */}
+      <div>
+        <label className={labelCls}>
+          Pricing Preset <span className="text-red-500">*</span>
+        </label>
+        <p className="text-xs text-muted-foreground mb-3">
+          {isInWarranty
+            ? 'Price is locked permanently after complaint creation.'
+            : 'SC earns this amount from Microvison. Admin records what customer paid separately.'}
+        </p>
+        {loadingPresets ? (
+          <div className="h-9 bg-muted rounded-lg animate-pulse w-full" />
+        ) : (
+          <div className="space-y-3">
+            <select
+              id="step4-preset"
+              value={formData.presetId || ''}
+              onChange={(e) => handleChange('presetId', e.target.value)}
+              className={inputCls}
+              required
+            >
+              <option value="">Select a preset...</option>
+              <option value="manual" className="font-bold">➕ Custom / Manual Entry</option>
+              {presets.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.packageName} — ₹{p.price} ({p.modelNo})
+                </option>
+              ))}
+            </select>
+
+            {formData.presetId === 'manual' && (
+              <div className="p-4 rounded-lg bg-muted/50 border border-border flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className={labelCls}>Custom Preset Title</label>
+                  <input
+                    type="text"
+                    value={formData.customPresetName || ''}
+                    onChange={(e) => handleChange('customPresetName', e.target.value)}
+                    placeholder="e.g. Special Motor Repair"
+                    className={inputCls}
+                  />
+                </div>
+                <div className="w-32">
+                  <label className={labelCls}>Price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.customPresetPrice || ''}
+                    onChange={(e) => handleChange('customPresetPrice', e.target.value)}
+                    placeholder="e.g. 500"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── PETROL (both warranty types) ───────────────────────────── */}
+      <div>
+        <label className={labelCls}>Petrol / Diesel Estimate (₹)</label>
+        <p className="text-xs text-muted-foreground mb-2">
+          Optional. This is Edit 1 of 3. SC adjusts actual later; admin can override once.
+        </p>
+        <input
+          id="step4-petrol"
+          type="number"
+          min="0"
+          value={formData.petrolAdmin || ''}
+          onChange={(e) => handleChange('petrolAdmin', e.target.value)}
+          placeholder="e.g. 150"
+          className={`${inputCls} max-w-xs`}
+        />
+      </div>
+
+      {/* ── INITIAL CUSTOMER PAYMENT (Out-of-warranty only) ───────── */}
+      {!isInWarranty && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-bold text-blue-900">Record Initial Customer Payment (Optional)</h4>
+            <p className="text-xs text-blue-800/80 mt-1">
+              Did the customer pay anything upfront? This will be recorded in the complaint immediately.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Amount (₹)</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.initialPaymentAmount || ''}
+                onChange={(e) => handleChange('initialPaymentAmount', e.target.value)}
+                placeholder="e.g. 500"
+                className={`${inputCls} border-blue-200 bg-white`}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Payment Route</label>
+              <select
+                value={formData.initialPaymentRoute || 'to_sc'}
+                onChange={(e) => handleChange('initialPaymentRoute', e.target.value)}
+                className={`${inputCls} border-blue-200 bg-white`}
+                disabled={!formData.initialPaymentAmount}
+              >
+                <option value="to_sc">Paid to SC directly</option>
+                <option value="to_microvison">Paid to Microvison (Company)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Payment Reason / Note</label>
+            <input
+              type="text"
+              value={formData.initialPaymentReason || ''}
+              onChange={(e) => handleChange('initialPaymentReason', e.target.value)}
+              placeholder="e.g. Advance payment during registration"
+              className={`${inputCls} border-blue-200 bg-white`}
+              disabled={!formData.initialPaymentAmount}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── EXTRA CHARGES (both warranty types) ─────────────────────── */}
       <div>
         <label className={labelCls}>Extra Charges (optional)</label>
         <p className="text-xs text-muted-foreground mb-3">
@@ -219,7 +271,7 @@ export default function Step4Charges({ formData, setFormData }) {
         </button>
       </div>
 
-      {/* ── NOTES ──────────────────────────────────────────────── */}
+      {/* ── NOTES ──────────────────────────────────────────────────── */}
       <div>
         <label className={labelCls}>Admin Notes (optional)</label>
         <textarea
@@ -232,7 +284,7 @@ export default function Step4Charges({ formData, setFormData }) {
         />
       </div>
 
-      {/* ── VOICE NOTE ──────────────────────────────────────────── */}
+      {/* ── VOICE NOTE ──────────────────────────────────────────────── */}
       <div>
         <label className={labelCls}>Voice Note (optional, max 60 seconds)</label>
         <VoiceRecorder
@@ -241,7 +293,7 @@ export default function Step4Charges({ formData, setFormData }) {
         />
       </div>
 
-      {/* ── ADMIN PHOTOS (max 2) ─────────────────────────────────── */}
+      {/* ── ADMIN PHOTOS (max 2) ─────────────────────────────────────── */}
       <div>
         <label className={labelCls}>
           Admin Photos (optional, max 2)

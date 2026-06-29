@@ -97,6 +97,9 @@ const createComplaint = async (req, res) => {
     reopenParentId,
     reopenNotes,
     reopenPhotos,
+
+    // Change 6A Refinement: Inline customer payment at registration
+    initialCustomerPayment,
   } = req.body;
 
   // ── Validate required fields ──────────────────────────────
@@ -115,11 +118,11 @@ const createComplaint = async (req, res) => {
       .json({ message: 'Coolers do not support installation complaints.' });
   }
 
-  // In-warranty: preset is required (either presetId OR custom presetName & presetPrice)
-  if (warrantyStatus === 'in_warranty' && !presetId && (!req.body.presetName || req.body.presetPrice == null)) {
+  // In Change 6A, ALL complaints (even OOW) require a preset because the SC gets paid by Microvison.
+  if (!presetId && (!req.body.presetName || req.body.presetPrice == null)) {
     return res
       .status(400)
-      .json({ message: 'A preset or custom manual preset must be provided for in-warranty complaints.' });
+      .json({ message: 'A preset or custom manual preset must be provided for all complaints.' });
   }
 
   // Reopen: reopenNotes is required (GRD Section 8)
@@ -133,18 +136,16 @@ const createComplaint = async (req, res) => {
   let snapshotPresetName = '';
   let snapshotPresetPrice = null;
 
-  if (warrantyStatus === 'in_warranty') {
-    if (presetId) {
-      const preset = await Preset.findById(presetId).lean();
-      if (!preset) {
-        return res.status(404).json({ message: 'Selected preset not found.' });
-      }
-      snapshotPresetName = preset.packageName;
-      snapshotPresetPrice = preset.price;
-    } else {
-      snapshotPresetName = req.body.presetName;
-      snapshotPresetPrice = Number(req.body.presetPrice);
+  if (presetId) {
+    const preset = await Preset.findById(presetId).lean();
+    if (!preset) {
+      return res.status(404).json({ message: 'Selected preset not found.' });
     }
+    snapshotPresetName = preset.packageName;
+    snapshotPresetPrice = preset.price;
+  } else {
+    snapshotPresetName = req.body.presetName;
+    snapshotPresetPrice = Number(req.body.presetPrice);
   }
 
   // ── Build extra charges array ─────────────────────────────
@@ -282,11 +283,17 @@ const createComplaint = async (req, res) => {
     state,
     product,
     complaintType,
-    presetId: finalWarrantyStatus === 'in_warranty' ? presetId : null,
+    customerPayments: initialCustomerPayment ? [{
+      ...initialCustomerPayment,
+      stage: 'registration',
+      recordedBy: req.user.id,
+      recordedAt: new Date()
+    }] : [],
+    presetId: presetId || null,
     presetName: snapshotPresetName,
     presetPrice: snapshotPresetPrice,
-    petrolAdmin: finalWarrantyStatus === 'in_warranty' ? petrolValue : null,
-    petrolEditCount: finalWarrantyStatus === 'in_warranty' ? petrolEditCount : 0,
+    petrolAdmin: petrolValue,
+    petrolEditCount: petrolEditCount,
     extraCharges: formattedExtras,
     notes: notes || '',
     voiceNoteUrl: voiceNoteUrl || '',
@@ -676,6 +683,9 @@ const updateStatus = async (req, res) => {
     scSerialSlipPhotoUrl,
     scMissingBypass,
     engineerName,
+    
+    // Change 6A Refinement: Inline customer payment during proxy form
+    inlineCustomerPayment,
   } = req.body;
 
   const ALLOWED_FINAL_STATUSES = ['done', 'not_done', 'part_pending'];
@@ -721,10 +731,8 @@ const updateStatus = async (req, res) => {
     }
 
     if (complaint.warrantyStatus === 'out_of_warranty') {
-      if (customerPaymentAmount == null || customerPaymentAmount === '') {
-        return res.status(400).json({ message: 'Amount collected from customer is required for out-of-warranty completed jobs.' });
-      }
-      complaint.customerPaymentAmount = Number(customerPaymentAmount);
+      // Change 6A: SC no longer collects payment — admin records via customerPayments
+      // Kept for backward compatibility but no longer required from SC done form
     }
 
     // Save lifecycle metrics
@@ -886,6 +894,16 @@ const updateStatus = async (req, res) => {
     timelineNote = `Part Pending: Sourcing requested for "${partDetails.trim()}".${trimmedNotes ? ' ' + trimmedNotes : ''}`;
     timelineVoiceUrl = partPendingVoiceUrl;
   }
+  // Change 6A Refinement: Append inline customer payment if provided
+  if (inlineCustomerPayment && inlineCustomerPayment.amount) {
+    if (!complaint.customerPayments) complaint.customerPayments = [];
+    complaint.customerPayments.push({
+      ...inlineCustomerPayment,
+      stage: newStatus,
+      recordedBy: req.user.id,
+      recordedAt: new Date()
+    });
+  }
 
   complaint.status = newStatus;
   complaint.proofPhotos = photos;
@@ -946,7 +964,6 @@ const confirmDone = async (req, res) => {
     criticalActionAcknowledgedAt,
     presetPriceOverride,
     presetPriceOverrideReason,
-    customerPaymentToMicrovison,
     engineerName,
   } = req.body;
 
@@ -1077,10 +1094,8 @@ const confirmDone = async (req, res) => {
     }
   }
 
-  // Change 6A: Customer payment to Microvison
-  if (customerPaymentToMicrovison !== undefined && customerPaymentToMicrovison !== null) {
-    complaint.customerPaymentToMicrovison = Number(customerPaymentToMicrovison) || null;
-  }
+  // Change 6A: customerPayments array is managed separately via /customer-payments endpoints
+  // customerPaymentToMicrovison legacy field no longer updated here
 
   // Change 6C: Engineer name
   if (engineerName !== undefined) {
@@ -1773,6 +1788,120 @@ const saveCriticalAction = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// Change 6A: Add a customer payment entry to a complaint
+// @route   POST /api/complaints/:id/customer-payments
+// @access  Private (Admin only)
+// Body: { amount, route ('to_microvison' | 'to_sc'), reason }
+// ─────────────────────────────────────────────────────────────
+const addCustomerPayment = async (req, res) => {
+  try {
+    const { amount, route, reason } = req.body;
+
+    if (!amount || !route) {
+      return res.status(400).json({ message: 'Amount and route are required.' });
+    }
+    if (!['to_microvison', 'to_sc'].includes(route)) {
+      return res.status(400).json({ message: 'Route must be \'to_microvison\' or \'to_sc\'.' });
+    }
+    if (Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Amount must be greater than 0.' });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+    if (complaint.status === 'closed') {
+      return res.status(400).json({ message: 'Cannot add payments to a closed complaint.' });
+    }
+
+    complaint.customerPayments.push({
+      amount: Number(amount),
+      route,
+      reason: reason || '',
+      recordedAt: new Date(),
+      recordedBy: req.user.id,
+    });
+
+    await complaint.save();
+    res.status(200).json({ message: 'Payment entry added.', customerPayments: complaint.customerPayments });
+  } catch (err) {
+    console.error('Error in addCustomerPayment:', err);
+    res.status(500).json({ message: 'Server error adding payment entry.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Change 6A: Delete a customer payment entry from a complaint
+// @route   DELETE /api/complaints/:id/customer-payments/:paymentId
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const deleteCustomerPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+    if (complaint.status === 'closed') {
+      return res.status(400).json({ message: 'Cannot remove payments from a closed complaint.' });
+    }
+
+    const idx = complaint.customerPayments.findIndex(p => String(p._id) === paymentId);
+    if (idx === -1) return res.status(404).json({ message: 'Payment entry not found.' });
+
+    complaint.customerPayments.splice(idx, 1);
+    await complaint.save();
+    res.status(200).json({ message: 'Payment entry removed.', customerPayments: complaint.customerPayments });
+  } catch (err) {
+    console.error('Error in deleteCustomerPayment:', err);
+    res.status(500).json({ message: 'Server error removing payment entry.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Change 6A: Edit a customer payment entry
+// @route   PATCH /api/complaints/:id/customer-payments/:paymentId
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const updateCustomerPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { amount, route, reason } = req.body;
+
+    if (!amount || !route) {
+      return res.status(400).json({ message: 'Amount and route are required.' });
+    }
+    if (!['to_microvison', 'to_sc'].includes(route)) {
+      return res.status(400).json({ message: 'Route must be \'to_microvison\' or \'to_sc\'.' });
+    }
+    if (Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Amount must be greater than 0.' });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ message: 'A reason is required when editing a payment.' });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+    if (complaint.status === 'closed') {
+      return res.status(400).json({ message: 'Cannot edit payments in a closed complaint.' });
+    }
+
+    const payment = complaint.customerPayments.id(paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment entry not found.' });
+
+    payment.amount = Number(amount);
+    payment.route = route;
+    payment.reason = reason.trim();
+    // Optional: update recordedBy to the admin who made the edit
+    // payment.recordedBy = req.user.id;
+
+    await complaint.save();
+    res.status(200).json({ message: 'Payment entry updated.', customerPayments: complaint.customerPayments });
+  } catch (err) {
+    console.error('Error in updateCustomerPayment:', err);
+    res.status(500).json({ message: 'Server error updating payment entry.' });
+  }
+};
+
 module.exports = {
   saveCriticalAction,
   reopenCheck,
@@ -1796,4 +1925,7 @@ module.exports = {
   updateExtraCharges,
   updateSingleExtraCharge,
   forceClose,
+  addCustomerPayment,
+  deleteCustomerPayment,
+  updateCustomerPayment,
 };

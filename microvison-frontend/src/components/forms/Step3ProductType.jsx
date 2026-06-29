@@ -3,6 +3,8 @@
 // Product type is locked if linked from Step 1 product tracking.
 // Warranty and bill info have been moved to the new Step 2 (Step2ProductInfo.jsx).
 
+import { useEffect } from 'react';
+
 const PRODUCTS = [
   { value: 'led', label: 'LED', icon: '💡' },
   { value: 'cooler', label: 'Cooler', icon: '❄️' },
@@ -11,6 +13,13 @@ const PRODUCTS = [
 export default function Step3ProductType({ formData, setFormData }) {
   // If a product was linked in Step 1, its product type is locked
   const isProductLocked = !!formData.trackingId;
+
+  // Coolers always have complaintType = complaint
+  useEffect(() => {
+    if (formData.product === 'cooler' && formData.complaintType !== 'complaint') {
+      setFormData((prev) => ({ ...prev, complaintType: 'complaint' }));
+    }
+  }, [formData.product, formData.complaintType, setFormData]);
 
   const handleProductChange = (product) => {
     if (isProductLocked) return;

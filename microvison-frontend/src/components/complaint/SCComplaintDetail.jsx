@@ -45,8 +45,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [proofPhotos, setProofPhotos] = useState([]);
   const [scNotes, setScNotes] = useState('');
   const [activeForm, setActiveForm] = useState('done'); // 'done' | 'not_done' | 'part_pending'
+  const [engineerName, setEngineerName] = useState('');
   const [petrolSC, setPetrolSC] = useState('');
-  const [customerPayment, setCustomerPayment] = useState('');
 
   const [markingGoing, setMarkingGoing] = useState(false);
   const [error, setError] = useState('');
@@ -73,7 +73,6 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const [scSerialSlipPhotoUrl, setScSerialSlipPhotoUrl] = useState('');
   const [skipBillPhoto, setSkipBillPhoto] = useState(false);
   const [skipSerialPhoto, setSkipSerialPhoto] = useState(false);
-  const [engineerName, setEngineerName] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -85,7 +84,6 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setProofPhotos([]);
       setScNotes('');
       setPetrolSC('');
-      setCustomerPayment('');
       setDoneVoiceUrl('');
       setNotDoneReason('');
       setNotDoneVoiceUrl('');
@@ -234,13 +232,6 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
         setError('At least one proof photo is required before marking as done.');
         return;
       }
-      if (!isInWarranty && !customerPayment) {
-        setError('Please enter the amount collected from the customer.');
-        return;
-      }
-      if (!isInWarranty) {
-        body.customerPaymentAmount = Number(customerPayment);
-      }
 
       body.totalVisits = totalVisits ? Number(totalVisits) : undefined;
       body.distanceTravelled = distanceTravelled ? Number(distanceTravelled) : undefined;
@@ -273,8 +264,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       if (isSerialInfoMissing && skipSerialPhoto) bypassedFields.push('serialPhoto');
       body.scMissingBypass = bypassedFields;
 
-      // Petrol SC (only if in-warranty and petrol is not locked by admin)
-      if (isInWarranty && !c.petrolLocked) {
+      // Petrol SC (if petrol is not locked by admin)
+      if (!c.petrolLocked) {
         body.petrolSC = (petrolSC === '' || petrolSC === null || petrolSC === undefined) ? null : Number(petrolSC);
       }
 
@@ -526,8 +517,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
           {/* Section 3: Job Context & Pricing Accordion */}
           <AccordionSection title="Job Context & Pricing" icon="🔧" defaultOpen={false}>
-            {/* Pricing Section (In Warranty only) - Read Only! */}
-            {isInWarranty && (
+            {/* Pricing Section - Read Only! */}
+            {true && (
               <div className="rounded-xl border border-border/80 p-3.5 bg-muted/10">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Preset Pricing Details (Admin Assigned)</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
@@ -544,7 +535,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
             )}
             
             {/* Petrol field (Read-only on SC side pricing context - editing only allowed in Done form) */}
-            {isInWarranty && (
+            {true && (
               <div className="bg-muted/10 border border-border/80 rounded-xl p-3.5 space-y-1.5">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Petrol Claimed</span>
                 <PetrolEditField
@@ -736,22 +727,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                       </div>
                     )}
 
-                    {/* Out of Warranty payment collection */}
-                    {!isInWarranty && (
-                      <div>
-                        <label className={labelCls}>
-                          Amount Collected from Customer (₹) <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={customerPayment}
-                          onChange={(e) => setCustomerPayment(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. 350"
-                        />
-                      </div>
-                    )}
+                    {/* Out-of-warranty: payment now recorded by admin only (Change 6A) */}
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -778,7 +754,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                     </div>
 
                     {/* Petrol allowance claim input (SC Side) */}
-                    {isInWarranty && !c.petrolLocked && (
+                    {!c.petrolLocked && (
                       <div>
                         <label className={labelCls}>Petrol Allowance Claim (₹)</label>
                         <input

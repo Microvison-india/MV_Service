@@ -1,41 +1,48 @@
-export default function BillSummary({ complaint }) {
+export default function BillSummary({ complaint, isAdmin = false }) {
   if (!complaint || !complaint.billGenerated) return null;
 
   const isWarranty = complaint.warrantyStatus === 'in_warranty';
 
   // 1. Preset base price
-  const presetOriginal = isWarranty ? (complaint.presetPrice ?? 0) : 0;
+  const presetOriginal = complaint.presetPrice ?? 0;
   const presetPrice =
     complaint.presetPriceOverride !== null && complaint.presetPriceOverride !== undefined
       ? complaint.presetPriceOverride
       : presetOriginal;
-  const presetName = isWarranty ? (complaint.presetName || 'Default Preset') : '';
+  const presetName = complaint.presetName || 'Default Preset';
 
   // 2. Petrol logic (strict null checks to preserve 0)
   let petrol = 0;
-  if (isWarranty) {
-    if (complaint.petrolFinal !== null && complaint.petrolFinal !== undefined) {
-      petrol = complaint.petrolFinal;
-    } else if (complaint.petrolSC !== null && complaint.petrolSC !== undefined) {
-      petrol = complaint.petrolSC;
-    } else if (complaint.petrolAdmin !== null && complaint.petrolAdmin !== undefined) {
-      petrol = complaint.petrolAdmin;
-    }
+  if (complaint.petrolFinal !== null && complaint.petrolFinal !== undefined) {
+    petrol = complaint.petrolFinal;
+  } else if (complaint.petrolSC !== null && complaint.petrolSC !== undefined) {
+    petrol = complaint.petrolSC;
+  } else if (complaint.petrolAdmin !== null && complaint.petrolAdmin !== undefined) {
+    petrol = complaint.petrolAdmin;
   }
 
   // 3. Approved Extra charges
   const approvedExtras = (complaint.extraCharges || []).filter((ec) => ec.status === 'approved');
   const extrasTotal = approvedExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
 
-  // 5. Gross total
-  const grossTotal = isWarranty
-    ? presetPrice + petrol + extrasTotal
-    : extrasTotal;
+  // 4. Gross total
+  const grossTotal = presetPrice + petrol + extrasTotal;
 
-  // 6. Deductions: Customer paid to SC
-  const customerPaidToSC = (complaint.customerPaymentAmount || 0) + (complaint.customerChargePaidToSCAmount || 0);
+  // 5. Change 6A: Multi-stage customer payments
+  const payments = complaint.customerPayments || [];
+  const toSCPayments = payments.filter(p => p.route === 'to_sc');
+  const toMVPayments = payments.filter(p => p.route === 'to_microvison');
+  const newCustomerPaidToSC = toSCPayments.reduce((s, p) => s + (p.amount || 0), 0);
+  const newCustomerPaidToMV = toMVPayments.reduce((s, p) => s + (p.amount || 0), 0);
 
-  // 7. Net total owed to SC (can be negative — SC owes Microvison if customer paid more to SC than SC's bill)
+  // Legacy field fallback for old complaints without customerPayments array
+  const legacyPaidToSC = (complaint.customerPaymentAmount || 0) + (complaint.customerChargePaidToSCAmount || 0);
+  const legacyPaidToMV = complaint.customerPaymentToMicrovison || 0;
+
+  const customerPaidToSC = payments.length > 0 ? newCustomerPaidToSC : legacyPaidToSC;
+  const customerPaidToMV = payments.length > 0 ? newCustomerPaidToMV : legacyPaidToMV;
+
+  // 6. Net total owed to SC (can be negative — SC owes Microvison if customer paid more to SC than SC's bill)
   const total = grossTotal - customerPaidToSC;
 
   return (
@@ -55,29 +62,25 @@ export default function BillSummary({ complaint }) {
       </div>
 
       <div className="space-y-2.5 text-sm">
-        {/* In Warranty specific lines */}
-        {isWarranty && (
-          <>
-            <div className="flex justify-between text-foreground">
-              <span className="text-muted-foreground">Preset: <span className="text-xs text-foreground font-medium">({presetName})</span></span>
-              <span className="font-medium">
-                {complaint.presetPriceOverride !== null && complaint.presetPriceOverride !== undefined && (
-                  <span className="line-through text-muted-foreground mr-2 text-xs">₹{presetOriginal}</span>
-                )}
-                ₹{presetPrice}
-              </span>
-            </div>
-            {complaint.presetPriceOverrideReason && (
-              <div className="text-[10px] text-muted-foreground -mt-1 ml-4 italic">
-                Override reason: {complaint.presetPriceOverrideReason}
-              </div>
+        {/* Preset and Petrol lines (now for all warranty types) */}
+        <div className="flex justify-between text-foreground">
+          <span className="text-muted-foreground">Preset: <span className="text-xs text-foreground font-medium">({presetName})</span></span>
+          <span className="font-medium">
+            {complaint.presetPriceOverride !== null && complaint.presetPriceOverride !== undefined && (
+              <span className="line-through text-muted-foreground mr-2 text-xs">₹{presetOriginal}</span>
             )}
-            <div className="flex justify-between text-foreground">
-              <span className="text-muted-foreground">Petrol Allowance:</span>
-              <span className="font-medium">₹{petrol}</span>
-            </div>
-          </>
+            ₹{presetPrice}
+          </span>
+        </div>
+        {complaint.presetPriceOverrideReason && (
+          <div className="text-[10px] text-muted-foreground -mt-1 ml-4 italic">
+            Override reason: {complaint.presetPriceOverrideReason}
+          </div>
         )}
+        <div className="flex justify-between text-foreground">
+          <span className="text-muted-foreground">Petrol Allowance:</span>
+          <span className="font-medium">₹{petrol}</span>
+        </div>
 
         {/* Approved Extras list */}
         {approvedExtras.length > 0 && (
@@ -104,8 +107,24 @@ export default function BillSummary({ complaint }) {
           </div>
         )}
 
-        {/* Deductions */}
-        {customerPaidToSC > 0 && (
+        {/* Change 6A: Deductions — Paid to SC entries (itemised) */}
+        {toSCPayments.length > 0 && (
+          <div className="space-y-1 pt-1">
+            {toSCPayments.map((p, i) => (
+              <div key={i} className="flex justify-between text-red-600 dark:text-red-400 text-xs">
+                <span>− Customer paid to SC{p.reason ? `: ${p.reason}` : ''}:</span>
+                <span>−₹{p.amount}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-red-600 dark:text-red-400 font-medium text-xs border-t border-dashed border-red-200 pt-1">
+              <span>Total deducted from SC bill:</span>
+              <span>−₹{customerPaidToSC}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Legacy single-field deduction (old complaints) */}
+        {payments.length === 0 && customerPaidToSC > 0 && (
           <div className="flex justify-between text-red-600 dark:text-red-400 font-medium text-xs">
             <span>- Customer paid to SC:</span>
             <span>-₹{customerPaidToSC}</span>
@@ -121,11 +140,22 @@ export default function BillSummary({ complaint }) {
           <p className="text-[10px] text-red-500 text-right italic mt-0.5">Customer paid more than SC's bill — SC must return ₹{Math.abs(total)} to Microvison.</p>
         )}
 
-        {/* Informational: Customer Paid Microvison Directly */}
-        {complaint.customerPaymentToMicrovison > 0 && (
-          <div className="mt-2 p-2 bg-green-50/50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30 rounded flex justify-between items-center text-green-700 dark:text-green-400">
-            <span className="text-[11px] font-medium">For record: Customer paid Microvison</span>
-            <span className="text-sm font-bold">₹{complaint.customerPaymentToMicrovison}</span>
+        {/* Change 6A: Informational — Customer paid Microvison (admin-only internal record) */}
+        {isAdmin && customerPaidToMV > 0 && (
+          <div className="mt-2 space-y-1">
+            {toMVPayments.length > 0 ? (
+              toMVPayments.map((p, i) => (
+                <div key={i} className="p-2 bg-green-50/50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30 rounded flex justify-between items-center text-green-700 dark:text-green-400">
+                  <span className="text-[11px] font-medium">For record: Customer paid Microvison{p.reason ? ` — ${p.reason}` : ''}</span>
+                  <span className="text-sm font-bold">₹{p.amount}</span>
+                </div>
+              ))
+            ) : (
+              <div className="mt-2 p-2 bg-green-50/50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30 rounded flex justify-between items-center text-green-700 dark:text-green-400">
+                <span className="text-[11px] font-medium">For record: Customer paid Microvison</span>
+                <span className="text-sm font-bold">₹{customerPaidToMV}</span>
+              </div>
+            )}
           </div>
         )}
 

@@ -188,10 +188,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   // Unregistered SC Action States
   const [unregActionForm, setUnregActionForm] = useState('');
   const [unregNotes, setUnregNotes] = useState('');
-  const [unregAmountCollected, setUnregAmountCollected] = useState('');
   const [unregPartDetails, setUnregPartDetails] = useState('');
   const [unregReason, setUnregReason] = useState('');
   const [unregPhotos, setUnregPhotos] = useState([]);
+  
+  // Change 6A Refinement: Inline customer payment for proxy forms
+  const [inlinePaymentAmount, setInlinePaymentAmount] = useState('');
+  const [inlinePaymentRoute, setInlinePaymentRoute] = useState('to_sc');
+  const [inlinePaymentReason, setInlinePaymentReason] = useState('');
 
 
   // Unregistered SC Proxy Mode
@@ -232,6 +236,20 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [presetPriceOverrideReason, setPresetPriceOverrideReason] = useState(c?.presetPriceOverrideReason || '');
   const [editingPreset, setEditingPreset] = useState(false);
   const [criticalActionAcknowledged, setCriticalActionAcknowledged] = useState(false);
+
+  // Change 6A: Collected from Customer panel state
+  const [showPaymentPanel, setShowPaymentPanel] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentRoute, setPaymentRoute] = useState('to_sc');
+  const [paymentReason, setPaymentReason] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState(null);
+
+  const [editingPaymentId, setEditingPaymentId] = useState(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState('');
+  const [editPaymentRoute, setEditPaymentRoute] = useState('to_sc');
+  const [editPaymentReason, setEditPaymentReason] = useState('');
+  const [savingEditPayment, setSavingEditPayment] = useState(false);
   
   const [adminEngineerName, setAdminEngineerName] = useState(c?.engineerName || '');
   const [selectedEngineerType, setSelectedEngineerType] = useState(c?.engineerName ? 'sc_submitted' : 'custom');
@@ -450,6 +468,85 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     }
   };
 
+  // Change 6A: Add a customer payment entry
+  const handleAddPayment = async () => {
+    if (!paymentAmount || Number(paymentAmount) <= 0) {
+      setError('Enter a valid payment amount greater than 0.');
+      return;
+    }
+    setSavingPayment(true);
+    setError('');
+    try {
+      await api.post(`/api/complaints/${c._id}/customer-payments`, {
+        amount: Number(paymentAmount),
+        route: paymentRoute,
+        reason: paymentReason,
+      });
+      setPaymentAmount('');
+      setPaymentReason('');
+      setPaymentRoute('to_sc');
+      setSuccess('Payment entry recorded.');
+      setTimeout(() => onUpdated(), 500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to add payment entry.');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  // Change 6A: Delete a customer payment entry
+  const handleDeletePayment = async (paymentId) => {
+    setDeletingPaymentId(paymentId);
+    setError('');
+    try {
+      await api.delete(`/api/complaints/${c._id}/customer-payments/${paymentId}`);
+      setSuccess('Payment entry removed.');
+      setTimeout(() => onUpdated(), 500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove payment entry.');
+    } finally {
+      setDeletingPaymentId(null);
+    }
+  };
+
+  // Change 6A: Edit a customer payment entry
+  const startEditPayment = (p) => {
+    setEditingPaymentId(p._id);
+    setEditPaymentAmount(p.amount);
+    setEditPaymentRoute(p.route);
+    setEditPaymentReason(p.reason);
+  };
+
+  const cancelEditPayment = () => {
+    setEditingPaymentId(null);
+    setEditPaymentAmount('');
+    setEditPaymentRoute('to_sc');
+    setEditPaymentReason('');
+  };
+
+  const handleEditPaymentSubmit = async (paymentId) => {
+    if (!editPaymentAmount || Number(editPaymentAmount) <= 0) {
+      setError('Enter a valid payment amount greater than 0.');
+      return;
+    }
+    setSavingEditPayment(true);
+    setError('');
+    try {
+      await api.patch(`/api/complaints/${c._id}/customer-payments/${paymentId}`, {
+        amount: Number(editPaymentAmount),
+        route: editPaymentRoute,
+        reason: editPaymentReason,
+      });
+      setSuccess('Payment entry updated.');
+      cancelEditPayment();
+      setTimeout(() => onUpdated(), 500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update payment entry.');
+    } finally {
+      setSavingEditPayment(false);
+    }
+  };
+
   const handleConfirm = async () => {
     setActionLoading('confirm');
     setError('');
@@ -547,7 +644,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         body.warrantyRevocationReason = warrantyRevocationReason;
         body.criticalActionAcknowledgedAt = new Date().toISOString();
       }
-      if (isInWarranty && !c.petrolLocked) {
+      if (!c.petrolLocked) {
         body.petrolAdmin = (petrolAdmin === '' || petrolAdmin === null || petrolAdmin === undefined) ? null : Number(petrolAdmin);
         body.petrolSC = (petrolSC === '' || petrolSC === null || petrolSC === undefined) ? null : Number(petrolSC);
         body.petrolFinal = (petrolFinal === '' || petrolFinal === null || petrolFinal === undefined) ? null : Number(petrolFinal);
@@ -734,18 +831,21 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       scNotes: unregNotes,
     };
 
+    if (c.warrantyStatus !== 'in_warranty' && inlinePaymentAmount) {
+      body.inlineCustomerPayment = {
+        amount: Number(inlinePaymentAmount),
+        route: inlinePaymentRoute || 'to_sc',
+        reason: inlinePaymentReason.trim() || `Customer payment at ${statusVal} stage`
+      };
+    }
+
     if (statusVal === 'done') {
       if (unregPhotos.length < 1) {
         setError('At least one proof photo is required.');
         return;
       }
-      if (!isInWarranty && !unregAmountCollected) {
-        setError('Please specify the amount collected from customer.');
-        return;
-      }
-      if (!isInWarranty) {
-        body.customerPaymentAmount = Number(unregAmountCollected);
-      }
+      // Change 6A: Admin records customer payments via the "Collected from Customer" panel
+      // No longer required to enter amount at done form submission
     } else if (statusVal === 'not_done') {
       if (!unregReason.trim()) {
         setError('A reason note is required.');
@@ -769,6 +869,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       await api.patch(`/api/complaints/${c._id}/status`, body);
       setSuccess(`Complaint marked as "${statusVal.replace(/_/g, ' ')}" successfully!`);
       setUnregActionForm('');
+      setInlinePaymentAmount('');
+      setInlinePaymentRoute('to_sc');
+      setInlinePaymentReason('');
       setTimeout(onUpdated, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update status.');
@@ -910,15 +1013,52 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               <span className="font-bold text-xs uppercase tracking-wider text-foreground">Financials & Settlement</span>
             </div>
 
-            {!compInWarranty && comp.customerPaymentAmount > 0 && (
-              <div className="bg-green-50/50 border border-green-100 rounded-xl p-3.5 flex justify-between items-center">
-                <div>
-                  <span className="text-[10px] font-bold text-green-800 uppercase tracking-wider">Payment Collected</span>
-                  <p className="text-xs text-muted-foreground">Amount collected directly from customer (OOW)</p>
-                </div>
-                <p className="text-lg font-black text-green-900">₹{comp.customerPaymentAmount}</p>
-              </div>
-            )}
+            {/* Change 6A: Show customer payments entries (or legacy field) */}
+            {!compInWarranty && (() => {
+              const payments = comp.customerPayments || [];
+              const toSC = payments.filter(p => p.route === 'to_sc');
+              const toMV = payments.filter(p => p.route === 'to_microvison');
+              const legacyAmt = comp.customerPaymentAmount;
+              if (payments.length > 0) {
+                return (
+                  <div className="space-y-1.5">
+                    {toSC.length > 0 && (
+                      <div className="bg-red-50/40 border border-red-100 rounded-xl p-3.5">
+                        <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Paid to SC (Deducted from SC Bill)</span>
+                        {toSC.map((p, i) => (
+                          <div key={i} className="flex justify-between items-center mt-1.5">
+                            <p className="text-xs text-muted-foreground">{p.reason || 'Customer payment'}</p>
+                            <p className="text-base font-black text-red-800">−₹{p.amount}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {toMV.length > 0 && (
+                      <div className="bg-green-50/40 border border-green-100 rounded-xl p-3.5">
+                        <span className="text-[10px] font-bold text-green-700 uppercase tracking-wider">Paid to Microvison (Internal Record)</span>
+                        {toMV.map((p, i) => (
+                          <div key={i} className="flex justify-between items-center mt-1.5">
+                            <p className="text-xs text-muted-foreground">{p.reason || 'Customer payment'}</p>
+                            <p className="text-base font-black text-green-800">₹{p.amount}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              } else if (legacyAmt > 0) {
+                return (
+                  <div className="bg-green-50/50 border border-green-100 rounded-xl p-3.5 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] font-bold text-green-800 uppercase tracking-wider">Payment Collected</span>
+                      <p className="text-xs text-muted-foreground">Amount collected from customer (OOW)</p>
+                    </div>
+                    <p className="text-lg font-black text-green-900">₹{legacyAmt}</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Petrol */}
             {compInWarranty && (
@@ -1090,7 +1230,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             {/* Bill Summary */}
             {comp.status === 'closed' && (
               <div className="pt-2">
-                <BillSummary complaint={comp} />
+                <BillSummary complaint={comp} isAdmin={true} />
               </div>
             )}
           </div>
@@ -1484,9 +1624,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             <span className="text-[10px] uppercase bg-secondary text-secondary-foreground px-2.5 py-0.5 rounded-full font-bold">
                               {item.type}
                             </span>
-                            {isCurrent && (
-                              <span className="bg-primary text-primary-foreground text-[9px] px-2 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
+                            {item.status !== 'closed' && (
+                              <span className="bg-slate-900 text-slate-100 text-[9px] px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
                                 Current Active
+                              </span>
+                            )}
+                            {isCurrent && (
+                              <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] px-2 py-0.5 rounded-full font-extrabold uppercase tracking-wider animate-pulse">
+                                Currently Viewing
                               </span>
                             )}
                           </div>
@@ -1607,6 +1752,52 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                       ))}
                     </div>
 
+                    {/* Change 6A Refinement: Inline Payment UI (Shared across proxy forms for OOW) */}
+                    {c.warrantyStatus !== 'in_warranty' && (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3 mt-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-600">💰</span>
+                          <h4 className="text-sm font-bold text-blue-900">Record Customer Payment (Optional)</h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold uppercase text-blue-900 block mb-1">Amount (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={inlinePaymentAmount}
+                              onChange={(e) => setInlinePaymentAmount(e.target.value)}
+                              placeholder="e.g. 500"
+                              className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold uppercase text-blue-900 block mb-1">Payment Route</label>
+                            <select
+                              value={inlinePaymentRoute}
+                              onChange={(e) => setInlinePaymentRoute(e.target.value)}
+                              className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              disabled={!inlinePaymentAmount}
+                            >
+                              <option value="to_sc">Paid to SC directly</option>
+                              <option value="to_microvison">Paid to Microvison (Company)</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase text-blue-900 block mb-1">Reason / Note</label>
+                          <input
+                            type="text"
+                            value={inlinePaymentReason}
+                            onChange={(e) => setInlinePaymentReason(e.target.value)}
+                            placeholder={`e.g. Paid during ${unregActionForm} visit`}
+                            className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            disabled={!inlinePaymentAmount}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {/* Done Form */}
                     {unregActionForm === 'done' && (
                       <div className="space-y-4 pt-2">
@@ -1620,21 +1811,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                           />
                         </div>
 
-                        {/* Out-of-warranty: Amount collected */}
-                        {!isInWarranty && (
-                          <div>
-                            <label className="text-[10px] font-bold uppercase block mb-1">Amount Collected from Customer (₹) <span className="text-red-500">*</span></label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={unregAmountCollected}
-                              onChange={(e) => setUnregAmountCollected(e.target.value)}
-                              className={inputCls}
-                              placeholder="Amount collected"
-                              required
-                            />
-                          </div>
-                        )}
+                        {/* Out-of-warranty: Payment now recorded via "Collected from Customer" panel (Change 6A) */}
 
                         {/* SC Notes */}
                         <div>
@@ -1734,6 +1911,177 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               </div>
             )}
 
+            {/* ─── Change 6A: Collected from Customer ────────────────────────── */}
+            {c.status !== 'closed' && (
+              <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentPanel(p => !p)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">💰 Collected from Customer</span>
+                    <span className="text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 px-2.5 py-0.5 rounded-full font-bold">
+                      Job: {c.complaintId}
+                    </span>
+                    {(c.customerPayments || []).length > 0 && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                        {(c.customerPayments || []).length} entr{(c.customerPayments || []).length === 1 ? 'y' : 'ies'}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Admin only</span>
+                  </div>
+                  <span className="text-muted-foreground text-xs">{showPaymentPanel ? '▲' : '▼'}</span>
+                </button>
+
+                {showPaymentPanel && (
+                  <div className="px-4 pb-4 space-y-4 border-t border-border/50">
+
+                    {/* Existing entries */}
+                    {(c.customerPayments || []).length > 0 ? (
+                      <div className="space-y-2 pt-3">
+                        {(c.customerPayments || []).map(p => (
+                          <div key={p._id} className={`rounded-lg px-3 py-2 text-sm border ${p.route === 'to_sc' ? 'bg-red-50/60 dark:bg-red-950/20 border-red-200/50' : 'bg-green-50/60 dark:bg-green-950/20 border-green-200/50'}`}>
+                            {editingPaymentId === p._id ? (
+                              <div className="space-y-2">
+                                <div className="flex gap-2 items-center flex-wrap">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={editPaymentAmount}
+                                    onChange={e => setEditPaymentAmount(e.target.value)}
+                                    placeholder="₹ Amount"
+                                    className={`${inputCls} w-24 shrink-0`}
+                                  />
+                                  <select
+                                    value={editPaymentRoute}
+                                    onChange={e => setEditPaymentRoute(e.target.value)}
+                                    className={`${inputCls} shrink-0`}
+                                  >
+                                    <option value="to_sc">Paid to SC directly</option>
+                                    <option value="to_microvison">Paid to Microvison</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    value={editPaymentReason}
+                                    onChange={e => setEditPaymentReason(e.target.value)}
+                                    placeholder="Reason for edit..."
+                                    className={`${inputCls} w-full`}
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2 pt-1">
+                                  <button
+                                    onClick={cancelEditPayment}
+                                    className="px-3 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted rounded transition"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditPaymentSubmit(p._id)}
+                                    disabled={savingEditPayment}
+                                    className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded transition disabled:opacity-50"
+                                  >
+                                    {savingEditPayment ? 'Saving...' : 'Save'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-bold text-foreground">
+                                    {p.route === 'to_sc' ? '−' : ''}₹{p.amount}
+                                    <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${p.route === 'to_sc' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'}`}>
+                                      {p.route === 'to_sc' ? 'Paid to SC' : 'Paid to Microvison'}
+                                    </span>
+                                  </span>
+                                  {p.reason && <span className="text-[11px] text-muted-foreground">{p.reason}</span>}
+                                  <span className="text-[10px] text-muted-foreground">{new Date(p.recordedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => startEditPayment(p)}
+                                    disabled={deletingPaymentId === p._id}
+                                    className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 rounded hover:bg-blue-50 transition disabled:opacity-40"
+                                    title="Edit entry"
+                                  >
+                                    ✎
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePayment(p._id)}
+                                    disabled={deletingPaymentId === p._id}
+                                    className="text-red-600 hover:text-red-800 text-xs font-bold px-2 py-1 rounded hover:bg-red-50 transition disabled:opacity-40"
+                                    title="Remove entry"
+                                  >
+                                    {deletingPaymentId === p._id ? '...' : '✕'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-xs font-bold text-muted-foreground pt-1 border-t border-dashed border-border/60">
+                          <span>Total deducted from SC bill (Paid to SC):</span>
+                          <span className="text-red-600">−₹{(c.customerPayments || []).filter(p => p.route === 'to_sc').reduce((s, p) => s + p.amount, 0)}</span>
+                        </div>
+                        {(c.customerPayments || []).some(p => p.route === 'to_microvison') && (
+                          <div className="flex justify-between text-xs font-bold text-muted-foreground">
+                            <span>For record only (Paid to Microvison):</span>
+                            <span className="text-green-700">₹{(c.customerPayments || []).filter(p => p.route === 'to_microvison').reduce((s, p) => s + p.amount, 0)}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic pt-3">No customer payments recorded yet.</p>
+                    )}
+
+                    {/* Add new entry form */}
+                    <div className="border-t border-dashed border-border/60 pt-3 space-y-2.5">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Record New Payment</p>
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <input
+                          type="number"
+                          min="1"
+                          value={paymentAmount}
+                          onChange={e => setPaymentAmount(e.target.value)}
+                          placeholder="₹ Amount"
+                          className={`${inputCls} w-28 shrink-0`}
+                        />
+                        <select
+                          value={paymentRoute}
+                          onChange={e => setPaymentRoute(e.target.value)}
+                          className={`${inputCls} shrink-0`}
+                        >
+                          <option value="to_sc">Paid to SC directly</option>
+                          <option value="to_microvison">Paid to Microvison</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={paymentReason}
+                          onChange={e => setPaymentReason(e.target.value)}
+                          placeholder="Stage / reason (e.g. initial estimate, part cost...)"
+                          className={`${inputCls} flex-grow min-w-[150px]`}
+                        />
+                        <button
+                          onClick={handleAddPayment}
+                          disabled={savingPayment}
+                          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 disabled:opacity-50 transition shrink-0"
+                        >
+                          {savingPayment ? 'Saving...' : '+ Add'}
+                        </button>
+                      </div>
+                      <p className={`text-[10px] italic ${paymentRoute === 'to_sc' ? 'text-red-500' : 'text-green-600'}`}>
+                        {paymentRoute === 'to_sc'
+                          ? '⚠ This amount will be subtracted from what Microvison owes the SC.'
+                          : 'ℹ This is an internal record only. Not included in the SC bill.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {canConfirmOrDispute ? (
             <div className="space-y-5">
               {/* Section heading */}
@@ -1747,7 +2095,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               </div>
               
               {/* Petrol Verification Section (Warranty only) */}
-              {c.status === 'done' && isInWarranty && !c.petrolLocked && (
+              {c.status === 'done' && !c.petrolLocked && (
                 <div className="bg-card border border-border p-4 rounded-xl shadow-sm space-y-3.5 hover:border-primary/20 transition-all">
                   <div className="flex items-center justify-between border-b border-border/50 pb-2">
                     <span className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -2181,28 +2529,36 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     // Inline Billing Calculation (mirrors billingCalculator.js)
                     const isWarr = isInWarranty;
                     
-                    const origPreset = isWarr ? (c?.presetPrice ?? 0) : 0;
+                    const origPreset = c?.presetPrice ?? 0;
                     const effPreset = (presetPriceOverride !== '' && presetPriceOverride !== null && presetPriceOverride !== undefined) 
                       ? Number(presetPriceOverride) 
                       : origPreset;
                       
                     let effPetrol = 0;
-                    if (isWarr) {
-                      if (petrolFinal !== '' && petrolFinal !== null && petrolFinal !== undefined) effPetrol = Number(petrolFinal);
-                      else if (petrolSC !== '' && petrolSC !== null && petrolSC !== undefined) effPetrol = Number(petrolSC);
-                      else if (petrolAdmin !== '' && petrolAdmin !== null && petrolAdmin !== undefined) effPetrol = Number(petrolAdmin);
-                    }
+                    if (petrolFinal !== '' && petrolFinal !== null && petrolFinal !== undefined) effPetrol = Number(petrolFinal);
+                    else if (petrolSC !== '' && petrolSC !== null && petrolSC !== undefined) effPetrol = Number(petrolSC);
+                    else if (petrolAdmin !== '' && petrolAdmin !== null && petrolAdmin !== undefined) effPetrol = Number(petrolAdmin);
 
                     const appExtras = adminExtraCharges.filter(ec => ec.status === 'approved');
                     const extrasTot = appExtras.reduce((sum, ec) => sum + (ec.amount || 0), 0);
                     
-                    const gross = isWarr ? (effPreset + effPetrol + extrasTot) : extrasTot;
+                    const gross = effPreset + effPetrol + extrasTot;
                     
-                    const custToSC = (c?.customerPaymentAmount || 0) + (
-                      criticalActionEnabled 
-                        ? (customerChargePaymentMode === 'paid_to_sc' ? Number(customerExtraCharge || 0) : 0)
-                        : (c?.customerChargePaidToSCAmount || 0)
-                    );
+                    const cpPayments = c?.customerPayments || [];
+                    const cpToSCEntries = cpPayments.filter(p => p.route === 'to_sc');
+                    const cpToMVEntries = cpPayments.filter(p => p.route === 'to_microvison');
+                    const cpToSCTotal = cpToSCEntries.reduce((s, p) => s + (p.amount || 0), 0);
+
+                    // Legacy fallback for critical action paid_to_sc
+                    const critDeductSC = criticalActionEnabled
+                      ? (customerChargePaymentMode === 'paid_to_sc' ? Number(customerExtraCharge || 0) : 0)
+                      : (c?.customerChargePaidToSCAmount || 0);
+                    const critToMV = criticalActionEnabled
+                      ? (customerChargePaymentMode === 'paid_to_microvison' ? Number(customerExtraCharge || 0) : 0)
+                      : 0;
+
+                    // Total deducted from SC bill
+                    const custToSC = cpToSCTotal + critDeductSC;
                     
                     const activeReason = criticalActionEnabled ? customerChargeReason : (c?.customerChargeReason || '');
                     
@@ -2271,56 +2627,52 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                            </div>
 
                           {/* Billing Breakdown */}
-                          {isWarr && (
-                            <div className="flex items-center justify-between py-1">
-                              <div className="flex flex-col">
-                                <span className="text-sm text-muted-foreground font-semibold">Preset Price:</span>
-                                {presetPriceOverride !== '' && <span className="text-[10px] text-muted-foreground italic">Override: {presetPriceOverrideReason}</span>}
+                          <div className="flex items-center justify-between py-1">
+                            <div className="flex flex-col">
+                              <span className="text-sm text-muted-foreground font-semibold">Preset Price:</span>
+                              {presetPriceOverride !== '' && <span className="text-[10px] text-muted-foreground italic">Override: {presetPriceOverrideReason}</span>}
+                            </div>
+                            {editingPreset ? (
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="number" 
+                                  min="0"
+                                  value={presetPriceOverride}
+                                  onChange={e => setPresetPriceOverride(e.target.value)}
+                                  placeholder={origPreset}
+                                  className={`${inputCls} w-20 py-1 px-2 text-right`}
+                                />
+                                <input 
+                                  type="text" 
+                                  value={presetPriceOverrideReason}
+                                  onChange={e => setPresetPriceOverrideReason(e.target.value)}
+                                  placeholder="Reason..."
+                                  className={`${inputCls} w-32 py-1 px-2`}
+                                />
+                                <button 
+                                  onClick={() => setEditingPreset(false)}
+                                  className="px-2 py-1 bg-green-100 text-green-800 text-[10px] font-bold rounded uppercase"
+                                >Save</button>
                               </div>
-                              {editingPreset ? (
-                                <div className="flex items-center gap-2">
-                                  <input 
-                                    type="number" 
-                                    min="0"
-                                    value={presetPriceOverride}
-                                    onChange={e => setPresetPriceOverride(e.target.value)}
-                                    placeholder={origPreset}
-                                    className={`${inputCls} w-20 py-1 px-2 text-right`}
-                                  />
-                                  <input 
-                                    type="text" 
-                                    value={presetPriceOverrideReason}
-                                    onChange={e => setPresetPriceOverrideReason(e.target.value)}
-                                    placeholder="Reason..."
-                                    className={`${inputCls} w-32 py-1 px-2`}
-                                  />
-                                  <button 
-                                    onClick={() => setEditingPreset(false)}
-                                    className="px-2 py-1 bg-green-100 text-green-800 text-[10px] font-bold rounded uppercase"
-                                  >Save</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  {presetPriceOverride !== '' ? (
-                                    <>
-                                      <span className="text-xs line-through text-muted-foreground">₹{origPreset}</span>
-                                      <span className="text-sm font-bold text-foreground">₹{effPreset}</span>
-                                    </>
-                                  ) : (
-                                    <span className="text-sm font-bold text-foreground">₹{origPreset}</span>
-                                  )}
-                                  <button onClick={() => setEditingPreset(true)} className="text-[10px] font-bold text-blue-600 hover:underline uppercase">[Edit]</button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {presetPriceOverride !== '' ? (
+                                  <>
+                                    <span className="text-xs line-through text-muted-foreground">₹{origPreset}</span>
+                                    <span className="text-sm font-bold text-foreground">₹{effPreset}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-sm font-bold text-foreground">₹{origPreset}</span>
+                                )}
+                                <button onClick={() => setEditingPreset(true)} className="text-[10px] font-bold text-blue-600 hover:underline uppercase">[Edit]</button>
+                              </div>
+                            )}
+                          </div>
 
-                          {isWarr && (
-                            <div className="flex items-center justify-between py-1">
-                              <span className="text-sm text-muted-foreground font-semibold">Petrol:</span>
-                              <span className="text-sm font-bold text-foreground">₹{effPetrol}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-sm text-muted-foreground font-semibold">Petrol:</span>
+                            <span className="text-sm font-bold text-foreground">₹{effPetrol}</span>
+                          </div>
 
                           {/* Individual Extra Charges list */}
                           {appExtras.length > 0 ? (
@@ -2349,34 +2701,52 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             <span className="text-sm font-black text-foreground">₹{gross}</span>
                           </div>
 
-                           {custToSC > 0 && (
-                            <div className="flex items-center justify-between py-1 text-red-600 dark:text-red-400">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-semibold">- Customer Paid to SC (Deducted):</span>
-                                {activeReason && <span className="text-[10px] italic text-red-400">{activeReason}</span>}
+                          {/* Change 6A: Customer payments to SC — itemised deductions */}
+                          {cpToSCEntries.length > 0 && (
+                            <div className="space-y-1 border-t border-red-200/60 pt-2">
+                              <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Customer Paid to SC (Deducted from SC Bill)</p>
+                              {cpToSCEntries.map((p, i) => (
+                                <div key={i} className="flex items-center justify-between py-0.5 pl-2 text-red-600 dark:text-red-400">
+                                  <span className="text-xs">{p.reason || 'Payment to SC'}</span>
+                                  <span className="text-xs font-semibold">−₹{p.amount}</span>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between py-1 border-t border-red-200/60 font-semibold text-red-600">
+                                <span className="text-sm">Total deducted:</span>
+                                <span className="text-sm font-bold">−₹{cpToSCTotal}</span>
                               </div>
-                              <span className="text-sm font-bold">- ₹{custToSC}</span>
                             </div>
                           )}
 
-                          {(() => {
-                            const paidToMV = criticalActionEnabled
-                              ? (customerChargePaymentMode === 'paid_to_microvison' ? Number(customerExtraCharge || 0) : 0)
-                              : (c?.customerPaymentToMicrovison || 0);
-                            
-                            if (paidToMV > 0) {
-                              return (
-                                <div className="flex items-center justify-between py-1 text-green-700 dark:text-green-400">
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-semibold italic">Customer Paid to Microvison (Internal Record — No SC Effect):</span>
-                                    {activeReason && <span className="text-[10px] italic text-green-500">{activeReason}</span>}
-                                  </div>
-                                  <span className="text-xs font-bold">₹{paidToMV}</span>
+                          {/* Critical action SC deduction (Change 5 path) */}
+                          {critDeductSC > 0 && (
+                            <div className="flex items-center justify-between py-1 text-red-600 dark:text-red-400">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-semibold">- Critical Action — Paid to SC:</span>
+                                {activeReason && <span className="text-[10px] italic text-red-400">{activeReason}</span>}
+                              </div>
+                              <span className="text-sm font-bold">- ₹{critDeductSC}</span>
+                            </div>
+                          )}
+
+                          {/* Change 6A: Customer paid Microvison (internal records) */}
+                          {(cpToMVEntries.length > 0 || critToMV > 0) && (
+                            <div className="space-y-1 border-t border-green-200/60 pt-2">
+                              <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider">Customer Paid Microvison (Internal Record — Not in SC Bill)</p>
+                              {cpToMVEntries.map((p, i) => (
+                                <div key={i} className="flex items-center justify-between py-0.5 pl-2 text-green-700 dark:text-green-400">
+                                  <span className="text-xs">{p.reason || 'Payment to Microvison'}</span>
+                                  <span className="text-xs font-semibold">₹{p.amount}</span>
                                 </div>
-                              );
-                            }
-                            return null;
-                          })()}
+                              ))}
+                              {critToMV > 0 && (
+                                <div className="flex items-center justify-between py-0.5 pl-2 text-green-700 dark:text-green-400">
+                                  <span className="text-xs">Critical Action — Paid to Microvison</span>
+                                  <span className="text-xs font-semibold">₹{critToMV}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           <div className={`flex items-center justify-between pt-3 border-t-2 ${net < 0 ? 'border-red-300' : 'border-primary/20'}`}>
                             <span className={`text-base font-black uppercase tracking-wide ${net < 0 ? 'text-red-600' : 'text-primary'}`}>
@@ -2785,6 +3155,69 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
               >
                 {actionLoading === 'reassign' ? 'Reassigning...' : 'Confirm Reassignment'}
               </button>
+            </div>
+          ) : c?.status === 'closed' ? (
+            // ─── Closed complaint: show full billing breakdown for admin ──
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-1">
+                <span className="text-sm font-extrabold text-foreground uppercase tracking-wider flex items-center gap-2">
+                  ✅ Complaint Closed — Final Bill
+                </span>
+                <span className="text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 px-2.5 py-1 rounded-full font-bold">
+                  {c.complaintId}
+                </span>
+              </div>
+
+              {c.billGenerated ? (
+                <BillSummary complaint={c} isAdmin={true} />
+              ) : (
+                <div className="bg-muted p-3.5 rounded-xl text-center text-sm text-muted-foreground">
+                  Complaint was closed without a bill (force-closed or cancelled). No billing records.
+                </div>
+              )}
+
+              {/* Customer Payments archive (admin-only view after close) */}
+              {(c.customerPayments || []).length > 0 && (
+                <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-foreground uppercase tracking-wider">💰 Customer Payment Records</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wide">Admin only — archived</span>
+                  </div>
+                  <div className="space-y-2">
+                    {(c.customerPayments || []).map(p => (
+                      <div key={p._id} className={`rounded-lg px-3 py-2.5 text-sm border flex items-center justify-between ${p.route === 'to_sc' ? 'bg-red-50/60 dark:bg-red-950/20 border-red-200/50' : 'bg-green-50/60 dark:bg-green-950/20 border-green-200/50'}`}>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-foreground">
+                            {p.route === 'to_sc' ? '−' : '+'}₹{p.amount}
+                            <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${p.route === 'to_sc' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'}`}>
+                              {p.route === 'to_sc' ? 'Paid to SC' : 'Paid to Microvison'}
+                            </span>
+                          </span>
+                          {p.reason && <span className="text-[11px] text-muted-foreground">{p.reason}</span>}
+                          {p.stage && <span className="text-[10px] text-muted-foreground/60">Stage: {p.stage}</span>}
+                          <span className="text-[10px] text-muted-foreground">{p.recordedAt ? new Date(p.recordedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Summary totals */}
+                    <div className="pt-1.5 space-y-1 border-t border-dashed border-border/60">
+                      {(c.customerPayments || []).some(p => p.route === 'to_sc') && (
+                        <div className="flex justify-between text-xs font-bold text-red-600">
+                          <span>Total deducted from SC bill (Paid to SC):</span>
+                          <span>−₹{(c.customerPayments || []).filter(p => p.route === 'to_sc').reduce((s, p) => s + p.amount, 0)}</span>
+                        </div>
+                      )}
+                      {(c.customerPayments || []).some(p => p.route === 'to_microvison') && (
+                        <div className="flex justify-between text-xs font-bold text-green-700">
+                          <span>Internal record (Paid to Microvison):</span>
+                          <span>+₹{(c.customerPayments || []).filter(p => p.route === 'to_microvison').reduce((s, p) => s + p.amount, 0)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-muted p-3.5 rounded-xl text-center text-sm text-muted-foreground font-bold">

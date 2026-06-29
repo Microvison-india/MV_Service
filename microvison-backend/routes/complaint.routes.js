@@ -25,6 +25,9 @@ const {
   updateSingleExtraCharge,
   forceClose,
   saveCriticalAction,
+  addCustomerPayment,
+  deleteCustomerPayment,
+  updateCustomerPayment,
 } = require('../controllers/complaint.controller');
 
 const {
@@ -86,6 +89,15 @@ router.patch('/:id/mark-delivered', auth, isAdmin, markPartDelivered);
 
 // PATCH /api/complaints/:id/critical-action — Admin saves critical action (Change 5)
 router.patch('/:id/critical-action', auth, isAdmin, saveCriticalAction);
+
+// POST /api/complaints/:id/customer-payments — Add a customer payment entry (Change 6A)
+router.post('/:id/customer-payments', auth, isAdmin, addCustomerPayment);
+
+// DELETE /api/complaints/:id/customer-payments/:paymentId — Remove a payment entry (Change 6A)
+router.delete('/:id/customer-payments/:paymentId', auth, isAdmin, deleteCustomerPayment);
+
+// PATCH /api/complaints/:id/customer-payments/:paymentId — Edit a payment entry (Change 6A)
+router.patch('/:id/customer-payments/:paymentId', auth, isAdmin, updateCustomerPayment);
 
 // ── SC Routes (all require auth + isSC) ────────────────────────
 // GET  /api/complaints/my — SC's own complaints (filtered)

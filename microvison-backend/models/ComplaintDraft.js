@@ -10,6 +10,8 @@ const complaintDraftSchema = new mongoose.Schema(
     currentStep: {
       type: Number,
       default: 1,
+      min: 1,
+      max: 5,
     },
     formData: {
       type: mongoose.Schema.Types.Mixed,

@@ -164,8 +164,13 @@ const getMonthlyInvoice = async (req, res) => {
         preset: calculation.preset,
         petrol: calculation.petrol,
         extrasTotal: calculation.extrasTotal,
-        customerPaymentAmount: calculation.customerPaymentAmount,
-        // Change 5: Critical Action deduction — visible to SC (spec §7)
+        // Change 6A: unified customerPaidToSC replaces old single field
+        customerPaidToSC: calculation.customerPaidToSC,
+        customerPaidToMicrovison: calculation.customerPaidToMicrovison,
+        // Change 6A: itemized SC deductions (SC-visible — amounts paid to SC, deducted from their bill)
+        toSCPayments: calculation.toSCPayments || [],
+        // Legacy fields kept for backward compatibility
+        customerPaymentAmount: calculation.customerPaidToSC,
         customerChargePaidToSCAmount: c.customerChargePaidToSCAmount || 0,
         customerChargeReason: c.customerChargeReason || '',
       };

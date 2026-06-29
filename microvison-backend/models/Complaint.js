@@ -9,6 +9,15 @@ const extraChargeSchema = new mongoose.Schema({
   approvedAt: { type: Date, default: null },
 });
 
+// Change 6A: Multi-stage customer payment entry sub-schema
+const customerPaymentSchema = new mongoose.Schema({
+  amount:      { type: Number, required: true },
+  route:       { type: String, enum: ['to_microvison', 'to_sc'], required: true },
+  reason:      { type: String, default: '' }, // stage / reason free text
+  recordedAt:  { type: Date, default: () => new Date() },
+  recordedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+});
+
 const complaintSchema = new mongoose.Schema(
   {
     // Unique Complaint ID: MV-YYYY-XXXXX
@@ -57,20 +66,17 @@ const complaintSchema = new mongoose.Schema(
     // ── Extra Charges (both warranty types) ──────────────────
     extraCharges: [extraChargeSchema],
 
-    // ── Customer Payment Split (Change 6A) ────────────────────────
-    // customerPaymentAmount = amount SC collected directly (deducted from SC bill)
-    customerPaymentAmount: { type: Number, default: null },
-    // customerPaymentToMicrovison = amount paid to Microvison directly (tracked only)
-    customerPaymentToMicrovison: { type: Number, default: null },
+    // ── Customer Payments (Change 6A) ─────────────────────────────
+    // Multi-stage array. Each entry = one payment event recorded by admin.
+    // route='to_sc'       → subtracted from SC bill
+    // route='to_microvison' → internal record only, not in SC bill
+    customerPayments: [customerPaymentSchema],
 
     // ── Preset Price Override (Change 6B) ─────────────────────────
     // presetPrice is the snapshot (NEVER changes).
     // presetPriceOverride is what admin sets before closing (for this complaint only).
     presetPriceOverride: { type: Number, default: null },
     presetPriceOverrideReason: { type: String, default: '' },
-
-    // ── Microvison-Approved Extras (Change 6A) ────────────────────
-    mvApprovedExtras: { type: Number, default: null },
 
     // ── Engineer Name (Change 6C) ─────────────────────────────────
     engineerName: { type: String, default: '' },
