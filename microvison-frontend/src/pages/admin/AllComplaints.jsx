@@ -300,7 +300,6 @@ export default function AllComplaints() {
           complaintId={selectedComplaintId}
           onClose={() => setSelectedComplaintId(null)}
           onUpdated={() => {
-            setSelectedComplaintId(null);
             refresh();
           }}
         />

@@ -40,7 +40,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [petrolSC, setPetrolSC] = useState('');
   const [adminExtraCharges, setAdminExtraCharges] = useState([]);
   const [isEditingExtraCharges, setIsEditingExtraCharges] = useState(false);
-  const [adminMadeEdits, setAdminMadeEdits] = useState(false);
+  const adminMadeEditsRef = useRef(false); // Ref so editing flag never restarts the polling interval
   const [savingExtraCharges, setSavingExtraCharges] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -51,6 +51,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [candidates, setCandidates] = useState([]);
   const [selectedSCId, setSelectedSCId] = useState('');
   const [loadingCandidates, setLoadingCandidates] = useState(false);
+
+  // Controlled state for "Add Charge" forms (replaces uncontrolled document.getElementById usage)
+  const [inlineNewChargeLabel, setInlineNewChargeLabel] = useState('');
+  const [inlineNewChargeAmount, setInlineNewChargeAmount] = useState('');
+  const [inlineNewChargeRequestedBy, setInlineNewChargeRequestedBy] = useState('admin');
+  const [confirmNewChargeLabel, setConfirmNewChargeLabel] = useState('');
+  const [confirmNewChargeAmount, setConfirmNewChargeAmount] = useState('');
+  const [confirmNewChargeRequestedBy, setConfirmNewChargeRequestedBy] = useState('admin');
 
   // More options / unregistered SC creation states for reassignment
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -331,7 +339,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
             setEditBillPhoto(prod.billPhoto || '');
 
             isFirst = false;
-          } else if (!isEditingExtraCharges && !adminMadeEdits) {
+          } else if (!isEditingExtraCharges && !adminMadeEditsRef.current) {
             setPetrolAdmin(data.complaint.petrolAdmin ?? '');
             setPetrolSC(data.complaint.petrolSC ?? '');
             setPetrolFinal(data.complaint.petrolFinal ?? '');
@@ -363,7 +371,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       active = false;
       clearInterval(intervalId);
     };
-  }, [complaintId, refreshTick, isEditingExtraCharges, adminMadeEdits, showProductEditor]);
+  }, [complaintId, refreshTick, isEditingExtraCharges, showProductEditor]);
 
   // IMPORTANT: useState initialises from c which is null at mount (async load),
   // so we must re-sync here after c is loaded or refreshed, BUT ONLY ONCE per complaint
@@ -446,8 +454,12 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const canConfirmOrDispute = ['done', 'not_done'].includes(c.status);
 
   const handleSaveCriticalAction = async () => {
-    setSavingCritical(true);
     setError('');
+    if (criticalActionEnabled && warrantyRevoked && !warrantyRevocationReason.trim()) {
+      setError('Revocation reason is required when revoking warranty.');
+      return;
+    }
+    setSavingCritical(true);
     try {
       await api.patch(`/api/complaints/${c._id}/critical-action`, {
         criticalActionEnabled,
@@ -669,7 +681,11 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       await api.patch(`/api/complaints/${c._id}/confirm-done`, body);
       setSuccess('Job confirmed and closed successfully!');
       setShowWarningModal(false);
-      setTimeout(onUpdated, 1200);
+      adminMadeEditsRef.current = false;
+      setTimeout(() => {
+        if (onUpdated) onUpdated();
+        if (onClose) onClose();
+      }, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to confirm job.');
     } finally {
@@ -684,6 +700,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       await api.patch(`/api/complaints/${c._id}/extra-charges`, { extraCharges: adminExtraCharges });
       setSuccess('Extra charges updated successfully!');
       setIsEditingExtraCharges(false);
+      adminMadeEditsRef.current = false; // Allow poll to sync again after save
       setRefreshTick(t => t + 1);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save extra charges.');
@@ -702,7 +719,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     try {
       await api.patch(`/api/complaints/${c._id}/dispute-done`, { note: disputeNote });
       setSuccess('Job disputed and sent back to SC!');
-      setTimeout(onUpdated, 1200);
+      setTimeout(() => {
+        if (onUpdated) onUpdated();
+        if (onClose) onClose();
+      }, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to dispute job.');
     } finally {
@@ -756,8 +776,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
       });
       setSuccess('Complaint closed successfully!');
       setForceCloseNote('');
-      setTimeout(onUpdated, 1200);
-    } catch (err) {
+      setTimeout(() => {
+        if (onUpdated) onUpdated();
+        if (onClose) onClose();
+      }, 1200);
       setError(err.response?.data?.message || 'Failed to close complaint.');
     } finally {
       setActionLoading(false);
@@ -785,8 +807,10 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     try {
       await api.patch(`/api/complaints/${c._id}/reject`);
       setSuccess('Rejected on behalf of Service Centre.');
-      setTimeout(onUpdated, 1200);
-    } catch (err) {
+      setTimeout(() => {
+        if (onUpdated) onUpdated();
+        if (onClose) onClose();
+      }, 1200);
       setError(err.response?.data?.message || 'Failed to reject on behalf of SC.');
     } finally {
       setActionLoading(false);
@@ -1118,7 +1142,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                               type="number"
                               value={item.amount}
                               onChange={(e) => {
-                                const newAmount = e.target.value === '' ? '' : Number(e.target.value);
+                                const newAmount = e.target.value; // Keep as string while editing; convert at submit
                                 setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, amount: newAmount } : ec));
                               }}
                               className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-20 shrink-0"
@@ -1165,18 +1189,21 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   <div className="flex gap-2 items-center pt-1">
                     <input
                       type="text"
-                      id="admin-inline-extra-label"
+                      value={inlineNewChargeLabel}
+                      onChange={(e) => setInlineNewChargeLabel(e.target.value)}
                       placeholder="Add item label..."
                       className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
                     />
                     <input
                       type="number"
-                      id="admin-inline-extra-amount"
+                      value={inlineNewChargeAmount}
+                      onChange={(e) => setInlineNewChargeAmount(e.target.value)}
                       placeholder="₹"
                       className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-20 shrink-0"
                     />
                     <select
-                      id="admin-inline-extra-requested-by"
+                      value={inlineNewChargeRequestedBy}
+                      onChange={(e) => setInlineNewChargeRequestedBy(e.target.value)}
                       className="bg-background border border-border text-xs rounded-lg px-2 py-1.5 font-semibold text-foreground focus:outline-none"
                     >
                       <option value="admin">Admin</option>
@@ -1185,18 +1212,18 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     <button
                       type="button"
                       onClick={() => {
-                        const lbl = document.getElementById('admin-inline-extra-label')?.value || '';
-                        const amt = document.getElementById('admin-inline-extra-amount')?.value || '';
-                        const reqBy = document.getElementById('admin-inline-extra-requested-by')?.value || 'admin';
-                        if (lbl.trim() && amt && !isNaN(Number(amt))) {
+                        const lbl = inlineNewChargeLabel.trim();
+                        const amt = inlineNewChargeAmount;
+                        if (lbl && amt && !isNaN(Number(amt))) {
                           setAdminExtraCharges(prev => [...prev, {
-                            label: lbl.trim(),
+                            label: lbl,
                             amount: Number(amt),
-                            requestedBy: reqBy,
+                            requestedBy: inlineNewChargeRequestedBy,
                             status: 'approved'
                           }]);
-                          document.getElementById('admin-inline-extra-label').value = '';
-                          document.getElementById('admin-inline-extra-amount').value = '';
+                          setInlineNewChargeLabel('');
+                          setInlineNewChargeAmount('');
+                          setInlineNewChargeRequestedBy('admin');
                         }
                       }}
                       className="px-3 py-1.5 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold whitespace-nowrap"
@@ -2112,7 +2139,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                         type="number"
                         min="0"
                         value={petrolAdmin}
-                        onChange={(e) => { setPetrolAdmin(e.target.value); setAdminMadeEdits(true); }}
+                        onChange={(e) => { setPetrolAdmin(e.target.value); adminMadeEditsRef.current = true; }}
                         className={inputCls}
                         placeholder="Admin Estimate"
                       />
@@ -2123,7 +2150,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                         type="number"
                         min="0"
                         value={petrolSC}
-                        onChange={(e) => { setPetrolSC(e.target.value); setAdminMadeEdits(true); }}
+                        onChange={(e) => { setPetrolSC(e.target.value); adminMadeEditsRef.current = true; }}
                         className={inputCls}
                         placeholder="SC Claim"
                       />
@@ -2134,7 +2161,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                         type="number"
                         min="0"
                         value={petrolFinal}
-                        onChange={(e) => { setPetrolFinal(e.target.value); setAdminMadeEdits(true); }}
+                        onChange={(e) => { setPetrolFinal(e.target.value); adminMadeEditsRef.current = true; }}
                         className={inputCls}
                         placeholder={petrolSC ? `Accept SC: ₹${petrolSC}` : petrolAdmin ? `Accept Admin: ₹${petrolAdmin}` : "Final Approved"}
                       />
@@ -2145,14 +2172,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   <div className="flex flex-wrap gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => { setPetrolFinal(petrolAdmin); setAdminMadeEdits(true); }}
+                      onClick={() => { setPetrolFinal(petrolAdmin); adminMadeEditsRef.current = true; }}
                       className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-bold text-xs hover:bg-primary/20 transition shadow-sm flex items-center gap-1"
                     >
                       ✓ Accept 1st (Admin: ₹{petrolAdmin || 0})
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setPetrolFinal(petrolSC); setAdminMadeEdits(true); }}
+                      onClick={() => { setPetrolFinal(petrolSC); adminMadeEditsRef.current = true; }}
                       className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-bold text-xs hover:bg-primary/20 transition shadow-sm flex items-center gap-1"
                     >
                       ✓ Accept 2nd (SC: ₹{petrolSC || 0})
@@ -2185,7 +2212,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                               onChange={(e) => {
                                 const newLabel = e.target.value;
                                 setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, label: newLabel } : ec));
-                                setAdminMadeEdits(true);
+                                adminMadeEditsRef.current = true;
                               }}
                               className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
                               placeholder="Description"
@@ -2194,9 +2221,9 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                               type="number"
                               value={item.amount}
                               onChange={(e) => {
-                                const newAmount = e.target.value === '' ? '' : Number(e.target.value);
+                                const newAmount = e.target.value; // Keep as string while editing; convert at submit
                                 setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, amount: newAmount } : ec));
-                                setAdminMadeEdits(true);
+                                adminMadeEditsRef.current = true;
                               }}
                               className="rounded border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
                               placeholder="Amount"
@@ -2215,7 +2242,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                               onChange={(e) => {
                                 const newStatus = e.target.value;
                                 setAdminExtraCharges(prev => prev.map((ec, i) => i === idx ? { ...ec, status: newStatus } : ec));
-                                setAdminMadeEdits(true);
+                                adminMadeEditsRef.current = true;
                               }}
                               className={`bg-background border border-border text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none ${
                                 item.status === 'approved' ? 'text-green-600 border-green-300 dark:border-green-800' :
@@ -2231,7 +2258,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                             {/* Delete button */}
                             <button
                               type="button"
-                              onClick={() => { setAdminExtraCharges(prev => prev.filter((_, i) => i !== idx)); setAdminMadeEdits(true); }}
+                              onClick={() => { setAdminExtraCharges(prev => prev.filter((_, i) => i !== idx)); adminMadeEditsRef.current = true; }}
                               className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition font-bold"
                               title="Delete charge"
                             >
@@ -2249,18 +2276,21 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                   <div className="flex gap-2 items-center pt-1">
                     <input
                       type="text"
-                      id="admin-confirm-extra-label"
+                      value={confirmNewChargeLabel}
+                      onChange={(e) => setConfirmNewChargeLabel(e.target.value)}
                       placeholder="Add new charge description..."
                       className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring flex-grow"
                     />
                     <input
                       type="number"
-                      id="admin-confirm-extra-amount"
+                      value={confirmNewChargeAmount}
+                      onChange={(e) => setConfirmNewChargeAmount(e.target.value)}
                       placeholder="₹ Amount"
                       className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-24 shrink-0"
                     />
                     <select
-                      id="admin-confirm-extra-requested-by"
+                      value={confirmNewChargeRequestedBy}
+                      onChange={(e) => setConfirmNewChargeRequestedBy(e.target.value)}
                       className="bg-background border border-border text-xs rounded-lg px-2.5 py-2 font-semibold text-foreground focus:outline-none shrink-0"
                     >
                       <option value="admin">Admin</option>
@@ -2269,19 +2299,19 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     <button
                       type="button"
                       onClick={() => {
-                        const lbl = document.getElementById('admin-confirm-extra-label')?.value || '';
-                        const amt = document.getElementById('admin-confirm-extra-amount')?.value || '';
-                        const reqBy = document.getElementById('admin-confirm-extra-requested-by')?.value || 'admin';
-                        if (lbl.trim() && amt && !isNaN(Number(amt))) {
+                        const lbl = confirmNewChargeLabel.trim();
+                        const amt = confirmNewChargeAmount;
+                        if (lbl && amt && !isNaN(Number(amt))) {
                           setAdminExtraCharges(prev => [...prev, {
-                            label: lbl.trim(),
+                            label: lbl,
                             amount: Number(amt),
-                            requestedBy: reqBy,
+                            requestedBy: confirmNewChargeRequestedBy,
                             status: 'approved'
                           }]);
-                          setAdminMadeEdits(true);
-                          document.getElementById('admin-confirm-extra-label').value = '';
-                          document.getElementById('admin-confirm-extra-amount').value = '';
+                          adminMadeEditsRef.current = true;
+                          setConfirmNewChargeLabel('');
+                          setConfirmNewChargeAmount('');
+                          setConfirmNewChargeRequestedBy('admin');
                         }
                       }}
                       className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm transition whitespace-nowrap shrink-0"
@@ -2815,8 +2845,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     onClick={handleConfirm}
                     disabled={
                       !!actionLoading ||
-                      (criticalActionEnabled && !criticalActionAcknowledged) ||
-                      (criticalActionEnabled && warrantyRevoked && !warrantyRevocationReason.trim())
+                      (criticalActionEnabled && !criticalActionAcknowledged)
                     }
                     className="px-8 py-2.5 bg-green-600 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-green-700 disabled:opacity-50 transition shadow-md hover:shadow-lg whitespace-nowrap shrink-0 flex items-center gap-2"
                   >

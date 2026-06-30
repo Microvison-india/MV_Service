@@ -187,7 +187,6 @@ export default function MyComplaints() {
           complaint={activeComplaint}
           onClose={() => setActiveComplaint(null)}
           onUpdated={() => {
-            setActiveComplaint(null);
             triggerRefresh();
           }}
         />

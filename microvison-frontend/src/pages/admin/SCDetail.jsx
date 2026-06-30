@@ -733,7 +733,6 @@ export default function SCDetail() {
           complaintId={selectedComplaintId}
           onClose={() => setSelectedComplaintId(null)}
           onUpdated={() => {
-            setSelectedComplaintId(null);
             refreshComplaints();
           }}
         />

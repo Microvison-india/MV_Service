@@ -984,6 +984,12 @@ const confirmDone = async (req, res) => {
     });
   }
 
+  if (criticalActionEnabled && warrantyRevoked && (!warrantyRevocationReason || !warrantyRevocationReason.trim())) {
+    return res.status(400).json({
+      message: 'Revocation reason is required when revoking warranty.',
+    });
+  }
+
   // Check linked Product's 5 Step 2 fields if trackingId exists
   if (complaint.trackingId) {
     const product = await Product.findById(complaint.trackingId);
@@ -1755,6 +1761,10 @@ const saveCriticalAction = async (req, res) => {
       warrantyRevoked,
       warrantyRevocationReason,
     } = req.body;
+
+    if (criticalActionEnabled && warrantyRevoked && (!warrantyRevocationReason || !warrantyRevocationReason.trim())) {
+      return res.status(400).json({ message: 'Revocation reason is required when revoking warranty.' });
+    }
 
     complaint.criticalActionEnabled = !!criticalActionEnabled;
     complaint.customerExtraCharge = customerExtraCharge ?? null;

@@ -50,19 +50,23 @@ export default function SCLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* ── Top Navbar ── */}
-      <header className="sticky top-0 z-40 bg-card border-b border-border flex items-center justify-between px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 bg-card/85 backdrop-blur-md border-b border-border flex items-center justify-between px-4 py-3 shadow-sm transition-all">
+        <div className="flex items-center gap-4">
           {/* Mobile menu toggle */}
           <button
-            className="sm:hidden p-2 rounded-md hover:bg-muted transition"
+            className="sm:hidden p-2 -ml-2 rounded-md hover:bg-muted transition text-foreground"
             onClick={() => setMobileMenuOpen((o) => !o)}
             aria-label="Toggle menu"
           >
             <span className="text-lg">{mobileMenuOpen ? '✕' : '☰'}</span>
           </button>
-          <div>
-            <p className="text-xs text-muted-foreground">Service Centre Portal</p>
-            <p className="text-sm font-semibold text-foreground leading-tight">{user?.name || 'SC Dashboard'}</p>
+          
+          <div className="flex items-center gap-3">
+            <img src="/small_logo.png" alt="M" className="w-9 h-9 rounded-md object-contain shadow-sm" />
+            <div>
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Service Centre</p>
+              <p className="text-sm font-semibold text-foreground leading-tight">{user?.name || 'SC Dashboard'}</p>
+            </div>
           </div>
         </div>
 

@@ -66,6 +66,11 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   // Ref so the polling interval always reads the latest extraCharges without stale closure
   const extraChargesRef = useRef([]);
   useEffect(() => { extraChargesRef.current = extraCharges; }, [extraCharges]);
+  
+  // Controlled state for "Add Charge" form (replaces uncontrolled document.getElementById usage)
+  const [newChargeLabel, setNewChargeLabel] = useState('');
+  const [newChargeAmount, setNewChargeAmount] = useState('');
+  
   const [markingReceived, setMarkingReceived] = useState(false);
 
   // Phase 21 State Variables
@@ -819,14 +824,16 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                       <div className="flex gap-2 items-center w-full">
                         <input
                           type="text"
-                          id="new-extra-label"
+                          value={newChargeLabel}
+                          onChange={(e) => setNewChargeLabel(e.target.value)}
                           placeholder="Description (e.g., replacement motor)"
                           className={`${inputCls} flex-grow flex-1 min-w-[120px] text-xs`}
                           style={{ width: '0px' }}
                         />
                         <input
                           type="number"
-                          id="new-extra-amount"
+                          value={newChargeAmount}
+                          onChange={(e) => setNewChargeAmount(e.target.value)}
                           placeholder="₹ Amount"
                           className={`${inputCls} shrink-0 text-xs`}
                           style={{ width: '90px' }}
@@ -834,12 +841,12 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                         <button
                           type="button"
                           onClick={() => {
-                            const lbl = document.getElementById('new-extra-label')?.value || '';
-                            const amt = document.getElementById('new-extra-amount')?.value || '';
-                            if (lbl.trim() && amt && !isNaN(Number(amt))) {
-                              setExtraCharges(prev => [...prev, { label: lbl.trim(), amount: Number(amt) }]);
-                              document.getElementById('new-extra-label').value = '';
-                              document.getElementById('new-extra-amount').value = '';
+                            const lbl = newChargeLabel.trim();
+                            const amt = newChargeAmount;
+                            if (lbl && amt && !isNaN(Number(amt))) {
+                              setExtraCharges(prev => [...prev, { label: lbl, amount: Number(amt) }]);
+                              setNewChargeLabel('');
+                              setNewChargeAmount('');
                             }
                           }}
                           className="px-3 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0"

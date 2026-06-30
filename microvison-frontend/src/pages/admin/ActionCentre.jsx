@@ -20,6 +20,7 @@ export default function ActionCentre() {
 
   // Slide Panel State
   const [selectedComplaintId, setSelectedComplaintId] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Unregistered Link Flow States
   const [unregisteredSCs, setUnregisteredSCs] = useState([]);
@@ -54,7 +55,7 @@ export default function ActionCentre() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refreshTick]);
 
   const performSCAction = async (id, action) => {
     setActionLoading((prev) => ({ ...prev, [id]: action }));
@@ -459,10 +460,7 @@ export default function ActionCentre() {
           complaintId={selectedComplaintId}
           onClose={() => setSelectedComplaintId(null)}
           onUpdated={() => {
-            setSelectedComplaintId(null);
-            // Quick window reload is the easiest way to refresh all action centre lists 
-            // after closing the panel, avoiding complex prop drilling of fetchActionItems
-            window.location.reload(); 
+            setRefreshTick(prev => prev + 1);
           }}
         />
       )}
