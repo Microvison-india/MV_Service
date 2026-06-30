@@ -640,8 +640,9 @@
 
 ---
 
-- [ ] **Phase 32 — Reopen Flow Correction & Billing Adjustments**
-  - [ ] Investigate and fix Reopen Flow bugs (ensure status transitions and state changes work correctly on backend and frontend).
-  - [ ] Implement Reopen Flow billing adjustments (define how existing invoice charges are reversed, adjusted, or locked upon reopening).
-  - [ ] Add reopen audit logging and timeline checks to trace cost changes during successive closures.
+- [x] **Phase 32 — Editable Billing, Negative Balances & UI Polish**
+  - [x] **Editable Billing (Change 6):** Make all money fields (Preset Price, Petrol, Extras, Customer Payments) fully editable by the admin before closing the ticket.
+  - [x] **Negative Billing Logic:** Remove `Math.max(0, ...)` clamp in `billingCalculator.js` so net payouts can go negative if SC owes Microvison. Add red text styling in Admin UI for negative balances.
+  - [x] **Timezone Date Parsing:** Switch to `parseLocalDate` to fix midnight UTC shift bugs when filtering complaints and invoices.
+  - [x] **UI/UX Overhaul & Polling Fix:** Transition from uncontrolled to controlled inputs using `useRef` to prevent 5-second polling wipes on forms. Update cards, buttons, dialogs with softer shadows (`shadow-sm`), rounded corners (`rounded-2xl`), and replace heavy colored pill badges with simpler text tags. Update logos and headers with glassmorphism blur.
 

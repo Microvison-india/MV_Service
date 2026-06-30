@@ -571,5 +571,21 @@ graph TD
 
 ---
 
+## Phase 32 — Editable Billing, Negative Balances & UI Polish
+
+### DEV-GRD-054
+- **Phase:** 32
+- **GRD Section:** 8.4 (Invoice & Billing Module)
+- **Type:** CHANGED
+- **Summary:** The original requirement assumed Microvison always pays the Service Centre a positive sum. Due to the out-of-warranty flow (Change 6), SCs can collect cash directly from customers, which is recorded as `customerPaymentAmount`. The net payout formula (`gross - deductions`) is no longer clamped to zero. If an SC owes Microvison money, the invoice net payout goes into negative numbers, and is visually represented in the Admin UI with red text formatting.
+
+### DEV-GRD-055
+- **Phase:** 32
+- **GRD Section:** 8.2 (Admin Action Centre)
+- **Type:** CHANGED
+- **Summary:** All money fields (Preset Price, Petrol, Extra Charges, Customer Payments) are now fully editable by the admin immediately prior to closing the complaint. A pre-close money summary panel displays the net calculations and any active overrides, replacing the abandoned Reopen-flow billing logic.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

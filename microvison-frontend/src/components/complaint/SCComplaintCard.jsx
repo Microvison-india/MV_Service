@@ -44,33 +44,29 @@ export default function SCComplaintCard({ complaint: c, mode, onAction, onOpenDe
   return (
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
       {/* ── Header row ── */}
-      <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex items-start justify-between gap-3 mb-5">
         <div>
-          <p className="text-xs text-muted-foreground font-mono mb-1">{c.complaintId}</p>
-          <p className="font-semibold text-foreground text-base">{c.customerName}</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground font-mono mb-1.5">{c.complaintId}</p>
+          <p className="font-bold text-foreground text-xl mb-1">{c.customerName}</p>
+          <p className="text-base text-muted-foreground">
             {c.localAddress}, {c.city}, {c.district}
           </p>
         </div>
-        <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${STATUS_COLORS[statusKey] || 'bg-gray-100 text-gray-700'}`}>
+        <span className={`shrink-0 text-sm font-semibold px-3 py-1 rounded-full border ${STATUS_COLORS[statusKey] || 'bg-background text-foreground'}`}>
           {statusKey.replace(/_/g, ' ').toUpperCase()}
         </span>
       </div>
 
       {/* ── Tags row ── */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span className="bg-secondary text-secondary-foreground text-xs font-medium px-2.5 py-1 rounded-full">
+      <div className="flex flex-wrap items-center gap-2 mb-5 text-sm font-medium text-muted-foreground">
+        <span className="text-foreground font-semibold border border-border px-2 py-0.5 rounded-md shadow-sm">
           {PRODUCT_LABELS[c.product] || c.product}
         </span>
-        <span className="bg-secondary text-secondary-foreground text-xs font-medium px-2.5 py-1 rounded-full capitalize">
+        <span className="capitalize border border-border px-2 py-0.5 rounded-md shadow-sm">
           {c.complaintType}
         </span>
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-          c.warrantyStatus === 'in_warranty'
-            ? 'bg-green-100 text-green-800'
-            : 'bg-orange-100 text-orange-800'
-        }`}>
-          {c.warrantyStatus === 'in_warranty' ? '✅ In Warranty' : '⚠️ Out of Warranty'}
+        <span className={c.warrantyStatus === 'in_warranty' ? 'text-foreground border border-border px-2 py-0.5 rounded-md shadow-sm' : 'text-foreground border border-border px-2 py-0.5 rounded-md shadow-sm'}>
+          {c.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty'}
         </span>
       </div>
 

@@ -780,6 +780,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         if (onUpdated) onUpdated();
         if (onClose) onClose();
       }, 1200);
+    } catch (err) {
       setError(err.response?.data?.message || 'Failed to close complaint.');
     } finally {
       setActionLoading(false);
@@ -811,6 +812,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
         if (onUpdated) onUpdated();
         if (onClose) onClose();
       }, 1200);
+    } catch (err) {
       setError(err.response?.data?.message || 'Failed to reject on behalf of SC.');
     } finally {
       setActionLoading(false);
@@ -2557,7 +2559,6 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                 <div className="space-y-4 pt-2">
                   {(() => {
                     // Inline Billing Calculation (mirrors billingCalculator.js)
-                    const isWarr = isInWarranty;
                     
                     const origPreset = c?.presetPrice ?? 0;
                     const effPreset = (presetPriceOverride !== '' && presetPriceOverride !== null && presetPriceOverride !== undefined) 

@@ -58,7 +58,7 @@ export default function NewRequests() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <h1 className="text-xl font-bold text-foreground">New Requests</h1>
         {[1, 2].map((i) => (
           <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
@@ -92,7 +92,7 @@ export default function NewRequests() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {complaints.map((c) => (
             <SCComplaintCard
               key={c._id}

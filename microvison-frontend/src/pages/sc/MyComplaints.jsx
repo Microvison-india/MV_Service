@@ -157,7 +157,7 @@ export default function MyComplaints() {
 
       {/* ── List ── */}
       {loading ? (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-40 rounded-xl bg-muted animate-pulse" />
           ))}
@@ -169,7 +169,7 @@ export default function MyComplaints() {
           <p className="text-sm text-muted-foreground mt-1">Try changing your filters.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {complaints.map((c) => (
             <SCComplaintCard
               key={c._id}
