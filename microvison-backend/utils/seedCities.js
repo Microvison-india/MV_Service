@@ -1,7 +1,11 @@
-//foinfunfiufi3fi3 fij3f f3i f3u f3 f3f 3f 3jf 3f
-console.log("hello");
+/**
+ * utils/seedCities.js
+ * Run once: node utils/seedCities.js
+ * Seeds master city list for Rajasthan (41 dist), Punjab (23 dist),
+ * Haryana (22 dist), Gujarat (33 dist), Maharashtra (36 dist)
+ * Districts verified against LGD + official sources (2026)
+ */
 
-<<<<<<< HEAD
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const City = require('../models/City');
@@ -1076,7 +1080,3 @@ const seed = async () => {
 };
 
 seed();
-=======
-console.log("hello");console.log("hello");console.log("hello");console.log("hello");
-console.log("hello");console.log("hello");
->>>>>>> 3e7a502b76d783e6333e260b360ad3f547e4f672
