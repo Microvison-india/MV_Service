@@ -21,4 +21,9 @@ const complaintDraftSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('ComplaintDraft', complaintDraftSchema);
+const ComplaintDraft = mongoose.model('ComplaintDraft', complaintDraftSchema);
+
+// Automatically sync indexes with this schema (this will drop any old unique indexes on createdBy if they exist)
+ComplaintDraft.syncIndexes().catch(console.error);
+
+module.exports = ComplaintDraft;

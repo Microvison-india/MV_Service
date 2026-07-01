@@ -587,5 +587,19 @@ graph TD
 
 ---
 
+### DEV-GRD-056 — WhatsApp: Reopen Trigger Removed (Change 6B)
+- **Phase:** 32
+- **GRD Section:** 14.2 (Trigger 2 — Complaint Reopened WhatsApp)
+- **Type:** REMOVED
+- **Summary:** GRD Section 14.2 defined a second WA trigger specifically for reopened complaints (`COMPLAINT REOPENED` label + original complaint ID reference). This trigger is completely removed. Reopen flow is abandoned in Change 6B. Repeat complaints for the same product are now plain new complaints with new IDs. The SC receives a standard `NEW COMPLAINT ASSIGNED` WA-01 — the same message they would receive for any brand new complaint. No separate Meta template is needed for reopen. The GRD-mandated dual-template model (new + reopen) is reduced to a single WA-01 template.
+
+### DEV-GRD-057 — WhatsApp: Out-of-Warranty Payment Recording Has Zero WA Impact (Change 6A)
+- **Phase:** 32
+- **GRD Section:** 8.4 (Invoice & Billing Module) / 14 (WhatsApp Notifications)
+- **Type:** CLARIFICATION
+- **Summary:** The new multi-stage customer payment tracking system (Change 6A) introduced a `customerPayments[]` array on the Complaint model. No WhatsApp trigger fires at any point when an admin records, edits, or removes a payment entry. Payment data is strictly internal (admin sees it in the complaint panel; SC sees the deductions read-only on their billing page). The `customerPayments` array is never included in any WhatsApp message content. This is intentional — customer payment information is confidential billing data and must not be shared with SCs via automated messages.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*

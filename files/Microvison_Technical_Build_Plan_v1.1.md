@@ -645,6 +645,8 @@ WATI_BASE_URL/sendTemplateMessage. Body:
 {whatsappNumber: phone, template_name,
 broadcast_name, parameters:[]}. Accepts complaint
 object, builds params array.
+3.1 models/ComplaintDraft.js Schema: createdBy (ref User), currentStep (Number), formData (Mixed). Auto-syncs indexes.
+3.2 controllers/draft.controller.js getDrafts (find all by user), saveDraft (create or update specific draft), deleteDraft.
 4 controllers/complaint.controller.js —
 create
 Validate. Run reopenChecker — if found return
@@ -670,12 +672,13 @@ reopenCheck
 GET endpoint: call reopenChecker, return result.
 7 routes/complaint.routes.js POST /complaints, PATCH /complaints/:id/assign,
 GET /complaints/reopen-check — all admin-only
-8 pages/admin/NewComplaint.jsx Step wizard: useState for currentStep (1-4) +
-formData object. Step indicator at top (1→2→3→4
-with shadcn pattern). Render current step
-component. Pass formData + setFormData as props.
-On step 4 submit: POST /complaints then PATCH
-/complaints/:id/assign.
+8 pages/admin/NewComplaint.jsx Step wizard: useState for currentStep +
+formData object. Auto-saves to Draft API every 2s.
+Mount logic fetches Drafts and shows Draft Selection UI (Resume/Start Fresh).
+Step indicator at top. Render current step component. 
+Pass formData + setFormData as props.
+On step submit: POST /complaints then PATCH
+/complaints/:id/assign, then delete Draft.
 9 components/forms/Step1CustomerInfo.jsx shadcn Form. All customer inputs. On phone1 blur:
 GET /complaints/reopen-check → if hit, show
 ReopenBanner (shadcn Alert). Admin chooses:

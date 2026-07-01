@@ -228,7 +228,7 @@ export default function Step1CustomerInfo({ formData, setFormData }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {/* Phone 1 */}
         <div>
-          <label className={labelCls}>Phone Number 1 <span className="text-red-500">*</span></label>
+          <label className={labelCls}>Phone 1 (WhatsApp Only - 10 digits) <span className="text-red-500">*</span></label>
           <div className="relative">
             <input
               id="step1-phone1"
@@ -236,7 +236,7 @@ export default function Step1CustomerInfo({ formData, setFormData }) {
               value={formData.phone1 || ''}
               onChange={(e) => handleChange('phone1', e.target.value)}
               onBlur={checkPhoneForProducts}
-              placeholder="Primary contact"
+              placeholder="10-digit WhatsApp number"
               className={inputCls}
               required
             />
@@ -264,13 +264,13 @@ export default function Step1CustomerInfo({ formData, setFormData }) {
 
         {/* Phone 2 */}
         <div>
-          <label className={labelCls}>Phone Number 2</label>
+          <label className={labelCls}>Phone 2 (Alternate Number)</label>
           <input
             id="step1-phone2"
             type="tel"
             value={formData.phone2 || ''}
             onChange={(e) => handleChange('phone2', e.target.value)}
-            placeholder="Alternate contact (optional)"
+            placeholder="Different alternate number"
             className={inputCls}
           />
         </div>

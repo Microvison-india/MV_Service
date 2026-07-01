@@ -91,6 +91,7 @@ export default function BillingTable({
                 )}
                 <th className="px-4 py-3 font-semibold">Complaint ID</th>
                 <th className="px-4 py-3 font-semibold">Customer</th>
+                {isAdmin && <th className="px-4 py-3 font-semibold">Service Centre</th>}
                 <th className="px-4 py-3 font-semibold">Product</th>
                 <th className="px-4 py-3 font-semibold">Warranty</th>
                 <th className="px-4 py-3 font-semibold text-right">Preset (₹)</th>
@@ -106,7 +107,7 @@ export default function BillingTable({
               {loading ? (
                 Array.from({ length: 4 }).map((_, idx) => (
                   <tr key={idx} className="border-b border-border">
-                    {Array.from({ length: isAdmin ? 12 : 11 }).map((_, cellIdx) => (
+                    {Array.from({ length: isAdmin ? 13 : 11 }).map((_, cellIdx) => (
                       <td key={cellIdx} className="px-4 py-3">
                         <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
                       </td>
@@ -115,7 +116,7 @@ export default function BillingTable({
                 ))
               ) : bills.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 12 : 11} className="px-4 py-12 text-center text-muted-foreground italic">
+                  <td colSpan={isAdmin ? 13 : 11} className="px-4 py-12 text-center text-muted-foreground italic">
                     No billing records found for this selection.
                   </td>
                 </tr>
@@ -146,6 +147,12 @@ export default function BillingTable({
                       <td className="px-4 py-3 font-medium text-foreground">
                         {b.customerName}
                       </td>
+                      {/* Service Centre (Admin Only) */}
+                      {isAdmin && (
+                        <td className="px-4 py-3 text-xs font-medium text-primary">
+                          {b.assignedCentreId?.businessName || '—'}
+                        </td>
+                      )}
                       {/* Product */}
                       <td className="px-4 py-3 text-xs font-medium">
                         {PRODUCT_LABELS[b.product] || b.product}
@@ -237,7 +244,7 @@ export default function BillingTable({
             {bills.length > 0 && !loading && (
               <tfoot className="bg-muted/30 border-t border-border font-bold text-foreground">
                 <tr>
-                  <td colSpan={isAdmin ? 5 : 4} className="px-4 py-3">Total Rollup</td>
+                  <td colSpan={isAdmin ? 6 : 4} className="px-4 py-3">Total Rollup</td>
                   <td className="px-4 py-3 text-right text-foreground">₹{totalPreset}</td>
                   <td className="px-4 py-3 text-right text-muted-foreground">₹{totalPetrol}</td>
                   <td className="px-4 py-3 text-right text-muted-foreground">₹{totalExtras}</td>

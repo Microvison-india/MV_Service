@@ -168,8 +168,8 @@ export default function Register() {
 
             {/* Section: Contact */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Phone Number 1 *" id="phone1" name="phone1" type="tel" value={formData.phone1} onChange={handleChange} required placeholder="Primary contact" />
-              <Field label="Phone Number 2" id="phone2" name="phone2" type="tel" value={formData.phone2} onChange={handleChange} placeholder="Optional" />
+              <Field label="Phone 1 (WhatsApp Only - 10 digits) *" id="phone1" name="phone1" type="tel" value={formData.phone1} onChange={handleChange} required placeholder="10-digit WhatsApp number" />
+              <Field label="Phone 2 (Alternate Number)" id="phone2" name="phone2" type="tel" value={formData.phone2} onChange={handleChange} placeholder="Different alternate number" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

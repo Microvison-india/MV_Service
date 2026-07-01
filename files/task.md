@@ -248,21 +248,21 @@
   - [ ] Configure environment variables for WhatsApp credentials in `.env` / `.env.example`
 
   **Immediate Triggers (fire on specific admin/SC actions — no scheduler needed)**
-  - [ ] **WA-01:** SC assigned new complaint — fires immediately in `assignComplaint` controller. Content: Complaint ID, Customer name, Phone, Full address, Product type, Complaint type, Warranty status, Admin notes, Portal login URL. If reopen: add REOPENED flag + original Complaint ID.
+  - [ ] **WA-01:** SC assigned new complaint — fires immediately in `assignComplaint` controller. Content: Complaint ID, Customer name, Phone, Full address, Product type, Complaint type, Warranty status, Admin notes, Portal login URL. (Note: Reopen variant abandoned in Change 6B. All complaints are plain new complaints).
   - [ ] **WA-04:** SC accepts complaint — fires immediately in `acceptComplaint` controller. Recipient: Customer phone1 (+ phone2 if exists). Content: Complaint ID, Product type, Complaint type, SC business name, SC phone number, acknowledgment message.
   - [ ] **WA-06:** Admin marks Part/Unit as Delivered — fires immediately in new `markPartDelivered` controller (Phase 8.5). Recipient: SC. Content: Complaint ID, Customer name, Address, Part/unit delivery notification, Admin note (if any). *Depends on Phase 8.5 controller being built first.*
 
   **Scheduled/Reminder Triggers (require a background cron job / scheduler)**
   > These triggers fire at a time DELAY after an event. They need a background task that runs periodically (e.g. every hour) to check which complaints are overdue and fire the reminder.
-  - [ ] **WA-02:** SC not acted 24 hours after assignment (no accept/reject). Recipient: SC.
-  - [ ] **WA-03:** SC still not acted 48 hours after assignment. Recipient: SC.
-  - [ ] **WA-0X (post-assign):** SC still not acted — repeat every 2 days after WA-03. Stops when SC accepts or rejects. Recipient: SC.
-  - [ ] **WA-04B:** SC accepted but no action for 24 hours (no Going, Done, Not Done, Part Pending). Recipient: SC.
-  - [ ] **WA-0X (post-accept):** Repeat every 2 days after WA-04B until SC takes any action. Recipient: SC.
-  - [ ] **WA-05:** SC submitted Not Done, no further action for 24 hours. Recipient: SC.
-  - [ ] **WA-0X (post-not-done):** Repeat every 2 days after WA-05 until SC takes any action. Recipient: SC.
-  - [ ] **WA-07:** SC marked Part Received but no further action for 24 hours. Recipient: SC.
-  - [ ] **WA-0X (post-received):** Repeat every 2 days after WA-07 until SC acts. Recipient: SC.
+  - [ ] **WA-02:** SC not acted 23.5 hours after assignment (no accept/reject). Recipient: SC.
+  - [ ] **WA-03:** SC still not acted 47.5 hours after assignment. Recipient: SC.
+  - [ ] **WA-0X (post-assign):** SC still not acted — repeat every 47.5 hours after WA-03. Stops when SC accepts or rejects. Recipient: SC.
+  - [ ] **WA-04B:** SC accepted but no action for 23.5 hours (no Going, Done, Not Done, Part Pending). Recipient: SC.
+  - [ ] **WA-0X (post-accept):** Repeat every 47.5 hours after WA-04B until SC takes any action. Recipient: SC.
+  - [ ] **WA-05:** SC submitted Not Done, no further action for 23.5 hours. Recipient: SC.
+  - [ ] **WA-0X (post-not-done):** Repeat every 47.5 hours after WA-05 until SC takes any action. Recipient: SC.
+  - [ ] **WA-07:** SC marked Part Received but no further action for 23.5 hours. Recipient: SC.
+  - [ ] **WA-0X (post-received):** Repeat every 47.5 hours after WA-07 until SC acts. Recipient: SC.
 
   **Scheduler Infrastructure (needed for all WA-0X triggers above)**
   - [ ] Build a cron job utility (e.g., `utils/whatsappReminder.js`) that runs periodically (hourly/daily)

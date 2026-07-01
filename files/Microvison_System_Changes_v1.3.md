@@ -346,6 +346,17 @@ Below the *Per Complaint Bills* table, two running totals are always shown based
 
 ---
 
+## Change 5 — Draft System
+
+### 5A. Multiple Incomplete Drafts
+- **Auto-Save**: Progress is automatically saved every 2 seconds when creating a new complaint.
+- **Multiple Drafts**: The system strictly supports saving multiple independent drafts per admin (e.g., if the admin clicks "Start Fresh" multiple times, multiple drafts are saved).
+- **Draft Selection UI**: When navigating to "New Complaint", a screen lists all incomplete drafts. The admin can **Resume**, **Delete**, or **Start Fresh**.
+- **Pre-fill Bypass**: If navigating via "Reopen" or "Link Product" (which inject pre-filled single-session state), the draft system intentionally suspends itself so it doesn't overwrite real data.
+- **Cleanup**: On final submission of a complaint, the associated draft is automatically deleted.
+
+---
+
 ## Master Summary — All Changes So Far
 
 | Change / Feature | What It Does |
@@ -367,6 +378,7 @@ Below the *Per Complaint Bills* table, two running totals are always shown based
 | **4A — Advanced billing filters** | An exact date range (From → To) replaces Month + Year. SC, Product, and Warranty filters remain. A new Payment Status filter is added: `All` / `Paid Only` / `Unpaid Only`. All are combinable simultaneously. |
 | **4B — Mark as Paid system** | Bills default to `unpaid` on generation. They can be marked paid at closing (optional) or from the Billing Dashboard (bulk all in filtered view, bulk all SCs in a date range, or manual checkbox selection). Reversals to unpaid are allowed with a warning. `paidAt` + `paidBy` are stored per bill. |
 | **4C — Running totals** | Displays two live sums below the billing table: *Total (all bills in view)* and *Unpaid Total (only unpaid)*. Both update dynamically with active filters. Default is the current month and all SCs. |
+| **5A — Draft System** | Multiple drafts are supported concurrently via auto-save. Navigating to New Complaint shows "Incomplete Drafts" UI (Resume/Delete/Start Fresh). Drafts auto-delete upon submission. |
 
 ---
 *End of Current Changes · More changes will be added to this document as discussed*

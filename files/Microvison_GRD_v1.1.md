@@ -152,8 +152,15 @@ out.
 
 <!-- Page 7 -->
 
-Microvison Service Management System | GRD v1.1 | Page 7 of 27 6. Complaint Registration
+6. Complaint Registration
 Only admin can register complaints. The form is divided into 4 steps.
+
+6.0 Draft System
+• The system supports multiple concurrent drafts per admin.
+• Progress is auto-saved every 2 seconds into the database.
+• On navigating to the registration page, if drafts exist, a Draft Selection screen allows the admin to Resume, Delete, or Start Fresh.
+• Drafts are strictly suspended during pre-filled flows (like Reopen or Link Product) to prevent overwriting.
+• On successful complaint submission, the associated draft is permanently deleted.
 
 6.1 Step 1 — Customer Information
 Field Type Required Notes

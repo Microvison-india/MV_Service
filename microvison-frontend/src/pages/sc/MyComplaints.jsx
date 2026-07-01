@@ -44,7 +44,7 @@ export default function MyComplaints() {
   const [loading, setLoading] = useState(true);
   const [activeComplaint, setActiveComplaint] = useState(null);
   const [filters, setFilters] = useState({
-    status: 'accepted,going,not_done,part_received',
+    status: '',
     product: '',
     complaintType: '',
     warrantyStatus: '',
