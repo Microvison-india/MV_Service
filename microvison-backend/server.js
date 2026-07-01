@@ -10,6 +10,10 @@ dotenv.config();
 connectDB().then(() => {
   const migrateLegacyComplaints = require('./utils/migrateLegacyComplaints');
   migrateLegacyComplaints();
+
+  // Auto-seed admins from environment variables on startup
+  const seedAdmins = require('./utils/seedAdmins');
+  seedAdmins();
 });
 
 const app = express();

@@ -14,37 +14,62 @@ const seedAdmins = async () => {
 
     const adminEmail1 = process.env.ADMIN_EMAIL_1;
     const adminEmail2 = process.env.ADMIN_EMAIL_2;
+    const adminEmail3 = process.env.ADMIN_EMAIL_3; // Added 3rd admin
+    
+    // Names (Optional, defaults to Super Admin if not provided)
+    const adminName1 = process.env.ADMIN_NAME_1 || 'Super Admin 1';
+    const adminName2 = process.env.ADMIN_NAME_2 || 'Super Admin 2';
+    const adminName3 = process.env.ADMIN_NAME_3 || 'Super Admin 3';
+    
     const defaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@123';
 
-    if (!adminEmail1 || !adminEmail2) {
-      throw new Error('ADMIN_EMAIL_1 or ADMIN_EMAIL_2 is missing in .env');
+    // We only throw an error if the first one is missing, so you can have 1, 2, or 3 admins.
+    if (!adminEmail1) {
+      throw new Error('At least ADMIN_EMAIL_1 is required in .env');
     }
 
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB...');
+    if (mongoose.connection.readyState !== 1) {
+      await mongoose.connect(process.env.MONGO_URI);
+      console.log('Connected to MongoDB for admin seeding...');
+    }
 
-    const adminsToCreate = [
-      {
-        name: 'Super Admin 1',
+    const adminsToCreate = [];
+    
+    if (adminEmail1) {
+      adminsToCreate.push({
+        name: adminName1,
         email: adminEmail1,
-        passwordHash: defaultPassword, // Model pre-save hook will hash this
+        passwordHash: defaultPassword,
         role: 'admin',
         status: 'active',
-      },
-      {
-        name: 'Super Admin 2',
+      });
+    }
+    
+    if (adminEmail2) {
+      adminsToCreate.push({
+        name: adminName2,
         email: adminEmail2,
-        passwordHash: defaultPassword, // Model pre-save hook will hash this
+        passwordHash: defaultPassword,
         role: 'admin',
         status: 'active',
-      },
-    ];
+      });
+    }
+
+    if (adminEmail3) {
+      adminsToCreate.push({
+        name: adminName3,
+        email: adminEmail3,
+        passwordHash: defaultPassword,
+        role: 'admin',
+        status: 'active',
+      });
+    }
 
     for (const adminData of adminsToCreate) {
       // Check if admin already exists
       const existingUser = await User.findOne({ email: adminData.email });
       if (existingUser) {
-        console.log(`Admin ${adminData.email} already exists. Skipping.`);
+        console.log(`Admin ${adminData.email} already exists.`);
       } else {
         await User.create(adminData);
         console.log(`Created admin: ${adminData.email}`);
@@ -52,13 +77,9 @@ const seedAdmins = async () => {
     }
 
     console.log('\nAdmin seeding completed successfully.');
-    console.log(`Default password for both is: ${defaultPassword}`);
-    console.log('You can change this password using the "Forgot Password" flow on the login page.');
-    process.exit(0);
   } catch (error) {
     console.error('Error seeding admins:', error);
-    process.exit(1);
   }
 };
 
-seedAdmins();
+module.exports = seedAdmins;
