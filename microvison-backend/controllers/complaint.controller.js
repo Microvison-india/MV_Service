@@ -737,9 +737,7 @@ const updateStatus = async (req, res) => {
 
   // ── Path 1: Done ─────────────────────────────────────────────────────────
   if (newStatus === 'done') {
-    if (photos.length < 1) {
-      return res.status(400).json({ message: 'At least one proof photo is required before marking as done.' });
-    }
+    // Photos are now completely optional
 
     if (complaint.warrantyStatus === 'out_of_warranty') {
       // Change 6A: SC no longer collects payment — admin records via customerPayments
@@ -864,39 +862,21 @@ const updateStatus = async (req, res) => {
 
   // ── Path 2: Not Done ─────────────────────────────────────────────────────
   else if (newStatus === 'not_done') {
-    const hasReason = notDoneReason && notDoneReason.trim() !== '';
-    const hasVoice = notDoneVoiceUrl && notDoneVoiceUrl.trim() !== '';
-
-    if (!hasReason && !hasVoice) {
-      return res.status(400).json({ message: 'Either a text reason or a voice note is required before marking as not done.' });
-    }
+    // Text reason and Voice note are completely optional
 
     if (notDoneReason) complaint.notDoneReason = notDoneReason.trim();
     if (notDoneVoiceUrl) complaint.notDoneVoiceUrl = notDoneVoiceUrl;
 
     if (scNotes) complaint.scNotes = scNotes.trim();
-    timelineNote = notDoneReason ? `Not Done: ${notDoneReason.trim()}` : 'SC marked as not done (voice note attached).';
+    timelineNote = notDoneReason ? `Not Done: ${notDoneReason.trim()}` : (notDoneVoiceUrl ? 'SC marked as not done (voice note attached).' : 'SC marked as not done.');
     timelineVoiceUrl = notDoneVoiceUrl || '';
   }
 
   // ── Path 3: Part Pending ─────────────────────────────────────────────────
   else if (newStatus === 'part_pending') {
-    if (photos.length < 2) {
-      return res.status(400).json({ message: 'At least two proof photos (proof of diagnosis) are required before marking as part pending.' });
-    }
+    // Photos, voice notes, and text notes are optional
     if (!partDetails || partDetails.trim() === '') {
       return res.status(400).json({ message: 'Parts detail description is compulsory before marking as part pending.' });
-    }
-    // Voice note not required for admin proxy
-    if (!partPendingVoiceUrl || partPendingVoiceUrl.trim() === '') {
-      if (req.user.role !== 'admin') {
-        return res.status(400).json({ message: 'A voice note explanation is compulsory before marking as part pending.' });
-      }
-    }
-    if (!scNotes || scNotes.trim() === '') {
-      if (req.user.role !== 'admin') {
-        return res.status(400).json({ message: 'Text notes are compulsory before marking as part pending.' });
-      }
     }
 
     // Reset delivery details to trigger a new cycle

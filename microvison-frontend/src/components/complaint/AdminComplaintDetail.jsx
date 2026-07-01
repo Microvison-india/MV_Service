@@ -878,23 +878,14 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     }
 
     if (statusVal === 'done') {
-      if (unregPhotos.length < 1) {
-        setError('At least one proof photo is required.');
-        return;
-      }
+      // Photos optional
       // Change 6A: Admin records customer payments via the "Collected from Customer" panel
       // No longer required to enter amount at done form submission
     } else if (statusVal === 'not_done') {
-      if (!unregReason.trim()) {
-        setError('A reason note is required.');
-        return;
-      }
+      // Reason optional
       body.notDoneReason = unregReason;
     } else if (statusVal === 'part_pending') {
-      if (unregPhotos.length < 2) {
-        setError('At least two proof photos are required for part pending.');
-        return;
-      }
+      // Photos optional
       if (!unregPartDetails.trim()) {
         setError('Part details are required.');
         return;
@@ -2014,7 +2005,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                       <div className="space-y-4 pt-2">
                         {/* Proof Photos */}
                         <div>
-                          <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Min 1) <span className="text-red-500">*</span></label>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Optional)</label>
                           <ImageUploader
                             maxFiles={5}
                             uploadedUrls={unregPhotos}
@@ -2051,14 +2042,13 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     {unregActionForm === 'not_done' && (
                       <div className="space-y-3 pt-2">
                         <div>
-                          <label className="text-[10px] font-bold uppercase block mb-1">Reason / Explanation <span className="text-red-500">*</span></label>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Reason / Explanation</label>
                           <textarea
                             value={unregReason}
                             onChange={(e) => setUnregReason(e.target.value)}
                             className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                             rows={2}
                             placeholder="Why is it not done?"
-                            required
                           />
                         </div>
 
@@ -2077,7 +2067,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                     {unregActionForm === 'part_pending' && (
                       <div className="space-y-3 pt-2">
                         <div>
-                          <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Min 2) <span className="text-red-500">*</span></label>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Proof Photos (Optional)</label>
                           <ImageUploader
                             maxFiles={5}
                             uploadedUrls={unregPhotos}
@@ -2086,7 +2076,7 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold uppercase block mb-1">Required Part Details <span className="text-red-500">*</span></label>
+                          <label className="text-[10px] font-bold uppercase block mb-1">Required Part Details</label>
                           <textarea
                             value={unregPartDetails}
                             onChange={(e) => setUnregPartDetails(e.target.value)}

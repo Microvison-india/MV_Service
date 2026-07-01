@@ -147,9 +147,9 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       active = false;
       clearInterval(intervalId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial._id]);
 
-  const isInWarranty = c.warrantyStatus === 'in_warranty';
   const [submitting, setSubmitting] = useState(false);
   
   const isProcessing = markingGoing || markingReceived || submitting;
@@ -233,10 +233,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
     // ── Path 1: Done Form ────────────────────────────────────
     if (activeForm === 'done') {
-      if (proofPhotos.length < 1) {
-        setError('At least one proof photo is required before marking as done.');
-        return;
-      }
+      // Photos optional
 
       body.totalVisits = totalVisits ? Number(totalVisits) : undefined;
       body.distanceTravelled = distanceTravelled ? Number(distanceTravelled) : undefined;
@@ -280,13 +277,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
     // ── Path 2: Not Done Form ────────────────────────────────
     else if (activeForm === 'not_done') {
-      const hasReason = notDoneReason && notDoneReason.trim() !== '';
-      const hasVoice = notDoneVoiceUrl && notDoneVoiceUrl.trim() !== '';
-      
-      if (!hasReason && !hasVoice) {
-        setError('Either a text reason or a voice note must be provided before marking as not done.');
-        return;
-      }
+      // All fields optional
 
       body.notDoneReason = notDoneReason;
       body.notDoneVoiceUrl = notDoneVoiceUrl;
@@ -294,20 +285,9 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
     // ── Path 3: Part Pending Form ────────────────────────────
     else if (activeForm === 'part_pending') {
-      if (proofPhotos.length < 2) {
-        setError('At least two proof photos (proof of diagnosis) are required before marking as part pending.');
-        return;
-      }
+      // Photos, voice note, and text notes optional
       if (!partDetails || !partDetails.trim()) {
         setError('Parts detail description is compulsory.');
-        return;
-      }
-      if (!partPendingVoiceUrl) {
-        setError('A voice note explanation is compulsory.');
-        return;
-      }
-      if (!scNotes || !scNotes.trim()) {
-        setError('Text notes are compulsory.');
         return;
       }
 
@@ -523,37 +503,33 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
           {/* Section 3: Job Context & Pricing Accordion */}
           <AccordionSection title="Job Context & Pricing" icon="🔧" defaultOpen={false}>
             {/* Pricing Section - Read Only! */}
-            {true && (
-              <div className="rounded-xl border border-border/80 p-3.5 bg-muted/10">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Preset Pricing Details (Admin Assigned)</p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Preset Name:</span>
-                    <p className="font-semibold text-foreground">{c.presetName || 'Default Preset'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Base Preset Price:</span>
-                    <p className="font-bold text-foreground">₹{c.presetPrice ?? 0}</p>
-                  </div>
+            <div className="rounded-xl border border-border/80 p-3.5 bg-muted/10">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Preset Pricing Details (Admin Assigned)</p>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-muted-foreground">Preset Name:</span>
+                  <p className="font-semibold text-foreground">{c.presetName || 'Default Preset'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Base Preset Price:</span>
+                  <p className="font-bold text-foreground">₹{c.presetPrice ?? 0}</p>
                 </div>
               </div>
-            )}
+            </div>
             
             {/* Petrol field (Read-only on SC side pricing context - editing only allowed in Done form) */}
-            {true && (
-              <div className="bg-muted/10 border border-border/80 rounded-xl p-3.5 space-y-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Petrol Claimed</span>
-                <PetrolEditField
-                  petrolAdmin={c.petrolAdmin}
-                  petrolSC={c.petrolSC}
-                  petrolFinal={c.petrolFinal}
-                  editCount={c.petrolEditCount}
-                  locked={c.petrolLocked}
-                  userRole="readonly"
-                  onSave={() => {}}
-                />
-              </div>
-            )}
+            <div className="bg-muted/10 border border-border/80 rounded-xl p-3.5 space-y-1.5 mt-3">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Petrol Claimed</span>
+              <PetrolEditField
+                petrolAdmin={c.petrolAdmin}
+                petrolSC={c.petrolSC}
+                petrolFinal={c.petrolFinal}
+                editCount={c.petrolEditCount}
+                locked={c.petrolLocked}
+                userRole="readonly"
+                onSave={() => {}}
+              />
+            </div>
 
             {/* Extra Charges Claim (Read-only in Pricing Context) */}
             {c.extraCharges && c.extraCharges.length > 0 && (
@@ -622,7 +598,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 {/* Proof Photos (Done & Part Pending required, Not Done optional) */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-foreground uppercase tracking-wide">
-                    Upload Photos {activeForm === 'done' && <span className="text-red-500">*</span>} {activeForm === 'part_pending' && <span className="text-red-500">*(Min 2)</span>}
+                    Upload Photos
                   </label>
                   <p className="text-[10px] text-muted-foreground">
                     {activeForm === 'done' && 'Upload proof of completed resolution (Min 1, max 5).'}
@@ -874,7 +850,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                   <div className="space-y-4 pt-2 border-t border-border/50">
                     <div>
                       <label className={labelCls}>
-                        Reason for Not Done <span className="text-red-500">*</span>
+                        Reason for Not Done
                       </label>
                       <textarea
                         rows={3}
@@ -886,7 +862,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                     </div>
 
                     <div>
-                      <label className={labelCls}>Voice Explanation (Required if no text reason)</label>
+                      <label className={labelCls}>Voice Explanation (Optional)</label>
                       <VoiceRecorder
                         uploadedUrl={notDoneVoiceUrl}
                         onUpload={setNotDoneVoiceUrl}
@@ -924,7 +900,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
                     <div>
                       <label className={labelCls}>
-                        Voice Explanation for Part Diagnosis <span className="text-red-500">*</span>
+                        Voice Explanation for Part Diagnosis
                       </label>
                       <VoiceRecorder
                         uploadedUrl={partPendingVoiceUrl}
@@ -934,7 +910,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
                     <div>
                       <label className={labelCls}>
-                        Detailed Text Notes / Sourcing Reason <span className="text-red-500">*</span>
+                        Detailed Text Notes / Sourcing Reason
                       </label>
                       <textarea
                         rows={2}
