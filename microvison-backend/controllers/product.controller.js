@@ -221,6 +221,7 @@ const updateProduct = async (req, res) => {
       forceOverride,
       manualReason,
       missingFieldsWarning,
+      overrideRevoke, // explicit admin un-revoke action
     } = req.body;
 
     const product = await Product.findOne({ trackingId });
@@ -249,12 +250,29 @@ const updateProduct = async (req, res) => {
     if (modelNumber !== undefined) product.modelNumber = modelNumber;
     if (missingFieldsWarning !== undefined) product.missingFieldsWarning = missingFieldsWarning;
 
+    // ── Bill Date Erase Guard ─────────────────────────────────
+    // If the product already has a bill date, and the request sends null/empty,
+    // only allow if forceOverride is also set (meaning user made an explicit choice).
+    if (
+      billDate !== undefined &&
+      (billDate === null || billDate === '') &&
+      product.billDate &&
+      !forceOverride &&
+      !overrideRevoke
+    ) {
+      return res.status(400).json({
+        message: 'Bill date cannot be removed without a replacement action. Please provide a new date or use Force Override.',
+        code: 'BILL_DATE_ERASE_BLOCKED',
+      });
+    }
+
     // Recalculate warranty if bill info or manual override is provided
     if (
       billDate !== undefined ||
       warrantyStatus !== undefined ||
       forceOverride !== undefined ||
       warrantyForceReason !== undefined ||
+      overrideRevoke ||
       shopName !== undefined ||
       modelNumber !== undefined
     ) {
@@ -264,21 +282,30 @@ const updateProduct = async (req, res) => {
       const {
         warrantyStatus: calcStatus,
         warrantyExpiryDate,
-        warrantySource,
+        warrantySource: calcSource,
         warrantyForceReason: forceReasonVal,
       } = calculateWarranty({
         billDate: product.billDate,
         complaintType: complaintType || 'complaint',
         manualSelection: warrantyStatus !== undefined ? warrantyStatus : product.warrantyStatus,
         manualReason,
-        forceOverride: forceOverride !== undefined ? forceOverride : (billDate ? false : (product.warrantySource === 'forced')),
+        forceOverride: forceOverride !== undefined ? forceOverride : (product.warrantySource === 'forced'),
         forceReason: warrantyForceReason !== undefined ? warrantyForceReason : product.warrantyForceReason,
+        warrantySource: product.warrantySource,  // always pass so P0 (revoked) guard fires correctly
+        overrideRevoke: !!overrideRevoke,        // explicit un-revoke bypasses P0
       });
 
       product.warrantyStatus = calcStatus;
       product.warrantyExpiryDate = warrantyExpiryDate;
-      product.warrantySource = warrantySource;
+      product.warrantySource = calcSource;
       product.warrantyForceReason = forceReasonVal || '';
+
+      // If admin explicitly un-revoked, clear all revocation metadata
+      if (overrideRevoke) {
+        product.revocationReason = '';
+        product.revocationDate = null;
+        product.revocationComplaintId = null;
+      }
     }
 
     await product.save();

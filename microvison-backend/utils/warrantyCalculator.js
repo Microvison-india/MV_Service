@@ -9,6 +9,7 @@
  * @param {Boolean|null} options.forceOverride - whether admin overrides calculated status
  * @param {String|null} options.forceReason - reason text for force override
  * @param {String|null} options.warrantySource - existing warranty source on the product (for revocation check)
+ * @param {Boolean} options.overrideRevoke - when true, admin explicitly un-revokes; skip the permanent revoke guard
  * @returns {Object} { warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }
  */
 const calculateWarranty = ({
@@ -19,9 +20,11 @@ const calculateWarranty = ({
   forceOverride,
   forceReason,
   warrantySource,
+  overrideRevoke = false,
 }) => {
   // Rule 0: Revoked status is permanent — overrides everything including force
-  if (warrantySource === 'revoked') {
+  // Exception: if admin explicitly passes overrideRevoke=true, skip this guard
+  if (warrantySource === 'revoked' && !overrideRevoke) {
     return {
       warrantyStatus: 'out_of_warranty',
       warrantyExpiryDate: null,

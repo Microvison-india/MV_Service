@@ -72,14 +72,16 @@ export default function SCDetail() {
   const { complaints, loading: complaintsLoading, error: complaintsError, pagination, refresh: refreshComplaints } = useComplaints(complaintFilters);
   const [selectedComplaintId, setSelectedComplaintId] = useState(null);
 
-  // Sync filters when ID parameter changes
-  useEffect(() => {
-    setComplaintFilters((prev) => ({
-      ...prev,
+  // Sync filters when ID parameter changes (React recommended pattern over useEffect)
+  const [prevId, setPrevId] = useState(id);
+  if (id !== prevId) {
+    setPrevId(id);
+    setComplaintFilters({
       assignedCentreId: id,
       page: 1,
-    }));
-  }, [id]);
+      limit: 10,
+    });
+  }
 
   useEffect(() => {
     let active = true;

@@ -46,6 +46,8 @@ export default function MonthlyInvoice({ invoice }) {
       total: c.total,
       // Change 6A: Use unified customerPaidToSC from billingCalculator
       customerPaidToSC: c.customerPaidToSC,
+      toSCPayments: c.toSCPayments || c.billing?.toSCPayments || [],
+      toMVPayments: c.toMVPayments || c.billing?.toMVPayments || [],
       // Legacy fields kept for backward compatibility
       customerPaymentAmount: c.customerPaymentAmount,
       customerChargePaidToSCAmount: c.customerChargePaidToSCAmount,

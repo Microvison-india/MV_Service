@@ -1048,10 +1048,24 @@ const seed = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB connected');
-    await City.deleteMany({});
-    console.log('Cleared existing cities');
-    const inserted = await City.insertMany(unique);
-    console.log(`✅ Seeded ${inserted.length} cities successfully`);
+    
+    // Use bulkWrite for safe Upsert (Update or Insert)
+    const bulkOps = unique.map(c => ({
+      updateOne: {
+        filter: { name: c.name, district: c.district, state: c.state },
+        update: { $set: c },
+        upsert: true
+      }
+    }));
+    const result = await City.bulkWrite(bulkOps);
+    console.log(`✅ Upserted cities. Matched: ${result.matchedCount}, Inserted: ${result.upsertedCount}, Modified: ${result.modifiedCount}`);
+    
+    // Cleanup: Remove any old cities in the DB that are not in our master script
+    const validNames = unique.map(c => c.name);
+    const deleteResult = await City.deleteMany({ name: { $nin: validNames } });
+    if (deleteResult.deletedCount > 0) {
+      console.log(`🧹 Removed ${deleteResult.deletedCount} outdated cities.`);
+    }
     const states = ['Rajasthan', 'Punjab', 'Haryana', 'Gujarat', 'Maharashtra'];
     states.forEach(s => {
       const count = unique.filter(c => c.state === s).length;

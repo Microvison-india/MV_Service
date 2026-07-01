@@ -47,7 +47,7 @@ export default function ImageUploader({ maxFiles = 2, onUpload, uploadedUrls = [
       <div className="flex items-center gap-4 mb-4">
         <input
           type="file"
-          accept="image/png, image/jpeg, image/webp"
+          accept="image/*"
           multiple
           className="hidden"
           ref={fileInputRef}

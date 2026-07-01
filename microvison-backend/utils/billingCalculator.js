@@ -52,11 +52,12 @@ function calcBill(complaint) {
   const customerPaidToMicrovison = toMVEntries.reduce((sum, p) => sum + (p.amount || 0), 0);
 
   // Legacy field compatibility (for old complaints that used single fields)
-  const legacyToSC = (complaint.customerPaymentAmount || 0) + (complaint.customerChargePaidToSCAmount || 0);
+  const legacyCustomerPaymentToSC = complaint.customerPaymentAmount || 0;
+  const criticalActionPaidToSC = complaint.customerChargePaidToSCAmount || 0;
   const legacyToMV = complaint.customerPaymentToMicrovison || 0;
 
   // Use new array if it has entries, else fall back to legacy fields
-  const effectiveCustomerPaidToSC = payments.length > 0 ? customerPaidToSC : legacyToSC;
+  const effectiveCustomerPaidToSC = (payments.length > 0 ? customerPaidToSC : legacyCustomerPaymentToSC) + criticalActionPaidToSC;
   const effectiveCustomerPaidToMV = payments.length > 0 ? customerPaidToMicrovison : legacyToMV;
 
   // 6. Net SC total (can be negative if customer paid more to SC than SC's bill)

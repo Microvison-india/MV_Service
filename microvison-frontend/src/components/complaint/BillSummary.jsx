@@ -36,10 +36,11 @@ export default function BillSummary({ complaint, isAdmin = false }) {
   const newCustomerPaidToMV = toMVPayments.reduce((s, p) => s + (p.amount || 0), 0);
 
   // Legacy field fallback for old complaints without customerPayments array
-  const legacyPaidToSC = (complaint.customerPaymentAmount || 0) + (complaint.customerChargePaidToSCAmount || 0);
+  const legacySinglePaidToSC = complaint.customerPaymentAmount || 0;
+  const criticalActionPaidToSC = complaint.customerChargePaidToSCAmount || 0;
   const legacyPaidToMV = complaint.customerPaymentToMicrovison || 0;
 
-  const customerPaidToSC = payments.length > 0 ? newCustomerPaidToSC : legacyPaidToSC;
+  const customerPaidToSC = (payments.length > 0 ? newCustomerPaidToSC : legacySinglePaidToSC) + criticalActionPaidToSC;
   const customerPaidToMV = payments.length > 0 ? newCustomerPaidToMV : legacyPaidToMV;
 
   // 6. Net total owed to SC (can be negative — SC owes Microvison if customer paid more to SC than SC's bill)

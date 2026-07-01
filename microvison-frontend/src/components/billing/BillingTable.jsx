@@ -44,9 +44,13 @@ export default function BillingTable({
 
   // Running totals — negative bills are real (SC owes MV money); they still count in the sum
   const totalAll    = bills.reduce((s, b) => s + (b.billing?.total ?? 0), 0);
-  const totalUnpaid = bills
-    .filter(b => b.paymentStatus !== 'paid')
+  const unpaidBills = bills.filter(b => b.paymentStatus !== 'paid');
+  const totalUnpaidOwedToSC = unpaidBills
+    .filter(b => (b.billing?.total ?? 0) > 0)
     .reduce((s, b) => s + (b.billing?.total ?? 0), 0);
+  const totalUnpaidOwedToMV = unpaidBills
+    .filter(b => (b.billing?.total ?? 0) < 0)
+    .reduce((s, b) => s + Math.abs(b.billing?.total ?? 0), 0);
 
   const allSelected = bills.length > 0 && bills.every(b => selectedIds.includes(b._id));
 
@@ -278,27 +282,26 @@ export default function BillingTable({
                 : 'Paid + Unpaid combined (MV owes SC)'}
             </p>
           </div>
-          <div className={`rounded-xl p-4 shadow-sm border ${
-            totalUnpaid < 0
-              ? 'bg-red-50 border-red-200 dark:bg-red-950/10 dark:border-red-900/40'
-              : 'bg-amber-50 border-amber-200 dark:bg-amber-950/10 dark:border-amber-900/40'
-          }`}>
-            <p className={`text-xs uppercase tracking-wide font-semibold ${
-              totalUnpaid < 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'
-            }`}>
-              {totalUnpaid < 0 ? 'SC Owes Microvison' : 'Unpaid Total (MV → SC)'}
+          <div className="bg-amber-50 border border-amber-200 dark:bg-amber-950/10 dark:border-amber-900/40 rounded-xl p-4 shadow-sm">
+            <p className="text-amber-700 dark:text-amber-400 text-xs uppercase tracking-wide font-semibold">
+              Unpaid Total (MV → SC)
             </p>
-            <p className={`text-2xl font-extrabold mt-1 ${
-              totalUnpaid < 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'
-            }`}>
-              {fmtRupee(totalUnpaid)}
+            <p className="text-amber-700 dark:text-amber-400 text-2xl font-extrabold mt-1">
+              {fmtRupee(totalUnpaidOwedToSC)}
             </p>
-            <p className={`text-xs mt-0.5 ${
-              totalUnpaid < 0 ? 'text-red-600 dark:text-red-500' : 'text-amber-600 dark:text-amber-500'
-            }`}>
-              {totalUnpaid < 0
-                ? 'SC collected more than billed — return the difference'
-                : 'What Microvison still owes the SC(s)'}
+            <p className="text-amber-600 dark:text-amber-500 text-xs mt-0.5">
+              What Microvison still owes the SC(s)
+            </p>
+          </div>
+          <div className="bg-red-50 border border-red-200 dark:bg-red-950/10 dark:border-red-900/40 rounded-xl p-4 shadow-sm">
+            <p className="text-red-700 dark:text-red-400 text-xs uppercase tracking-wide font-semibold">
+              SC Owes Microvison
+            </p>
+            <p className="text-red-700 dark:text-red-400 text-2xl font-extrabold mt-1">
+              {fmtRupee(totalUnpaidOwedToMV)}
+            </p>
+            <p className="text-red-600 dark:text-red-500 text-xs mt-0.5">
+              SC collected more than billed — return difference
             </p>
           </div>
         </div>

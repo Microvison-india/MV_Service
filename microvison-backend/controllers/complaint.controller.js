@@ -110,6 +110,17 @@ const createComplaint = async (req, res) => {
     return res.status(400).json({ message: 'Product and complaint type are required.' });
   }
 
+  if (initialCustomerPayment) {
+    const initialAmount = Number(initialCustomerPayment.amount);
+    if (
+      !['to_microvison', 'to_sc'].includes(initialCustomerPayment.route) ||
+      !Number.isFinite(initialAmount) ||
+      initialAmount <= 0
+    ) {
+      return res.status(400).json({ message: 'Initial customer payment must include a valid route and amount greater than 0.' });
+    }
+  }
+
   // ── Business rules ────────────────────────────────────────
   // Coolers cannot be "installation" type (GRD Section 6.2)
   if (product === 'cooler' && complaintType === 'installation') {
@@ -751,7 +762,6 @@ const updateStatus = async (req, res) => {
 
     // Petrol Edit 2 — SC's turn as long as admin has not locked it (GRD 6.3)
     if (
-      complaint.warrantyStatus === 'in_warranty' &&
       !complaint.petrolLocked &&
       petrolSC !== undefined
     ) {
@@ -760,13 +770,20 @@ const updateStatus = async (req, res) => {
     }
 
     // Preserve existing extra charges and append only new ones
+    // SECURITY: Admin-added charges (requestedBy === 'admin') cannot be modified by SC submission
     const updatedCharges = [];
     for (const ec of complaint.extraCharges) {
       const foundInFrontend = Array.isArray(extraCharges) && extraCharges.find(item => item._id && String(item._id) === String(ec._id));
       if (foundInFrontend) {
-        ec.label = foundInFrontend.label;
-        ec.amount = Number(foundInFrontend.amount);
-        updatedCharges.push(ec);
+        if (ec.requestedBy === 'admin') {
+          // Admin charges: SC cannot change label or amount — preserve originals
+          updatedCharges.push(ec);
+        } else {
+          // SC's own charges can be updated
+          ec.label = foundInFrontend.label;
+          ec.amount = Number(foundInFrontend.amount);
+          updatedCharges.push(ec);
+        }
       } else if (ec.requestedBy === 'admin') {
         updatedCharges.push(ec);
       }
@@ -977,14 +994,14 @@ const confirmDone = async (req, res) => {
     return res.status(400).json({ message: 'Complaint is not in Done or Not Done status. Admin can only confirm finalized jobs.' });
   }
 
-  // Change 5: If critical action was enabled, admin MUST have acknowledged before closing
-  if (criticalActionEnabled && !criticalActionAcknowledgedAt) {
+  // Change 5: If critical action was enabled (from DB, not request body), admin MUST have acknowledged before closing
+  if (complaint.criticalActionEnabled && !criticalActionAcknowledgedAt) {
     return res.status(400).json({
       message: 'This complaint has a critical action recorded. You must acknowledge it before closing.',
     });
   }
 
-  if (criticalActionEnabled && warrantyRevoked && (!warrantyRevocationReason || !warrantyRevocationReason.trim())) {
+  if (complaint.criticalActionEnabled && warrantyRevoked && (!warrantyRevocationReason || !warrantyRevocationReason.trim())) {
     return res.status(400).json({
       message: 'Revocation reason is required when revoking warranty.',
     });
@@ -995,26 +1012,51 @@ const confirmDone = async (req, res) => {
     const product = await Product.findById(complaint.trackingId);
     if (product) {
       // If admin sent any of these in req.body during Confirm Done, update them on the product first!
-      const { billDate, billPhoto, shopName, serialNumber, modelNumber } = req.body;
+      const { billDate, billPhoto, shopName, serialNumber, modelNumber, overrideRevoke, forceOverride: closeForceOverride, warrantyStatus: closeWarrantyStatus, warrantyForceReason: closeForceReason } = req.body;
       let productUpdated = false;
+
+      // ── Bill Date Erase Guard ─────────────────────────────────────────────
+      // If product already has a bill date, do not allow clearing it unless a force override is also provided
+      if (
+        billDate !== undefined &&
+        (billDate === null || billDate === '') &&
+        product.billDate &&
+        !closeForceOverride &&
+        !overrideRevoke
+      ) {
+        return res.status(400).json({
+          message: 'Bill date cannot be removed without a replacement action. Please provide a new date or use Force Override.',
+          code: 'BILL_DATE_ERASE_BLOCKED',
+        });
+      }
+
       if (billDate !== undefined) { product.billDate = billDate || null; productUpdated = true; }
       if (billPhoto !== undefined) { product.billPhoto = billPhoto || ''; productUpdated = true; }
       if (shopName !== undefined) { product.shopName = shopName || ''; productUpdated = true; }
       if (serialNumber !== undefined) { product.serialNumber = serialNumber || ''; productUpdated = true; }
       if (modelNumber !== undefined) { product.modelNumber = modelNumber || ''; productUpdated = true; }
+      if (closeForceOverride !== undefined || overrideRevoke) { productUpdated = true; }
+
       if (productUpdated) {
-        // Re-run warranty calculator — pass warrantySource so revoked guard fires
-        const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty({
+        // Re-run warranty calculator — always pass warrantySource so P0 (revoked) guard fires correctly
+        const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource: calcSource } = calculateWarranty({
           billDate: product.billDate,
           complaintType: complaint.complaintType || 'complaint',
-          manualSelection: product.warrantyStatus,
-          forceOverride: billDate ? false : (product.warrantySource === 'forced'),
-          forceReason: product.warrantyForceReason,
+          manualSelection: closeWarrantyStatus || product.warrantyStatus,
+          forceOverride: closeForceOverride !== undefined ? closeForceOverride : (product.warrantySource === 'forced'),
+          forceReason: closeForceReason || product.warrantyForceReason,
           warrantySource: product.warrantySource,   // CRITICAL: passes 'revoked' so Rule 0 fires
+          overrideRevoke: !!overrideRevoke,         // explicit un-revoke bypasses P0
         });
         product.warrantyStatus = calcStatus;
         product.warrantyExpiryDate = warrantyExpiryDate;
-        product.warrantySource = warrantySource;
+        product.warrantySource = calcSource;
+        if (overrideRevoke) {
+          // Clear revocation metadata if admin explicitly un-revoked
+          product.revocationReason = '';
+          product.revocationDate = null;
+          product.revocationComplaintId = null;
+        }
         await product.save();
 
         // Sync newly calculated warranty + bill info back to the complaint snapshot
@@ -1305,9 +1347,9 @@ const getActionItems = async (req, res) => {
   // 1. Pending SC Registrations
   const pendingSCRegistrations = await ServiceCentre.find({ status: 'pending' }).sort({ createdAt: -1 });
 
-  // 2. Pending Confirmations (Jobs done by SC, waiting for admin to close)
+  // 2. Pending Confirmations (Jobs done or not_done by SC, waiting for admin to close)
   const pendingConfirmations = await Complaint.find({
-    status: 'done'
+    status: { $in: ['done', 'not_done'] }
   })
     .populate('assignedCentreId', 'ownerName businessName phone1 isUnregistered')
     .sort({ updatedAt: -1 });
@@ -1652,6 +1694,18 @@ const updateExtraCharges = async (req, res) => {
 
     if (!Array.isArray(extraCharges)) {
       return res.status(400).json({ message: 'extraCharges must be an array.' });
+    }
+
+    // Validate each extra charge before touching the DB
+    for (let i = 0; i < extraCharges.length; i++) {
+      const ec = extraCharges[i];
+      if (!ec.label || !ec.label.trim()) {
+        return res.status(400).json({ message: `Extra charge #${i + 1} label cannot be empty.` });
+      }
+      const amt = Number(ec.amount);
+      if (isNaN(amt) || amt <= 0) {
+        return res.status(400).json({ message: `Extra charge #${i + 1} amount must be a positive number.` });
+      }
     }
 
     const complaint = await Complaint.findById(id);

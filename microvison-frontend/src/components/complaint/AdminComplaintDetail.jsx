@@ -269,6 +269,18 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
   const [editBillDate, setEditBillDate] = useState('');
   const [editBillPhoto, setEditBillPhoto] = useState('');
   const [showProductEditor, setShowProductEditor] = useState(false);
+  // Bill date reset flow
+  const [billDateResetMode, setBillDateResetMode] = useState(false); // show reset picker
+  const [billDateResetChoice, setBillDateResetChoice] = useState(''); // 'new_date' | 'force_in' | 'force_out'
+  const [billDateResetNewDate, setBillDateResetNewDate] = useState('');
+  const [billDateResetForceReason, setBillDateResetForceReason] = useState('');
+  // Override revoke flow
+  const [showOverrideRevoke, setShowOverrideRevoke] = useState(false);
+  const [overrideRevokeConfirm, setOverrideRevokeConfirm] = useState(false);
+  const [overrideRevokeChoice, setOverrideRevokeChoice] = useState(''); // 'new_date' | 'force_in' | 'force_out'
+  const [overrideRevokeDate, setOverrideRevokeDate] = useState('');
+  const [overrideRevokeReason, setOverrideRevokeReason] = useState('');
+  const [overrideRevokeForceReason, setOverrideRevokeForceReason] = useState('');
 
   // Historical details caching & expanded state
   const [loadedDetails, setLoadedDetails] = useState({});
@@ -911,17 +923,71 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
     setError('');
     setSuccess('');
     try {
-      await api.put(`/api/products/${displayTrackingId}`, {
+      let body = {
         serialNumber: editSerialNumber,
         modelNumber: editModelNumber,
         shopName: editShopName,
-        billDate: editBillDate || null,        // null clears the date (triggers manual warranty)
         billPhoto: editBillPhoto,
-        complaintType: c?.complaintType || 'complaint', // context for warranty calc
-      });
+        complaintType: c?.complaintType || 'complaint',
+      };
+
+      // ── Override Revoke flow ──────────────────────────────────
+      if (showOverrideRevoke && overrideRevokeConfirm) {
+        if (!overrideRevokeReason.trim()) {
+          setError('Please provide a reason for overriding the revoke.');
+          setActionLoading(false);
+          return;
+        }
+        body.overrideRevoke = true;
+        body.overrideRevokeReason = overrideRevokeReason.trim();
+        if (overrideRevokeChoice === 'new_date') {
+          if (!overrideRevokeDate) { setError('Please enter a new bill date.'); setActionLoading(false); return; }
+          body.billDate = overrideRevokeDate;
+        } else if (overrideRevokeChoice === 'force_in' || overrideRevokeChoice === 'force_out') {
+          body.forceOverride = true;
+          body.warrantyStatus = overrideRevokeChoice === 'force_in' ? 'in_warranty' : 'out_of_warranty';
+          body.warrantyForceReason = overrideRevokeForceReason.trim();
+          body.billDate = null; // clear bill date in force mode
+        } else {
+          setError('Please choose what happens to the warranty after overriding the revoke.');
+          setActionLoading(false);
+          return;
+        }
+      } else if (billDateResetMode) {
+        // ── Bill Date Reset flow ──────────────────────────────────
+        if (billDateResetChoice === 'new_date') {
+          if (!billDateResetNewDate) { setError('Please enter a new bill date.'); setActionLoading(false); return; }
+          body.billDate = billDateResetNewDate;
+        } else if (billDateResetChoice === 'force_in' || billDateResetChoice === 'force_out') {
+          if (!billDateResetForceReason.trim()) { setError('Please provide a force override reason.'); setActionLoading(false); return; }
+          body.billDate = null;
+          body.forceOverride = true;
+          body.warrantyStatus = billDateResetChoice === 'force_in' ? 'in_warranty' : 'out_of_warranty';
+          body.warrantyForceReason = billDateResetForceReason.trim();
+        } else {
+          setError('Please choose what to do with the bill date.');
+          setActionLoading(false);
+          return;
+        }
+      } else {
+        // ── Normal edit ──────────────────────────────────────────
+        body.billDate = editBillDate || null;
+      }
+
+      await api.put(`/api/products/${displayTrackingId}`, body);
       setSuccess('Product registry details updated. Warranty status has been recalculated and synced.');
       setShowProductEditor(false);
-      setRefreshTick(t => t + 1); // trigger reload
+      setBillDateResetMode(false);
+      setBillDateResetChoice('');
+      setBillDateResetNewDate('');
+      setBillDateResetForceReason('');
+      setShowOverrideRevoke(false);
+      setOverrideRevokeConfirm(false);
+      setOverrideRevokeChoice('');
+      setOverrideRevokeDate('');
+      setOverrideRevokeReason('');
+      setOverrideRevokeForceReason('');
+      setRefreshTick(t => t + 1);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update product details.');
     } finally {
@@ -1517,75 +1583,191 @@ export default function AdminComplaintDetail({ complaintId, onClose, onUpdated }
 
               {showProductEditor && (
                 <div className="mt-4 p-4 border rounded-xl bg-card space-y-4 text-xs">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-bold text-muted-foreground mb-1">Serial Number</label>
-                      <input
-                        type="text"
-                        value={editSerialNumber}
-                        onChange={(e) => setEditSerialNumber(e.target.value)}
-                        placeholder="Enter serial number"
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-muted-foreground mb-1">Model Number / Variant</label>
-                      <input
-                        type="text"
-                        value={editModelNumber}
-                        onChange={(e) => setEditModelNumber(e.target.value)}
-                        placeholder="Enter model number"
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-muted-foreground mb-1">Shop / Dealer Name</label>
-                      <input
-                        type="text"
-                        value={editShopName}
-                        onChange={(e) => setEditShopName(e.target.value)}
-                        placeholder="Enter dealer shop name"
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-muted-foreground mb-1">Bill Date</label>
-                      <input
-                        type="date"
-                        value={editBillDate}
-                        onChange={(e) => setEditBillDate(e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="block font-bold text-muted-foreground mb-1">Bill / Invoice Photo Link</label>
-                      {editBillPhoto ? (
-                        <div className="flex items-center gap-2 border rounded-lg p-2 bg-muted/40">
-                          <a href={editBillPhoto} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-xs font-medium">
-                            View Current Bill Photo
-                          </a>
-                          <button type="button" onClick={() => setEditBillPhoto('')} className="text-red-500 font-bold ml-auto">Remove</button>
-                        </div>
+
+                  {/* 🔴 Revoke Banner — shown if product warranty is revoked */}
+                  {productInfo?.warrantySource === 'revoked' && (
+                    <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/30 p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-rose-600 font-black text-sm">🔒</span>
+                        <span className="text-rose-700 dark:text-rose-400 font-extrabold uppercase tracking-wider text-[10px]">WARRANTY REVOKED</span>
+                      </div>
+                      {productInfo?.revocationReason && (
+                        <p className="text-rose-600 text-[10px] italic">Reason: "{productInfo.revocationReason}"</p>
+                      )}
+                      {productInfo?.revocationDate && (
+                        <p className="text-rose-500 text-[10px]">Date: {new Date(productInfo.revocationDate).toLocaleDateString('en-IN')}</p>
+                      )}
+                      {!showOverrideRevoke ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowOverrideRevoke(true)}
+                          className="mt-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition"
+                        >
+                          ⚠️ Override Revoke
+                        </button>
                       ) : (
-                        <div className="space-y-2">
-                          {c.scBillPhotoUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setEditBillPhoto(c.scBillPhotoUrl)}
-                              className="px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded font-bold text-[10px] uppercase tracking-wider mb-2"
-                            >
-                              ✓ Use SC Uploaded Bill Photo
-                            </button>
-                          )}
-                          <ImageUploader
-                            maxFiles={1}
-                            uploadedUrls={[]}
-                            onUpload={(urls) => setEditBillPhoto(urls[0] || '')}
+                        <div className="mt-2 border border-amber-300 rounded-xl bg-amber-50 dark:bg-amber-950/20 p-3 space-y-3">
+                          <p className="text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                            ⚠️ You are about to override a revoked warranty. This is a permanent action. Choose what the warranty should become:
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="radio" name="overrideRevokeChoice" value="new_date" checked={overrideRevokeChoice === 'new_date'} onChange={() => setOverrideRevokeChoice('new_date')} />
+                              <span className="font-semibold">Set New Bill Date (auto-calculate warranty)</span>
+                            </label>
+                            {overrideRevokeChoice === 'new_date' && (
+                              <input type="date" value={overrideRevokeDate} onChange={(e) => setOverrideRevokeDate(e.target.value)} className={inputCls + ' ml-5'} />
+                            )}
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="radio" name="overrideRevokeChoice" value="force_in" checked={overrideRevokeChoice === 'force_in'} onChange={() => setOverrideRevokeChoice('force_in')} />
+                              <span className="font-semibold text-green-700">Force In Warranty</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="radio" name="overrideRevokeChoice" value="force_out" checked={overrideRevokeChoice === 'force_out'} onChange={() => setOverrideRevokeChoice('force_out')} />
+                              <span className="font-semibold text-orange-700">Force Out of Warranty</span>
+                            </label>
+                            {(overrideRevokeChoice === 'force_in' || overrideRevokeChoice === 'force_out') && (
+                              <input type="text" value={overrideRevokeForceReason} onChange={(e) => setOverrideRevokeForceReason(e.target.value)} placeholder="Force override reason (required)" className={inputCls + ' ml-5'} />
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={overrideRevokeReason}
+                            onChange={(e) => setOverrideRevokeReason(e.target.value)}
+                            placeholder="Reason for overriding the revoke (required)"
+                            className={inputCls}
                           />
+                          <label className="flex items-center gap-2 text-amber-700 font-semibold cursor-pointer">
+                            <input type="checkbox" checked={overrideRevokeConfirm} onChange={(e) => setOverrideRevokeConfirm(e.target.checked)} className="rounded" />
+                            I confirm I want to override this revocation
+                          </label>
+                          <button type="button" onClick={() => { setShowOverrideRevoke(false); setOverrideRevokeConfirm(false); setOverrideRevokeChoice(''); }} className="text-[10px] text-muted-foreground underline">Cancel</button>
                         </div>
                       )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* Normal Fields — only show if not in override-revoke mode */}
+                  {!showOverrideRevoke && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-bold text-muted-foreground mb-1">Serial Number</label>
+                        <input
+                          type="text"
+                          value={editSerialNumber}
+                          onChange={(e) => setEditSerialNumber(e.target.value)}
+                          placeholder="Enter serial number"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-muted-foreground mb-1">Model Number / Variant</label>
+                        <input
+                          type="text"
+                          value={editModelNumber}
+                          onChange={(e) => setEditModelNumber(e.target.value)}
+                          placeholder="Enter model number"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-muted-foreground mb-1">Shop / Dealer Name</label>
+                        <input
+                          type="text"
+                          value={editShopName}
+                          onChange={(e) => setEditShopName(e.target.value)}
+                          placeholder="Enter dealer shop name"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-muted-foreground mb-1">Bill Date</label>
+                        {billDateResetMode ? (
+                          /* Reset picker */
+                          <div className="border border-amber-300 rounded-xl bg-amber-50 dark:bg-amber-950/20 p-3 space-y-3">
+                            <p className="text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                              ⚠️ Bill date is being erased. Choose what happens to the warranty:
+                            </p>
+                            <div className="flex flex-col gap-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="billDateResetChoice" value="new_date" checked={billDateResetChoice === 'new_date'} onChange={() => setBillDateResetChoice('new_date')} />
+                                <span className="font-semibold">Enter a New Bill Date</span>
+                              </label>
+                              {billDateResetChoice === 'new_date' && (
+                                <input type="date" value={billDateResetNewDate} onChange={(e) => setBillDateResetNewDate(e.target.value)} className={inputCls + ' ml-5'} />
+                              )}
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="billDateResetChoice" value="force_in" checked={billDateResetChoice === 'force_in'} onChange={() => setBillDateResetChoice('force_in')} />
+                                <span className="font-semibold text-green-700">Force In Warranty (manual)</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="billDateResetChoice" value="force_out" checked={billDateResetChoice === 'force_out'} onChange={() => setBillDateResetChoice('force_out')} />
+                                <span className="font-semibold text-orange-700">Force Out of Warranty (manual)</span>
+                              </label>
+                              {(billDateResetChoice === 'force_in' || billDateResetChoice === 'force_out') && (
+                                <input type="text" value={billDateResetForceReason} onChange={(e) => setBillDateResetForceReason(e.target.value)} placeholder="Force override reason (required)" className={inputCls + ' ml-5'} />
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { setBillDateResetMode(false); setBillDateResetChoice(''); setBillDateResetNewDate(''); setBillDateResetForceReason(''); setEditBillDate(productInfo?.billDate ? productInfo.billDate.split('T')[0] : ''); }}
+                              className="text-[10px] text-muted-foreground underline"
+                            >
+                              Cancel Reset
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="date"
+                              value={editBillDate}
+                              onChange={(e) => setEditBillDate(e.target.value)}
+                              className={inputCls + ' flex-1'}
+                            />
+                            {/* Only show the Reset button if there's an existing bill date on the product */}
+                            {productInfo?.billDate && (
+                              <button
+                                type="button"
+                                onClick={() => { setBillDateResetMode(true); setEditBillDate(''); }}
+                                title="Reset bill date"
+                                className="px-2 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-600 font-bold rounded-lg text-[10px] uppercase tracking-wider transition whitespace-nowrap"
+                              >
+                                🗑 Reset
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block font-bold text-muted-foreground mb-1">Bill / Invoice Photo Link</label>
+                        {editBillPhoto ? (
+                          <div className="flex items-center gap-2 border rounded-lg p-2 bg-muted/40">
+                            <a href={editBillPhoto} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-xs font-medium">
+                              View Current Bill Photo
+                            </a>
+                            <button type="button" onClick={() => setEditBillPhoto('')} className="text-red-500 font-bold ml-auto">Remove</button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {c.scBillPhotoUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setEditBillPhoto(c.scBillPhotoUrl)}
+                                className="px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded font-bold text-[10px] uppercase tracking-wider mb-2"
+                              >
+                                ✓ Use SC Uploaded Bill Photo
+                              </button>
+                            )}
+                            <ImageUploader
+                              maxFiles={1}
+                              uploadedUrls={[]}
+                              onUpload={(urls) => setEditBillPhoto(urls[0] || '')}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="button"
