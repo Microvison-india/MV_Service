@@ -1048,7 +1048,7 @@ const seed = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB connected');
-    
+
     // Use bulkWrite for safe Upsert (Update or Insert)
     const bulkOps = unique.map(c => ({
       updateOne: {
@@ -1059,7 +1059,7 @@ const seed = async () => {
     }));
     const result = await City.bulkWrite(bulkOps);
     console.log(`✅ Upserted cities. Matched: ${result.matchedCount}, Inserted: ${result.upsertedCount}, Modified: ${result.modifiedCount}`);
-    
+
     // Cleanup: Remove any old cities in the DB that are not in our master script
     const validNames = unique.map(c => c.name);
     const deleteResult = await City.deleteMany({ name: { $nin: validNames } });
