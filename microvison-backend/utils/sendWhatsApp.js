@@ -40,7 +40,7 @@ const sendWhatsApp = async (phone, templateName, parameters = []) => {
       type: "template",
       template: {
         name: templateName,
-        language: { code: "en_US" }
+        language: { code: "en" }
       }
     };
 

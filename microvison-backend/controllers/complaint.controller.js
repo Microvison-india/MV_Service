@@ -431,41 +431,31 @@ const assignComplaint = async (req, res) => {
   });
 
   // Trigger 2: Send SC details to Customer
-  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'sc_details_to_customer';
+  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
   sendWhatsApp(complaint.phone1, templateCustomer, [
-    complaint.customerName,
     complaint.complaintId,
+    complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+    complaint.complaintType === 'installation' ? 'Installation' : 'Complaint',
     sc.businessName,
-    sc.ownerName || '',
-    sc.phone1
+    sc.phone1,
+    process.env.SUPPORT_PHONE || 'Microvison Support'
   ]);
 
   // Trigger 3: Send basic complaint details to Assigned SC (WA-01) - suppressed for unregistered SCs
   if (sc.isUnregistered !== true) {
-    const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'complaint_details_to_sc';
+    const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'sc_new_assignment';
     const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
     
-    let reopenInfo = 'NO';
-    if (complaint.isReopened && complaint.reopenParentId) {
-      const parent = await Complaint.findById(complaint.reopenParentId);
-      reopenInfo = `REOPENED (Original Job ID: ${parent ? parent.complaintId : 'Unknown'})`;
-    }
-
     sendWhatsApp(sc.phone1, templateSC, [
-      sc.ownerName || '',
-      complaint.complaintId,
       complaint.customerName,
       complaint.phone1,
       customerAddress,
       complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-      complaint.complaintType,
+      complaint.complaintType === 'installation' ? 'Installation' : 'Complaint',
       complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
-      complaint.notes || 'None',
-      process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in/login',
-      reopenInfo,
       complaint.serialNumber || 'N/A',
-      complaint.modelNumber || 'N/A',
-      complaint.locationText || 'N/A'
+      complaint.complaintId,
+      process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in'
     ]);
   }
 };
@@ -551,7 +541,7 @@ const acceptComplaint = async (req, res) => {
   res.status(200).json({ message: 'Complaint accepted.', complaint });
 
   // Trigger WA-04: Sent to Customer immediately on SC acceptance
-  const templateCustomer = process.env.WHATSAPP_TEMPLATE_ACCEPT_CUSTOMER || 'sc_accept_to_customer';
+  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
   const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
   const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
   
@@ -560,7 +550,8 @@ const acceptComplaint = async (req, res) => {
     productType,
     complaintType,
     sc.businessName,
-    sc.phone1
+    sc.phone1,
+    process.env.SUPPORT_PHONE || 'Microvison Support'
   ]);
 
   if (complaint.phone2) {
@@ -569,7 +560,8 @@ const acceptComplaint = async (req, res) => {
       productType,
       complaintType,
       sc.businessName,
-      sc.phone1
+      sc.phone1,
+      process.env.SUPPORT_PHONE || 'Microvison Support'
     ]);
   }
 };
