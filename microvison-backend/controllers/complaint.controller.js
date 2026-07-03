@@ -1897,46 +1897,10 @@ const deleteCustomerPayment = async (req, res) => {
 // @route   PATCH /api/complaints/:id/customer-payments/:paymentId
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
-const updateCustomerPayment = async (req, res) => {
-  try {
-    const { paymentId } = req.params;
-    const { amount, route, reason } = req.body;
 
-    if (!amount || !route) {
-      return res.status(400).json({ message: 'Amount and route are required.' });
-    }
-    if (!['to_microvison', 'to_sc'].includes(route)) {
-      return res.status(400).json({ message: 'Route must be \'to_microvison\' or \'to_sc\'.' });
-    }
-    if (Number(amount) <= 0) {
-      return res.status(400).json({ message: 'Amount must be greater than 0.' });
-    }
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({ message: 'A reason is required when editing a payment.' });
-    }
+//enter code here -- 
+console.log("Hello");
 
-    const complaint = await Complaint.findById(req.params.id);
-    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
-    if (complaint.status === 'closed') {
-      return res.status(400).json({ message: 'Cannot edit payments in a closed complaint.' });
-    }
-
-    const payment = complaint.customerPayments.id(paymentId);
-    if (!payment) return res.status(404).json({ message: 'Payment entry not found.' });
-
-    payment.amount = Number(amount);
-    payment.route = route;
-    payment.reason = reason.trim();
-    // Optional: update recordedBy to the admin who made the edit
-    // payment.recordedBy = req.user.id;
-
-    await complaint.save();
-    res.status(200).json({ message: 'Payment entry updated.', customerPayments: complaint.customerPayments });
-  } catch (err) {
-    console.error('Error in updateCustomerPayment:', err);
-    res.status(500).json({ message: 'Server error updating payment entry.' });
-  }
-};
 
 module.exports = {
   saveCriticalAction,

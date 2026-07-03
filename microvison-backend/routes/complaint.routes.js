@@ -60,66 +60,10 @@ router.post('/drafts', auth, isAdmin, saveDraft);
 router.delete('/drafts/:id', auth, isAdmin, deleteDraft);
 
 // ── Admin Action Centre Routes (Phase 9) ───────────────────
-// GET /api/complaints/action-items — Dashboard lists and counts
-router.get('/action-items', auth, isAdmin, getActionItems);
-
-// PATCH /api/complaints/:id/confirm-done — Confirm SC job
-router.patch('/:id/confirm-done', auth, isAdmin, confirmDone);
-
-// PATCH /api/complaints/:id/force-close — Force close complaint without SC action
-router.patch('/:id/force-close', auth, isAdmin, forceClose);
-
-// PATCH /api/complaints/:id/dispute-done — Dispute SC job
-router.patch('/:id/dispute-done', auth, isAdmin, disputeDone);
-
-// PATCH /api/complaints/:id/extras/:extraId/approve — Approve extra charge
-router.patch('/:id/extras/:extraId/approve', auth, isAdmin, approveExtra);
-
-// PATCH /api/complaints/:id/extras/:extraId/reject — Reject extra charge
-router.patch('/:id/extras/:extraId/reject', auth, isAdmin, rejectExtra);
-
-// PATCH /api/complaints/:id/extras/:extraId — Update a single extra charge (label/amount)
-router.patch('/:id/extras/:extraId', auth, isAdmin, updateSingleExtraCharge);
-
-// PATCH /api/complaints/:id/extra-charges — Update all extra charges
-router.patch('/:id/extra-charges', auth, isAdmin, updateExtraCharges);
-
-// PATCH /api/complaints/:id/mark-delivered — Admin marks part delivered (SC Flow v1.1)
-router.patch('/:id/mark-delivered', auth, isAdmin, markPartDelivered);
-
-// PATCH /api/complaints/:id/critical-action — Admin saves critical action (Change 5)
-router.patch('/:id/critical-action', auth, isAdmin, saveCriticalAction);
-
-// POST /api/complaints/:id/customer-payments — Add a customer payment entry (Change 6A)
-router.post('/:id/customer-payments', auth, isAdmin, addCustomerPayment);
-
-// DELETE /api/complaints/:id/customer-payments/:paymentId — Remove a payment entry (Change 6A)
-router.delete('/:id/customer-payments/:paymentId', auth, isAdmin, deleteCustomerPayment);
-
-// PATCH /api/complaints/:id/customer-payments/:paymentId — Edit a payment entry (Change 6A)
-router.patch('/:id/customer-payments/:paymentId', auth, isAdmin, updateCustomerPayment);
+// - enter here 1st commit - 
 
 // ── SC Routes (all require auth + isSC) ────────────────────────
-// GET  /api/complaints/my — SC's own complaints (filtered)
-router.get('/my', auth, isSC, getMyComplaints);
-
-// GET /api/complaints/:id — Get full complaint with timeline updates
-// IMPORTANT: MUST BE PLACED AFTER ALL OTHER GET ROUTES TO PREVENT COLLISION
-router.get('/:id', auth, getComplaintById);
-
-// PATCH /api/complaints/:id/accept — SC accepts assignment
-router.patch('/:id/accept', auth, isAdminOrSC, acceptComplaint);
-
-// PATCH /api/complaints/:id/reject — SC rejects assignment
-router.patch('/:id/reject', auth, isAdminOrSC, rejectComplaint);
-
-// PATCH /api/complaints/:id/going — SC marks they are on the way (optional)
-router.patch('/:id/going', auth, isAdminOrSC, markGoing);
-
-// PATCH /api/complaints/:id/status — SC submits final result after visit
-router.patch('/:id/status', auth, isAdminOrSC, updateStatus);
-
-// PATCH /api/complaints/:id/part-received — SC marks part received (SC Flow v1.1)
-router.patch('/:id/part-received', auth, isAdminOrSC, markPartReceived);
+// 2nd commit enter here - 
+console.log("Hello");
 
 module.exports = router;
