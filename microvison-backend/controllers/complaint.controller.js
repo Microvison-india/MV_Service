@@ -12,12 +12,12 @@ const sendWhatsApp = require('../utils/sendWhatsApp');
 const makeComplaintIdPattern = (term) => {
   if (!term) return '';
   const clean = term.trim().toLowerCase();
-  
+
   if (clean.startsWith('m')) {
     const pattern = clean.replace(/[^a-z0-9]/g, '.*');
     return pattern;
   }
-  
+
   const digits = clean.replace(/[^0-9]/g, '');
   if (digits) {
     if (digits.startsWith('20') && digits.length >= 9) {
@@ -163,11 +163,11 @@ const createComplaint = async (req, res) => {
   // Admin-added extras at registration are auto-approved
   const formattedExtras = Array.isArray(extraCharges)
     ? extraCharges.map((ec) => ({
-        label: ec.label,
-        amount: ec.amount,
-        requestedBy: 'admin',
-        status: 'approved', // Admin-added extras are pre-approved
-      }))
+      label: ec.label,
+      amount: ec.amount,
+      requestedBy: 'admin',
+      status: 'approved', // Admin-added extras are pre-approved
+    }))
     : [];
 
   // ── Petrol tracking ───────────────────────────────────────
@@ -215,11 +215,11 @@ const createComplaint = async (req, res) => {
     if (shopName) productRecord.shopName = shopName;
     if (modelNumber) productRecord.modelNumber = modelNumber;
     if (locationText !== undefined) productRecord.locationText = locationText;
-    
+
     if (serialNumber && serialNumber !== productRecord.serialNumber) {
       const existing = await Product.findOne({ serialNumber });
       if (existing && existing.trackingId !== trackingId) {
-         return res.status(400).json({ message: 'Serial number already exists on another product.' });
+        return res.status(400).json({ message: 'Serial number already exists on another product.' });
       }
       productRecord.serialNumber = serialNumber;
       productRecord.hasSerial = true;
@@ -445,7 +445,7 @@ const assignComplaint = async (req, res) => {
   if (sc.isUnregistered !== true) {
     const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'sc_new_assignment';
     const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
-    
+
     sendWhatsApp(sc.phone1, templateSC, [
       complaint.customerName,
       complaint.phone1,
@@ -544,7 +544,7 @@ const acceptComplaint = async (req, res) => {
   const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
   const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
   const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
-  
+
   sendWhatsApp(complaint.phone1, templateCustomer, [
     complaint.complaintId,
     productType,
@@ -640,8 +640,8 @@ const markGoing = async (req, res) => {
   if (!updatedComplaint) {
     // Re-fetch to show current status in error message
     const current = await Complaint.findById(complaint._id).select('status');
-    return res.status(400).json({ 
-      message: `Cannot mark as going. The complaint is no longer in 'accepted' status (currently: ${current?.status}).` 
+    return res.status(400).json({
+      message: `Cannot mark as going. The complaint is no longer in 'accepted' status (currently: ${current?.status}).`
     });
   }
 
@@ -686,7 +686,7 @@ const updateStatus = async (req, res) => {
     scSerialSlipPhotoUrl,
     scMissingBypass,
     engineerName,
-    
+
     // Change 6A Refinement: Inline customer payment during proxy form
     inlineCustomerPayment,
   } = req.body;
@@ -1059,10 +1059,10 @@ const confirmDone = async (req, res) => {
             missingFields,
           });
         }
-        
+
         // Save bypassed fields to complaint
         complaint.missingFieldsBypassed = missingFieldsBypassed;
-        
+
         // Add bypassed fields to product's missingFieldsWarning (append uniquely)
         missingFieldsBypassed.forEach(f => {
           if (!product.missingFieldsWarning.includes(f)) {
@@ -1124,9 +1124,9 @@ const confirmDone = async (req, res) => {
 
   // Determine if bill should be generated. Generated for all closed complaints to track in Billing.
   const billGenerated = true;
-  
+
   const oldStatus = complaint.status;
-  
+
   complaint.status = 'closed';
   complaint.billGenerated = billGenerated;
   complaint.billLockedAt = new Date();
@@ -1141,7 +1141,7 @@ const confirmDone = async (req, res) => {
     complaint.paidAt = null;
     complaint.paidBy = null;
   }
-  
+
   // Update petrol Admin & SC estimates if sent
   if (req.body.petrolAdmin !== undefined) {
     complaint.petrolAdmin = (req.body.petrolAdmin === '' || req.body.petrolAdmin === null) ? null : Number(req.body.petrolAdmin);
@@ -1213,10 +1213,10 @@ const disputeDone = async (req, res) => {
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
   const oldStatus = complaint.status;
-  
+
   // Bounce back to accepted
   complaint.status = 'accepted';
-  
+
   await complaint.save();
 
   await ComplaintUpdate.create({
@@ -1271,7 +1271,7 @@ const getComplaintById = async (req, res) => {
         select: 'status assignedCentreId reopenParentId isReopened'
       }
     });
-    
+
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
   // Security: If user is SC, they can only view their own assigned complaints
@@ -1389,7 +1389,7 @@ const markPartDelivered = async (req, res) => {
   // Update delivered state (does NOT change the status)
   const deliveredAt = new Date();
   const deliveredNote = note ? note.trim() : '';
-  
+
   complaint.partDeliveredAt = deliveredAt;
   complaint.partDeliveredNote = deliveredNote;
 
@@ -1545,7 +1545,7 @@ const getAllComplaints = async (req, res) => {
       const escapedTerm = term.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const searchRegex = new RegExp(escapedTerm, 'i');
       const complaintPattern = makeComplaintIdPattern(term);
-      
+
       // Query Product to find matching serialNumber or trackingId
       const Product = require('../models/Product');
       const matchingProducts = await Product.find({
@@ -1747,7 +1747,7 @@ const forceClose = async (req, res) => {
     complaint.billGenerated = false;
     complaint.petrolLocked = true;
     complaint.petrolFinal = 0;
-    
+
     await complaint.save();
 
     const ComplaintUpdate = require('../models/ComplaintUpdate');
@@ -1898,8 +1898,46 @@ const deleteCustomerPayment = async (req, res) => {
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
 
-//enter code here -- 
-console.log("Hello");
+const updateCustomerPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { amount, route, reason } = req.body;
+
+    if (!amount || !route) {
+      return res.status(400).json({ message: 'Amount and route are required.' });
+    }
+    if (!['to_microvison', 'to_sc'].includes(route)) {
+      return res.status(400).json({ message: 'Route must be \'to_microvison\' or \'to_sc\'.' });
+    }
+    if (Number(amount) <= 0) {
+      return res.status(400).json({ message: 'Amount must be greater than 0.' });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ message: 'A reason is required when editing a payment.' });
+    }
+
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
+    if (complaint.status === 'closed') {
+      return res.status(400).json({ message: 'Cannot edit payments in a closed complaint.' });
+    }
+
+    const payment = complaint.customerPayments.id(paymentId);
+    if (!payment) return res.status(404).json({ message: 'Payment entry not found.' });
+
+    payment.amount = Number(amount);
+    payment.route = route;
+    payment.reason = reason.trim();
+    // Optional: update recordedBy to the admin who made the edit
+    // payment.recordedBy = req.user.id;
+
+    await complaint.save();
+    res.status(200).json({ message: 'Payment entry updated.', customerPayments: complaint.customerPayments });
+  } catch (err) {
+    console.error('Error in updateCustomerPayment:', err);
+    res.status(500).json({ message: 'Server error updating payment entry.' });
+  }
+};
 
 
 module.exports = {
