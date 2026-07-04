@@ -104,7 +104,7 @@ Microvison Support Team
 - **{{5}}** `123 Main Street, Delhi` *(Customer Address)*
 - **{{6}}** `https://microvisonservice.co.in/sc-portal` *(Portal Link)*
 
-## 4. `sc_post_accept_reminder` (⏳ Verification Pending)
+## 4. `sc_post_accept_reminder` (✅ Verified)
 - **Category:** Utility
 - **Language:** English
 - **Recipient:** Service Centre
@@ -135,7 +135,7 @@ Microvison Support Team
 - **{{5}}** `123 Main Street, Delhi` *(Customer Address)*
 - **{{6}}** `https://microvisonservice.co.in/sc-portal` *(Portal Link)*
 
-## 5. `sc_not_done_reminder` (⏳ Verification Pending)
+## 5. `sc_not_done_reminder` (✅ Verified)
 - **Category:** Utility
 - **Language:** English
 - **Recipient:** Service Centre
@@ -164,7 +164,7 @@ Microvison Support Team
 - **{{4}}** `123 Main Street, Delhi` *(Customer Address)*
 - **{{5}}** `https://microvisonservice.co.in/sc-portal` *(Portal Link)*
 
-## 6. `sc_part_dispatched` (⏳ Verification Pending)
+## 6. `sc_part_dispatched` (✅ Verified)
 - **Category:** Utility
 - **Language:** English
 - **Recipient:** Service Centre
@@ -195,7 +195,7 @@ Microvison Support Team
 - **{{4}}** `Dispatched via DTDC tracking #123456` *(Admin Note)*
 - **{{5}}** `https://microvisonservice.co.in/sc-portal` *(Portal Link)*
 
-## 7. `sc_part_received_reminder` (⏳ Verification Pending)
+## 7. `sc_part_received_reminder` (✅ Verified)
 - **Category:** Utility
 - **Language:** English
 - **Recipient:** Service Centre

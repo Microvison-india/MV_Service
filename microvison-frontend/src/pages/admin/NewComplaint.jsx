@@ -19,7 +19,11 @@ const STEPS = [
 const validateStep = (step, formData) => {
   if (step === 1) {
     if (!formData.customerName?.trim()) return 'Customer name is required.';
-    if (!formData.phone1?.trim()) return 'Phone number 1 is required.';
+    if (!formData.phone1?.trim()) return 'Phone number 1 (WhatsApp Only) is required.';
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone1?.trim())) {
+      return 'Phone number 1 must be exactly 10 digits.';
+    }
     if (!formData.localAddress?.trim()) return 'Local address is required.';
     if (!formData.city?.trim()) return 'City is required.';
     if (!formData.district?.trim()) return 'District must be auto-filled from city selection.';

@@ -114,6 +114,11 @@ export default function Register() {
       setError('Please select product capability.');
       return;
     }
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone1?.trim())) {
+      setError('Phone 1 must be exactly 10 digits.');
+      return;
+    }
 
     setLoading(true);
     try {

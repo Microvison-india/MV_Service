@@ -109,6 +109,7 @@ const complaintSchema = new mongoose.Schema(
     // ── Assignment ────────────────────────────────────────────
     assignedCentreId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCentre', default: null },
     assignedAt: { type: Date, default: null },
+    scAcceptedAt: { type: Date, default: null },
 
     // ── SC Flow v1.1 Fields ───────────────────────────────────
     doneVoiceUrl: { type: String, default: '' },
@@ -121,6 +122,13 @@ const complaintSchema = new mongoose.Schema(
     partReceivedAt: { type: Date, default: null },
     distanceTravelled: { type: Number, default: null },
     totalVisits: { type: Number, default: null },
+    
+    // WhatsApp reminders tracking
+    scAssignmentReminderSentAt: { type: Date, default: null },
+    scPostAcceptReminderSentAt: { type: Date, default: null },
+    scNotDoneReminderSentAt:    { type: Date, default: null },
+    scPartReceivedReminderSentAt: { type: Date, default: null },
+    notDoneAt:                  { type: Date, default: null },
 
     // ── Status (per GRD Section 7.2) ──────────────────────────
     status: {

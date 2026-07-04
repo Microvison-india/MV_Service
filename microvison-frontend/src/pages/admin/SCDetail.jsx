@@ -172,6 +172,12 @@ export default function SCDetail() {
     setActionLoading(true);
     setError('');
     setSuccessMsg('');
+    const phoneRegex = /^\d{10}$/;
+    if (editData.phone1 && !phoneRegex.test(editData.phone1.trim())) {
+      setError('Phone 1 must be exactly 10 digits.');
+      setActionLoading(false);
+      return;
+    }
     try {
       const { data } = await api.put(`/api/service-centres/${id}`, editData);
       setSc(data.sc);
@@ -345,7 +351,7 @@ export default function SCDetail() {
                   {[
                     { label: 'Owner Name', key: 'ownerName' },
                     { label: 'Business Name', key: 'businessName' },
-                    { label: 'Phone 1', key: 'phone1' },
+                    { label: 'Phone 1 (WhatsApp Only - 10 digits)', key: 'phone1' },
                     { label: 'Phone 2', key: 'phone2' },
                     { label: 'Email 2 (CC)', key: 'email2' },
                     { label: 'City', key: 'city' },
@@ -412,7 +418,7 @@ export default function SCDetail() {
                 {[
                   { label: 'Owner / Contact Name', value: sc.ownerName },
                   { label: 'Business Name', value: sc.businessName },
-                  { label: 'Phone 1 (Primary)', value: sc.phone1 },
+                  { label: 'Phone 1 (WhatsApp Only)', value: sc.phone1 },
                   { label: 'Phone 2', value: sc.phone2 || '—' },
                   { label: 'Login Email', value: sc.email1 },
                   { label: 'CC Email', value: sc.email2 || '—' },
