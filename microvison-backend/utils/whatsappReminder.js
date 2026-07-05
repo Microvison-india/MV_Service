@@ -137,3 +137,52 @@ const runWAReminderCron = async () => {
                 await c.save();
             }
         }
+        // ─────────────────────────────────────────────────────────────────────────
+        // 4. WA-07: sc_part_received_reminder
+        // Condition: status === 'part_pending' && partReceivedAt !== null
+        // Timers: First at 23.5h, then every 47.5h loop
+        // ─────────────────────────────────────────────────────────────────────────
+        const partReceivedComplaints = await Complaint.find({
+            status: 'part_pending',
+            partReceivedAt: { $ne: null }
+        }).populate('assignedCentreId');
+
+        for (const c of partReceivedComplaints) {
+            const sc = c.assignedCentreId;
+            if (!sc || sc.isUnregistered === true || !sc.phone1) continue;
+
+            const hoursSinceReceived = (Date.now() - new Date(c.partReceivedAt).getTime()) / (1000 * 60 * 60);
+            const lastSent = c.scPartReceivedReminderSentAt;
+            const hoursSinceLastSent = lastSent
+                ? (Date.now() - new Date(lastSent).getTime()) / (1000 * 60 * 60)
+                : null;
+
+            const shouldSendFirst = !lastSent && hoursSinceReceived >= 23.5;
+            const shouldSendLoop = lastSent && hoursSinceLastSent >= 47.5;
+
+            if (shouldSendFirst || shouldSendLoop) {
+                const templateName = process.env.WHATSAPP_TEMPLATE_PART_RECEIVED_REMINDER || 'sc_part_received_reminder';
+
+                console.log(`[WhatsApp Cron] Sending ${templateName} to ${sc.businessName} (${sc.phone1}) for ${c.complaintId}`);
+
+                await sendWhatsApp(sc.phone1, templateName, [
+                    c.complaintId,            // {{1}} Complaint ID
+                    getProduct(c),            // {{2}} Product
+                    c.customerName,           // {{3}} Customer Name
+                    getCustomerAddress(c),    // {{4}} Customer Address
+                    getPortalUrl()            // {{5}} Portal Link
+                ]);
+
+                c.scPartReceivedReminderSentAt = new Date();
+                await c.save();
+            }
+        }
+
+    } catch (err) {
+        console.error(`[WhatsApp Cron] Error during WhatsApp reminders check:`, err);
+    }
+
+    console.log(`[WhatsApp Cron] Completed WhatsApp reminders check.`);
+};
+
+module.exports = runWAReminderCron;
