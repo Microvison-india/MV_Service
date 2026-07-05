@@ -57,9 +57,44 @@ const runWAReminderCron = async () => {
                 await c.save();
             }
         }
-    } catch (error) {
-        console.error('[WhatsApp Cron] Error in WA-03:', error);
-    }
-};
+        // ─────────────────────────────────────────────────────────────────────────
+        // 2. WA-04B: sc_post_accept_reminder
+        // Condition: status === 'accepted'
+        // Timers: First at 23.5h, then every 47.5h loop
+        // ─────────────────────────────────────────────────────────────────────────
+        const acceptedComplaints = await Complaint.find({ status: 'accepted' })
+            .populate('assignedCentreId');
 
-module.exports = runWAReminderCron;
+        for (const c of acceptedComplaints) {
+            const sc = c.assignedCentreId;
+            if (!sc || sc.isUnregistered === true || !sc.phone1) continue;
+
+            // Note: SC updates scAcceptedAt on accept, verify fallback to updatedAt just in case
+            const acceptTime = c.scAcceptedAt || c.updatedAt;
+            const hoursSinceAccepted = (Date.now() - new Date(acceptTime).getTime()) / (1000 * 60 * 60);
+            const lastSent = c.scPostAcceptReminderSentAt;
+            const hoursSinceLastSent = lastSent
+                ? (Date.now() - new Date(lastSent).getTime()) / (1000 * 60 * 60)
+                : null;
+
+            const shouldSendFirst = !lastSent && hoursSinceAccepted >= 23.5;
+            const shouldSendLoop = lastSent && hoursSinceLastSent >= 47.5;
+
+            if (shouldSendFirst || shouldSendLoop) {
+                const templateName = process.env.WHATSAPP_TEMPLATE_POST_ACCEPT_REMINDER || 'sc_post_accept_reminder';
+
+                console.log(`[WhatsApp Cron] Sending ${templateName} to ${sc.businessName} (${sc.phone1}) for ${c.complaintId}`);
+
+                await sendWhatsApp(sc.phone1, templateName, [
+                    getRequestType(c),        // {{1}} Request Type (Installation / Complaint)
+                    c.complaintId,            // {{2}} Complaint ID
+                    getProduct(c),            // {{3}} Product
+                    c.customerName,           // {{4}} Customer Name
+                    getCustomerAddress(c),    // {{5}} Customer Address
+                    getPortalUrl()            // {{6}} Portal Link
+                ]);
+
+                c.scPostAcceptReminderSentAt = new Date();
+                await c.save();
+            }
+        }
