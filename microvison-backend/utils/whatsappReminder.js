@@ -98,3 +98,42 @@ const runWAReminderCron = async () => {
                 await c.save();
             }
         }
+        // ─────────────────────────────────────────────────────────────────────────
+        // 3. WA-05: sc_not_done_reminder
+        // Condition: status === 'not_done'
+        // Timers: First at 23.5h, then every 47.5h loop
+        // ─────────────────────────────────────────────────────────────────────────
+        const notDoneComplaints = await Complaint.find({ status: 'not_done' })
+            .populate('assignedCentreId');
+
+        for (const c of notDoneComplaints) {
+            const sc = c.assignedCentreId;
+            if (!sc || sc.isUnregistered === true || !sc.phone1) continue;
+
+            const notDoneTime = c.notDoneAt || c.updatedAt;
+            const hoursSinceNotDone = (Date.now() - new Date(notDoneTime).getTime()) / (1000 * 60 * 60);
+            const lastSent = c.scNotDoneReminderSentAt;
+            const hoursSinceLastSent = lastSent
+                ? (Date.now() - new Date(lastSent).getTime()) / (1000 * 60 * 60)
+                : null;
+
+            const shouldSendFirst = !lastSent && hoursSinceNotDone >= 23.5;
+            const shouldSendLoop = lastSent && hoursSinceLastSent >= 47.5;
+
+            if (shouldSendFirst || shouldSendLoop) {
+                const templateName = process.env.WHATSAPP_TEMPLATE_NOT_DONE_REMINDER || 'sc_not_done_reminder';
+
+                console.log(`[WhatsApp Cron] Sending ${templateName} to ${sc.businessName} (${sc.phone1}) for ${c.complaintId}`);
+
+                await sendWhatsApp(sc.phone1, templateName, [
+                    c.complaintId,            // {{1}} Complaint ID
+                    getProduct(c),            // {{2}} Product
+                    c.customerName,           // {{3}} Customer Name
+                    getCustomerAddress(c),    // {{4}} Customer Address
+                    getPortalUrl()            // {{5}} Portal Link
+                ]);
+
+                c.scNotDoneReminderSentAt = new Date();
+                await c.save();
+            }
+        }
