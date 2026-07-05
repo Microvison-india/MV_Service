@@ -186,8 +186,8 @@
   - [x] Refine SC Assignment Logic — now handled in Phase 19 (Step 5 of new 5-step form, with Skip option and capability filtering)
   - [x] Support custom/new cities/locations — now handled in Phase 20 (Section 2D, inline "Create new" from any city field)
   - [x] Add optional `location` text field — addressed in Phase 21 (Section 3C, `locationText` field added to Step 1 `Step1CustomerInfo.jsx` and `Complaint` model)
-  - [ ] Advanced pagination
-  - [ ] SC specific complaint and stats
+  - [x] Advanced pagination
+  - [x] SC specific complaint and stats
 
 - [x] **Phase 9 — Admin Action Centre (Day 12-13)**
   - [x] Admin confirm and extra charge approval controllers (confirmDone, disputeDone, approveExtra, rejectExtra)
@@ -224,12 +224,12 @@
   - [x] Frontend `ReopenBanner.jsx` integration
   - [x] Frontend `NewComplaint.jsx` workflow wiring
   - [x] Frontend `AdminComplaintDetail.jsx` inline reopen action panel
-  - [ ] Reopen condition change and from where we can reopen it, we will deal with it later
+  - [x] Reopen condition change and from where we can reopen it, we will deal with it later
 
-- [ ] **Phase 13 — PWA + Polish + Deploy (Day 19-20)**
-  - [ ] Finalize Vite PWA config & Icons
-  - [ ] Add global Toaster to `main.jsx`
-  - [ ] Loading Skeletons & Empty States
+- [x] **Phase 13 — PWA + Polish + Deploy (Day 19-20)**
+  - [x] Finalize Vite PWA config & Icons
+  - [x] Add global Toaster to `main.jsx`
+  - [x] Loading Skeletons & Empty States
   - [x] Railway Backend Deploy
   - [x] MongoDB Atlas setup
   - [x] Cloudflare R2 File Storage Migration
@@ -240,34 +240,34 @@
     - [x] Verify ESLint and local build correctness
   - [x] Vercel Frontend Deploy
 
-- [ ] **Phase 14 — WhatsApp Messaging Integrations (Full SC Flow v1.1 Triggers)**
+- [x] **Phase 14 — WhatsApp Messaging Integrations (Full SC Flow v1.1 Triggers)**
   > ⚠ Phase 14 must be done AFTER Phase 8.5 is fully complete, since triggers depend on the new statuses and controllers. All triggers below are from `Microvison_SC_Flow_v1.1.txt` Section 9.
 
   **Infrastructure**
-  - [ ] Direct Meta WhatsApp Cloud API wrapper utility (`utils/sendWhatsApp.js`) (Sandbox Mode implemented)
-  - [ ] Configure environment variables for WhatsApp credentials in `.env` / `.env.example`
+  - [x] Direct Meta WhatsApp Cloud API wrapper utility (`utils/sendWhatsApp.js`) (Sandbox Mode implemented)
+  - [x] Configure environment variables for WhatsApp credentials in `.env` / `.env.example`
 
   **Immediate Triggers (fire on specific admin/SC actions — no scheduler needed)**
-  - [ ] **WA-01:** SC assigned new complaint — fires immediately in `assignComplaint` controller. Content: Complaint ID, Customer name, Phone, Full address, Product type, Complaint type, Warranty status, Admin notes, Portal login URL. (Note: Reopen variant abandoned in Change 6B. All complaints are plain new complaints).
-  - [ ] **WA-04:** SC accepts complaint — fires immediately in `acceptComplaint` controller. Recipient: Customer phone1 (+ phone2 if exists). Content: Complaint ID, Product type, Complaint type, SC business name, SC phone number, acknowledgment message.
-  - [ ] **WA-06:** Admin marks Part/Unit as Delivered — fires immediately in new `markPartDelivered` controller (Phase 8.5). Recipient: SC. Content: Complaint ID, Customer name, Address, Part/unit delivery notification, Admin note (if any). *Depends on Phase 8.5 controller being built first.*
+  - [x] **WA-01:** SC assigned new complaint — fires immediately in `assignComplaint` controller. Content: Complaint ID, Customer name, Phone, Full address, Product type, Complaint type, Warranty status, Admin notes, Portal login URL. (Note: Reopen variant abandoned in Change 6B. All complaints are plain new complaints).
+  - [x] **WA-04:** SC accepts complaint — fires immediately in `acceptComplaint` controller. Recipient: Customer phone1 (+ phone2 if exists). Content: Complaint ID, Product type, Complaint type, SC business name, SC phone number, acknowledgment message.
+  - [x] **WA-06:** Admin marks Part/Unit as Delivered — fires immediately in new `markPartDelivered` controller (Phase 8.5). Recipient: SC. Content: Complaint ID, Customer name, Address, Part/unit delivery notification, Admin note (if any). *Depends on Phase 8.5 controller being built first.*
 
   **Scheduled/Reminder Triggers (require a background cron job / scheduler)**
   > These triggers fire at a time DELAY after an event. They need a background task that runs periodically (e.g. every hour) to check which complaints are overdue and fire the reminder.
-  - [ ] **WA-02:** SC not acted 23.5 hours after assignment (no accept/reject). Recipient: SC.
-  - [ ] **WA-03:** SC still not acted 47.5 hours after assignment. Recipient: SC.
-  - [ ] **WA-0X (post-assign):** SC still not acted — repeat every 47.5 hours after WA-03. Stops when SC accepts or rejects. Recipient: SC.
-  - [ ] **WA-04B:** SC accepted but no action for 23.5 hours (no Going, Done, Not Done, Part Pending). Recipient: SC.
-  - [ ] **WA-0X (post-accept):** Repeat every 47.5 hours after WA-04B until SC takes any action. Recipient: SC.
-  - [ ] **WA-05:** SC submitted Not Done, no further action for 23.5 hours. Recipient: SC.
-  - [ ] **WA-0X (post-not-done):** Repeat every 47.5 hours after WA-05 until SC takes any action. Recipient: SC.
-  - [ ] **WA-07:** SC marked Part Received but no further action for 23.5 hours. Recipient: SC.
-  - [ ] **WA-0X (post-received):** Repeat every 47.5 hours after WA-07 until SC acts. Recipient: SC.
+  - [x] **WA-02:** SC not acted 23.5 hours after assignment (no accept/reject). Recipient: SC.
+  - [x] **WA-03:** SC still not acted 47.5 hours after assignment. Recipient: SC.
+  - [x] **WA-0X (post-assign):** SC still not acted — repeat every 47.5 hours after WA-03. Stops when SC accepts or rejects. Recipient: SC.
+  - [x] **WA-04B:** SC accepted but no action for 23.5 hours (no Going, Done, Not Done, Part Pending). Recipient: SC.
+  - [x] **WA-0X (post-accept):** Repeat every 47.5 hours after WA-04B until SC takes any action. Recipient: SC.
+  - [x] **WA-05:** SC submitted Not Done, no further action for 23.5 hours. Recipient: SC.
+  - [x] **WA-0X (post-not-done):** Repeat every 47.5 hours after WA-05 until SC takes any action. Recipient: SC.
+  - [x] **WA-07:** SC marked Part Received but no further action for 23.5 hours. Recipient: SC.
+  - [x] **WA-0X (post-received):** Repeat every 47.5 hours after WA-07 until SC acts. Recipient: SC.
 
   **Scheduler Infrastructure (needed for all WA-0X triggers above)**
-  - [ ] Build a cron job utility (e.g., `utils/whatsappReminder.js`) that runs periodically (hourly/daily)
-  - [ ] Query DB for complaints that match each reminder condition (status + time elapsed since last action)
-  - [ ] Integrate cron scheduler into `server.js` on startup (e.g. using `node-cron` package)
+  - [x] Build a cron job utility (e.g., `utils/whatsappReminder.js`) that runs periodically (hourly/daily)
+  - [x] Query DB for complaints that match each reminder condition (status + time elapsed since last action)
+  - [x] Integrate cron scheduler into `server.js` on startup (e.g. using `node-cron` package)
 
   **NOT sent (per v1.1 spec — do NOT implement these)**
   - No WhatsApp is sent to customer after SC acceptance (WA-04 is the only customer message)
@@ -277,15 +277,15 @@
 
   **v1.3 Additions — Must be applied when building Phase 14**
   > Source: `Microvison_System_Changes_v1.3.md` — Changes 1A, 2, and 3. These items modify or restrict existing WA triggers. Build them alongside the triggers they affect.
-  - [ ] **WA-01 content update (v1.3 Change 3 — Phase 21 dependency):** When implementing WA-01 in `assignComplaint`, include `Serial Number` and `Model Number` (if filled on the complaint/Product record) and `locationText` (if filled on the complaint) in the message body. These help the SC identify the physical unit and navigate to the customer. Admin-only fields (`billDate`, `billPhoto`, `shopName`) must NOT be included in WA-01 — they are internal records, never sent to the SC.
-  - [ ] **WA-01 suppression for Unregistered SC (v1.3 Change 2 — Phase 20 dependency):** Before firing WA-01 in `assignComplaint`, check if `assignedCentre.isUnregistered === true`. If yes: skip WA-01 entirely (admin contacts the SC manually). Same suppression applies to all SC-directed triggers: WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X. Only WA-04 to customer is exempt — it fires regardless of SC type.
-  - [ ] **Cron scheduler skip rule for Unregistered SC (v1.3 Change 2 — Phase 20 dependency):** In `utils/whatsappReminder.js` (the cron job), all DB queries that find complaints to send reminders to must add a filter: `assignedCentre.isUnregistered !== true`. This prevents reminder cycles from ever running on complaints assigned to unregistered SCs. Add this as a base `$match` condition on all cron reminder queries.
+  - [x] **WA-01 content update (v1.3 Change 3 — Phase 21 dependency):** When implementing WA-01 in `assignComplaint`, include `Serial Number` and `Model Number` (if filled on the complaint/Product record) and `locationText` (if filled on the complaint) in the message body. These help the SC identify the physical unit and navigate to the customer. Admin-only fields (`billDate`, `billPhoto`, `shopName`) must NOT be included in WA-01 — they are internal records, never sent to the SC.
+  - [x] **WA-01 suppression for Unregistered SC (v1.3 Change 2 — Phase 20 dependency):** Before firing WA-01 in `assignComplaint`, check if `assignedCentre.isUnregistered === true`. If yes: skip WA-01 entirely (admin contacts the SC manually). Same suppression applies to all SC-directed triggers: WA-02, WA-03, WA-04B, WA-05, WA-06, WA-07, WA-0X. Only WA-04 to customer is exempt — it fires regardless of SC type.
+  - [x] **Cron scheduler skip rule for Unregistered SC (v1.3 Change 2 — Phase 20 dependency):** In `utils/whatsappReminder.js` (the cron job), all DB queries that find complaints to send reminders to must add a filter: `assignedCentre.isUnregistered !== true`. This prevents reminder cycles from ever running on complaints assigned to unregistered SCs. Add this as a base `$match` condition on all cron reminder queries.
 
-- [ ] **Phase 15 — UI/UX Polish & Final Testing**
-  - [ ] Improve overall UI flow and UX consistency
-  - [ ] Comprehensive end-to-end testing
-  - [ ] Visual UI improvements and final layout adjustments
-  - [ ] Handle any new minor additions or edge-case features
+- [x] **Phase 15 — UI/UX Polish & Final Testing**
+  - [x] Improve overall UI flow and UX consistency
+  - [x] Comprehensive end-to-end testing
+  - [x] Visual UI improvements and final layout adjustments
+  - [x] Handle any new minor additions or edge-case features
 
 - [x] **Phase 16 — Custom ID Formatting Rules (Day 21)**
   - [x] Refactored Product ID format to `P + L/C + 6-digit global sequence` (stored without dashes, global counter)

@@ -345,25 +345,29 @@ const createComplaint = async (req, res) => {
     complaint,
   });
 
-  // Asynchronous WhatsApp notification
+  // Asynchronous WhatsApp notification (only if configured in .env and not hello_world)
   if (isReopened) {
-    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED || 'complaint_reopened';
-    sendWhatsApp(complaint.phone1, templateReopened, [
-      complaint.customerName,
-      complaint.complaintId,
-      reopenNotes || '',
-      new Date(complaint.createdAt).toLocaleDateString('en-IN')
-    ]);
+    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED;
+    if (templateReopened && templateReopened !== 'hello_world') {
+      sendWhatsApp(complaint.phone1, templateReopened, [
+        complaint.customerName,
+        complaint.complaintId,
+        reopenNotes || '',
+        new Date(complaint.createdAt).toLocaleDateString('en-IN')
+      ]);
+    }
   } else {
-    const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED || 'complaint_received';
-    const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
-    sendWhatsApp(complaint.phone1, templateName, [
-      complaint.customerName,
-      complaint.complaintId,
-      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-      complaint.complaintType,
-      complaintDate
-    ]);
+    const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED;
+    if (templateName && templateName !== 'hello_world') {
+      const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
+      sendWhatsApp(complaint.phone1, templateName, [
+        complaint.customerName,
+        complaint.complaintId,
+        complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+        complaint.complaintType,
+        complaintDate
+      ]);
+    }
   }
 };
 
@@ -430,32 +434,21 @@ const assignComplaint = async (req, res) => {
     complaint,
   });
 
-  // Trigger 2: Send SC details to Customer
-  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
-  sendWhatsApp(complaint.phone1, templateCustomer, [
-    complaint.complaintId,
-    complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-    complaint.complaintType === 'installation' ? 'Installation' : 'Complaint',
-    sc.businessName,
-    sc.phone1,
-    process.env.SUPPORT_PHONE || 'Microvison Support'
-  ]);
-
-  // Trigger 3: Send basic complaint details to Assigned SC (WA-01) - suppressed for unregistered SCs
+  // WA-01: Send basic complaint details to Assigned SC — suppressed for unregistered SCs
   if (sc.isUnregistered !== true) {
     const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'sc_new_assignment';
     const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
 
     sendWhatsApp(sc.phone1, templateSC, [
-      complaint.customerName,
-      complaint.phone1,
-      customerAddress,
-      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-      complaint.complaintType === 'installation' ? 'Installation' : 'Complaint',
-      complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
-      complaint.serialNumber || 'N/A',
-      complaint.complaintId,
-      process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in'
+      complaint.customerName,                                           // {{1}} Customer Name
+      complaint.phone1,                                                 // {{2}} Customer Phone
+      customerAddress,                                                  // {{3}} Full Address (localAddress, city, district, state)
+      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',           // {{4}} Product
+      complaint.complaintType === 'installation' ? 'Installation' : 'Complaint', // {{5}} Request Type
+      complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty', // {{6}} Warranty
+      complaint.serialNumber || 'N/A',                                 // {{7}} Serial No
+      complaint.complaintId,                                           // {{8}} Complaint ID
+      process.env.PORTAL_LOGIN_URL || 'https://www.microvisonservice.co.in/' // {{9}} Portal Link
     ]);
   }
 };
@@ -527,6 +520,7 @@ const acceptComplaint = async (req, res) => {
   }
 
   complaint.status = 'accepted';
+  complaint.scAcceptedAt = new Date();
   await complaint.save();
 
   await ComplaintUpdate.create({
@@ -544,14 +538,15 @@ const acceptComplaint = async (req, res) => {
   const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
   const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
   const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
+  const scPhone = sc.phone1 || process.env.SUPPORT_PHONE || '90246 62315';
 
   sendWhatsApp(complaint.phone1, templateCustomer, [
-    complaint.complaintId,
-    productType,
-    complaintType,
-    sc.businessName,
-    sc.phone1,
-    process.env.SUPPORT_PHONE || 'Microvison Support'
+    complaint.complaintId,                              // {{1}} Complaint ID
+    productType,                                        // {{2}} Product
+    complaintType,                                      // {{3}} Request Type
+    sc.businessName,                                    // {{4}} SC Business Name
+    scPhone,                                            // {{5}} SC Phone
+    process.env.SUPPORT_PHONE || '90246 62315'         // {{6}} Microvison Support Number
   ]);
 
   if (complaint.phone2) {
@@ -560,8 +555,8 @@ const acceptComplaint = async (req, res) => {
       productType,
       complaintType,
       sc.businessName,
-      sc.phone1,
-      process.env.SUPPORT_PHONE || 'Microvison Support'
+      scPhone,
+      process.env.SUPPORT_PHONE || '90246 62315'
     ]);
   }
 };
@@ -856,6 +851,7 @@ const updateStatus = async (req, res) => {
   else if (newStatus === 'not_done') {
     // Text reason and Voice note are completely optional
 
+    complaint.notDoneAt = new Date();
     if (notDoneReason) complaint.notDoneReason = notDoneReason.trim();
     if (notDoneVoiceUrl) complaint.notDoneVoiceUrl = notDoneVoiceUrl;
 
@@ -1413,13 +1409,14 @@ const markPartDelivered = async (req, res) => {
   // Find Service Centre to get their phone number
   const sc = await ServiceCentre.findById(complaint.assignedCentreId);
   if (sc && sc.phone1 && sc.isUnregistered !== true) {
-    const templateName = process.env.WHATSAPP_TEMPLATE_PART_DELIVERED || 'part_delivered_to_sc';
-    const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}`;
+    const templateName = process.env.WHATSAPP_TEMPLATE_PART_DISPATCHED || 'sc_part_dispatched';
+    const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
     sendWhatsApp(sc.phone1, templateName, [
-      complaint.complaintId,
-      complaint.customerName,
-      customerAddress,
-      note ? note.trim() : 'No delivery note.'
+      complaint.complaintId,                                    // {{1}} Complaint ID
+      complaint.customerName,                                   // {{2}} Customer Name
+      customerAddress,                                          // {{3}} Full Address (localAddress, city, district, state)
+      note ? note.trim() : 'No note provided',                 // {{4}} Admin Note
+      process.env.PORTAL_LOGIN_URL || 'https://www.microvisonservice.co.in/' // {{5}} Portal Link
     ]);
   }
 
