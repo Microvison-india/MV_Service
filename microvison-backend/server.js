@@ -56,4 +56,13 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-//here put code - 
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+
+  // WhatsApp reminders scheduler: runs on startup (after 5s delay) and then every 1 hour
+  const runWAReminderCron = require('./utils/whatsappReminder');
+  setTimeout(() => {
+    runWAReminderCron();
+  }, 5000);
+  setInterval(runWAReminderCron, 60 * 60 * 1000);
+});
