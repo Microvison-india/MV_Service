@@ -253,3 +253,40 @@ One approved template is needed per trigger type:
 - SC sees payment deductions on their **billing page** only (as a read-only view showing `−₹X — Customer payment collected by SC: [reason]`), not via WhatsApp.
 
 **Why this matters for template design:** Do NOT add payment-related variables to any WA template. Payment data is strictly internal between admin and billing system.
+
+---
+
+## PART 8 — Future Recommendations (Missing Coverage)
+
+*Added: July 2, 2026*
+
+While our 7 existing templates provide strong coverage for managing Service Centres, there are critical gaps in **Customer Experience** and **Admin/Billing** that should be considered for future phases:
+
+### 1. `customer_complaint_registered` (Highly Recommended)
+- **Recipient:** Customer
+- **When:** Immediately when an Admin registers a new complaint in the system.
+- **Why:** Currently, a customer calls in, hangs up, and gets zero confirmation until a Service Centre accepts the job. A simple WhatsApp message immediately after the phone call builds massive trust.
+- **Content Draft Idea:** "Hello! Your complaint has been successfully registered. Complaint ID: {{1}}. Our team is assigning a Service Centre and will update you shortly."
+
+### 2. `customer_complaint_resolved` (Highly Recommended)
+- **Recipient:** Customer
+- **When:** When the Admin clicks "Confirm Done" and closes the complaint.
+- **Why:** It gives the customer closure, acts as a digital receipt, and prevents them from calling the support line to ask "is it officially closed?". It is also a great place to ask for feedback.
+- **Content Draft Idea:** "Hello! Your complaint (ID: {{1}}) has been successfully resolved. If you face any further issues, please reply to this number or call our support line."
+
+### 3. `customer_part_pending_delay` (Optional but Good)
+- **Recipient:** Customer
+- **When:** When a Service Centre marks the job as "Part Pending".
+- **Why:** If a technician leaves the customer's house saying "I need a part", the customer is left in the dark. A WhatsApp message acknowledging the delay keeps them calm.
+- **Content Draft Idea:** "Hello! Our technician inspected your product (ID: {{1}}) and ordered a spare part. We will notify you as soon as the part arrives for installation."
+
+### 4. `sc_bill_settled` (Optional for Change 6 Billing)
+- **Recipient:** Service Centre
+- **When:** When Admin marks an SC's bill/invoice as settled or paid.
+- **Why:** It keeps SCs happy and informed about their payouts without them having to constantly log into the portal to check their ledger.
+- **Content Draft Idea:** "Hello! A payment of ₹{{1}} for Complaint ID {{2}} has been credited to your ledger. Please check your Microvison portal for details."
+
+### 5. `admin_escalation_alert` (Optional Internal Alert)
+- **Recipient:** Admin's WhatsApp (or a dedicated internal group)
+- **When:** When an SC ignores a complaint for 48+ hours (when WA-03 fires).
+- **Why:** While the Action Centre shows this, getting a WhatsApp ping allows Admins to immediately call the lazy SC, even if they aren't looking at their computer.

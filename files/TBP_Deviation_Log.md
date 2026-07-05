@@ -664,5 +664,18 @@ Each entry follows this structure:
 
 ---
 
+### DEV-TBP-074 — WhatsApp: 10-Digit Phone Constraints & 6-Param Reminder
+- **Phase:** 14
+- **TBP Section / File:** `utils/sendWhatsApp.js` / Frontend Forms Validation / `models/Complaint.js`
+- **Type:** CHANGED
+- **Summary:**
+  - Added strict regex validation (`/^\d{10}$/`) to all primary phone inputs (`phone1`) on frontend forms (New Complaint Step 1, SC Sign Up, SC Detail Edit, and Unregistered SC Creation Modal) to enforce exactly 10-digit WhatsApp numbers.
+  - Updated backend `utils/sendWhatsApp.js` to strip non-digit characters and automatically prepend `91` to any 10-digit number.
+  - Added `scAcceptedAt` (Date) to the `Complaint` Mongoose schema and updated `acceptComplaint` controller to save the acceptance timestamp.
+  - Updated WA-03 reminder cron logic to supply 6 parameters (adding `Request Type` as the first param) matching the updated Meta template structure.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
+

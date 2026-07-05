@@ -67,15 +67,7 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
       .filter((c) => (modalData.state ? c.state === modalData.state : true))
       .map((c) => c.district)
   )].sort();
-  const filteredCities = [...new Set(
-    cities
-      .filter((c) => {
-        if (modalData.state && c.state !== modalData.state) return false;
-        if (modalData.district && c.district !== modalData.district) return false;
-        return true;
-      })
-      .map((c) => c.name)
-  )].sort();
+
 
   const [prevCity, setPrevCity] = useState(formData.city);
   const [prevDistrict, setPrevDistrict] = useState(formData.district);
@@ -189,6 +181,11 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
     e.preventDefault();
     if (!modalData.name || !modalData.phone1 || !modalData.city || !modalData.state) {
       setCreateError('Name, Phone 1, City, and State are required.');
+      return;
+    }
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(modalData.phone1?.trim())) {
+      setCreateError('Phone 1 must be exactly 10 digits.');
       return;
     }
     setCreatingSC(true);
@@ -559,14 +556,14 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold block mb-1">Phone Number 1 <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-semibold block mb-1">Phone Number 1 (WhatsApp Only - 10 digits) <span className="text-red-500">*</span></label>
                   <input
                     type="tel"
                     value={modalData.phone1}
                     onChange={(e) => setModalData(prev => ({ ...prev, phone1: e.target.value }))}
                     className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     required
-                    placeholder="10-digit number"
+                    placeholder="10-digit WhatsApp number"
                   />
                 </div>
                 <div>

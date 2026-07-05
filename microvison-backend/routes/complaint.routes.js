@@ -121,5 +121,4 @@ router.patch('/:id/status', auth, isAdminOrSC, updateStatus);
 
 // PATCH /api/complaints/:id/part-received — SC marks part received (SC Flow v1.1)
 router.patch('/:id/part-received', auth, isAdminOrSC, markPartReceived);
-
 module.exports = router;

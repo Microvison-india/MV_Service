@@ -12,12 +12,12 @@ const sendWhatsApp = require('../utils/sendWhatsApp');
 const makeComplaintIdPattern = (term) => {
   if (!term) return '';
   const clean = term.trim().toLowerCase();
-  
+
   if (clean.startsWith('m')) {
     const pattern = clean.replace(/[^a-z0-9]/g, '.*');
     return pattern;
   }
-  
+
   const digits = clean.replace(/[^0-9]/g, '');
   if (digits) {
     if (digits.startsWith('20') && digits.length >= 9) {
@@ -163,11 +163,11 @@ const createComplaint = async (req, res) => {
   // Admin-added extras at registration are auto-approved
   const formattedExtras = Array.isArray(extraCharges)
     ? extraCharges.map((ec) => ({
-        label: ec.label,
-        amount: ec.amount,
-        requestedBy: 'admin',
-        status: 'approved', // Admin-added extras are pre-approved
-      }))
+      label: ec.label,
+      amount: ec.amount,
+      requestedBy: 'admin',
+      status: 'approved', // Admin-added extras are pre-approved
+    }))
     : [];
 
   // ── Petrol tracking ───────────────────────────────────────
@@ -215,11 +215,11 @@ const createComplaint = async (req, res) => {
     if (shopName) productRecord.shopName = shopName;
     if (modelNumber) productRecord.modelNumber = modelNumber;
     if (locationText !== undefined) productRecord.locationText = locationText;
-    
+
     if (serialNumber && serialNumber !== productRecord.serialNumber) {
       const existing = await Product.findOne({ serialNumber });
       if (existing && existing.trackingId !== trackingId) {
-         return res.status(400).json({ message: 'Serial number already exists on another product.' });
+        return res.status(400).json({ message: 'Serial number already exists on another product.' });
       }
       productRecord.serialNumber = serialNumber;
       productRecord.hasSerial = true;
@@ -345,25 +345,29 @@ const createComplaint = async (req, res) => {
     complaint,
   });
 
-  // Asynchronous WhatsApp notification
+  // Asynchronous WhatsApp notification (only if configured in .env and not hello_world)
   if (isReopened) {
-    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED || 'complaint_reopened';
-    sendWhatsApp(complaint.phone1, templateReopened, [
-      complaint.customerName,
-      complaint.complaintId,
-      reopenNotes || '',
-      new Date(complaint.createdAt).toLocaleDateString('en-IN')
-    ]);
+    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED;
+    if (templateReopened && templateReopened !== 'hello_world') {
+      sendWhatsApp(complaint.phone1, templateReopened, [
+        complaint.customerName,
+        complaint.complaintId,
+        reopenNotes || '',
+        new Date(complaint.createdAt).toLocaleDateString('en-IN')
+      ]);
+    }
   } else {
-    const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED || 'complaint_received';
-    const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
-    sendWhatsApp(complaint.phone1, templateName, [
-      complaint.customerName,
-      complaint.complaintId,
-      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-      complaint.complaintType,
-      complaintDate
-    ]);
+    const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED;
+    if (templateName && templateName !== 'hello_world') {
+      const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
+      sendWhatsApp(complaint.phone1, templateName, [
+        complaint.customerName,
+        complaint.complaintId,
+        complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+        complaint.complaintType,
+        complaintDate
+      ]);
+    }
   }
 };
 
@@ -430,42 +434,21 @@ const assignComplaint = async (req, res) => {
     complaint,
   });
 
-  // Trigger 2: Send SC details to Customer
-  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'sc_details_to_customer';
-  sendWhatsApp(complaint.phone1, templateCustomer, [
-    complaint.customerName,
-    complaint.complaintId,
-    sc.businessName,
-    sc.ownerName || '',
-    sc.phone1
-  ]);
-
-  // Trigger 3: Send basic complaint details to Assigned SC (WA-01) - suppressed for unregistered SCs
+  // WA-01: Send basic complaint details to Assigned SC — suppressed for unregistered SCs
   if (sc.isUnregistered !== true) {
-    const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'complaint_details_to_sc';
+    const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'sc_new_assignment';
     const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
-    
-    let reopenInfo = 'NO';
-    if (complaint.isReopened && complaint.reopenParentId) {
-      const parent = await Complaint.findById(complaint.reopenParentId);
-      reopenInfo = `REOPENED (Original Job ID: ${parent ? parent.complaintId : 'Unknown'})`;
-    }
 
     sendWhatsApp(sc.phone1, templateSC, [
-      sc.ownerName || '',
-      complaint.complaintId,
-      complaint.customerName,
-      complaint.phone1,
-      customerAddress,
-      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-      complaint.complaintType,
-      complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty',
-      complaint.notes || 'None',
-      process.env.PORTAL_LOGIN_URL || 'https://microvisonservice.co.in/login',
-      reopenInfo,
-      complaint.serialNumber || 'N/A',
-      complaint.modelNumber || 'N/A',
-      complaint.locationText || 'N/A'
+      complaint.customerName,                                           // {{1}} Customer Name
+      complaint.phone1,                                                 // {{2}} Customer Phone
+      customerAddress,                                                  // {{3}} Full Address (localAddress, city, district, state)
+      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',           // {{4}} Product
+      complaint.complaintType === 'installation' ? 'Installation' : 'Complaint', // {{5}} Request Type
+      complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty', // {{6}} Warranty
+      complaint.serialNumber || 'N/A',                                 // {{7}} Serial No
+      complaint.complaintId,                                           // {{8}} Complaint ID
+      process.env.PORTAL_LOGIN_URL || 'https://www.microvisonservice.co.in/' // {{9}} Portal Link
     ]);
   }
 };
@@ -537,6 +520,7 @@ const acceptComplaint = async (req, res) => {
   }
 
   complaint.status = 'accepted';
+  complaint.scAcceptedAt = new Date();
   await complaint.save();
 
   await ComplaintUpdate.create({
@@ -551,16 +535,18 @@ const acceptComplaint = async (req, res) => {
   res.status(200).json({ message: 'Complaint accepted.', complaint });
 
   // Trigger WA-04: Sent to Customer immediately on SC acceptance
-  const templateCustomer = process.env.WHATSAPP_TEMPLATE_ACCEPT_CUSTOMER || 'sc_accept_to_customer';
+  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
   const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
   const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
-  
+  const scPhone = sc.phone1 || process.env.SUPPORT_PHONE || '90246 62315';
+
   sendWhatsApp(complaint.phone1, templateCustomer, [
-    complaint.complaintId,
-    productType,
-    complaintType,
-    sc.businessName,
-    sc.phone1
+    complaint.complaintId,                              // {{1}} Complaint ID
+    productType,                                        // {{2}} Product
+    complaintType,                                      // {{3}} Request Type
+    sc.businessName,                                    // {{4}} SC Business Name
+    scPhone,                                            // {{5}} SC Phone
+    process.env.SUPPORT_PHONE || '90246 62315'         // {{6}} Microvison Support Number
   ]);
 
   if (complaint.phone2) {
@@ -569,7 +555,8 @@ const acceptComplaint = async (req, res) => {
       productType,
       complaintType,
       sc.businessName,
-      sc.phone1
+      scPhone,
+      process.env.SUPPORT_PHONE || '90246 62315'
     ]);
   }
 };
@@ -648,8 +635,8 @@ const markGoing = async (req, res) => {
   if (!updatedComplaint) {
     // Re-fetch to show current status in error message
     const current = await Complaint.findById(complaint._id).select('status');
-    return res.status(400).json({ 
-      message: `Cannot mark as going. The complaint is no longer in 'accepted' status (currently: ${current?.status}).` 
+    return res.status(400).json({
+      message: `Cannot mark as going. The complaint is no longer in 'accepted' status (currently: ${current?.status}).`
     });
   }
 
@@ -694,7 +681,7 @@ const updateStatus = async (req, res) => {
     scSerialSlipPhotoUrl,
     scMissingBypass,
     engineerName,
-    
+
     // Change 6A Refinement: Inline customer payment during proxy form
     inlineCustomerPayment,
   } = req.body;
@@ -864,6 +851,7 @@ const updateStatus = async (req, res) => {
   else if (newStatus === 'not_done') {
     // Text reason and Voice note are completely optional
 
+    complaint.notDoneAt = new Date();
     if (notDoneReason) complaint.notDoneReason = notDoneReason.trim();
     if (notDoneVoiceUrl) complaint.notDoneVoiceUrl = notDoneVoiceUrl;
 
@@ -1067,10 +1055,10 @@ const confirmDone = async (req, res) => {
             missingFields,
           });
         }
-        
+
         // Save bypassed fields to complaint
         complaint.missingFieldsBypassed = missingFieldsBypassed;
-        
+
         // Add bypassed fields to product's missingFieldsWarning (append uniquely)
         missingFieldsBypassed.forEach(f => {
           if (!product.missingFieldsWarning.includes(f)) {
@@ -1132,9 +1120,9 @@ const confirmDone = async (req, res) => {
 
   // Determine if bill should be generated. Generated for all closed complaints to track in Billing.
   const billGenerated = true;
-  
+
   const oldStatus = complaint.status;
-  
+
   complaint.status = 'closed';
   complaint.billGenerated = billGenerated;
   complaint.billLockedAt = new Date();
@@ -1149,7 +1137,7 @@ const confirmDone = async (req, res) => {
     complaint.paidAt = null;
     complaint.paidBy = null;
   }
-  
+
   // Update petrol Admin & SC estimates if sent
   if (req.body.petrolAdmin !== undefined) {
     complaint.petrolAdmin = (req.body.petrolAdmin === '' || req.body.petrolAdmin === null) ? null : Number(req.body.petrolAdmin);
@@ -1221,10 +1209,10 @@ const disputeDone = async (req, res) => {
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
   const oldStatus = complaint.status;
-  
+
   // Bounce back to accepted
   complaint.status = 'accepted';
-  
+
   await complaint.save();
 
   await ComplaintUpdate.create({
@@ -1279,7 +1267,7 @@ const getComplaintById = async (req, res) => {
         select: 'status assignedCentreId reopenParentId isReopened'
       }
     });
-    
+
   if (!complaint) return res.status(404).json({ message: 'Complaint not found.' });
 
   // Security: If user is SC, they can only view their own assigned complaints
@@ -1397,7 +1385,7 @@ const markPartDelivered = async (req, res) => {
   // Update delivered state (does NOT change the status)
   const deliveredAt = new Date();
   const deliveredNote = note ? note.trim() : '';
-  
+
   complaint.partDeliveredAt = deliveredAt;
   complaint.partDeliveredNote = deliveredNote;
 
@@ -1421,13 +1409,14 @@ const markPartDelivered = async (req, res) => {
   // Find Service Centre to get their phone number
   const sc = await ServiceCentre.findById(complaint.assignedCentreId);
   if (sc && sc.phone1 && sc.isUnregistered !== true) {
-    const templateName = process.env.WHATSAPP_TEMPLATE_PART_DELIVERED || 'part_delivered_to_sc';
-    const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}`;
+    const templateName = process.env.WHATSAPP_TEMPLATE_PART_DISPATCHED || 'sc_part_dispatched';
+    const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
     sendWhatsApp(sc.phone1, templateName, [
-      complaint.complaintId,
-      complaint.customerName,
-      customerAddress,
-      note ? note.trim() : 'No delivery note.'
+      complaint.complaintId,                                    // {{1}} Complaint ID
+      complaint.customerName,                                   // {{2}} Customer Name
+      customerAddress,                                          // {{3}} Full Address (localAddress, city, district, state)
+      note ? note.trim() : 'No note provided',                 // {{4}} Admin Note
+      process.env.PORTAL_LOGIN_URL || 'https://www.microvisonservice.co.in/' // {{5}} Portal Link
     ]);
   }
 
@@ -1553,7 +1542,7 @@ const getAllComplaints = async (req, res) => {
       const escapedTerm = term.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       const searchRegex = new RegExp(escapedTerm, 'i');
       const complaintPattern = makeComplaintIdPattern(term);
-      
+
       // Query Product to find matching serialNumber or trackingId
       const Product = require('../models/Product');
       const matchingProducts = await Product.find({
@@ -1755,7 +1744,7 @@ const forceClose = async (req, res) => {
     complaint.billGenerated = false;
     complaint.petrolLocked = true;
     complaint.petrolFinal = 0;
-    
+
     await complaint.save();
 
     const ComplaintUpdate = require('../models/ComplaintUpdate');
@@ -1905,6 +1894,7 @@ const deleteCustomerPayment = async (req, res) => {
 // @route   PATCH /api/complaints/:id/customer-payments/:paymentId
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
+
 const updateCustomerPayment = async (req, res) => {
   try {
     const { paymentId } = req.params;
@@ -1945,6 +1935,7 @@ const updateCustomerPayment = async (req, res) => {
     res.status(500).json({ message: 'Server error updating payment entry.' });
   }
 };
+
 
 module.exports = {
   saveCriticalAction,

@@ -29,3 +29,20 @@ This document serves as a technical journal logging specific bug fixes, complex 
 **The Solution:** Implemented a new `parseLocalDate` utility that reads the `x-timezone-offset` header sent by the frontend, dynamically shifting the bounds of the MongoDB `$gte` and `$lte` queries to match the user's exact local midnight and 23:59:59 timestamps.
 
 ---
+
+## Phase 14: WhatsApp Messaging Integrations & Phone Validation
+
+### 1. 7-Template Automation Flow
+**The Problem:** Reminders were completely manual, and immediate notifications were inconsistent or sent duplicates (e.g. customer_sc_assigned sent twice).
+**The Solution:**
+- Wired automated immediate notifications: SC assigned (`sc_new_assignment` / Template 2) fires on assignment; Customer notification (`customer_sc_assigned` / Template 1) fires only upon SC acceptance. Unregistered SCs skip SC notifications.
+- Created `whatsappReminder.js` cron job running every hour checking DB status timestamps (`assignedAt`, `scAcceptedAt`, `notDoneAt`, `partReceivedAt`).
+- Timers check: if `>= 23.5 hours` elapsed since last action and no reminder sent (or `>= 47.5 hours` elapsed since last reminder), fires WhatsApp template to SC.
+
+### 2. 10-Digit Phone Enforcements
+**The Problem:** WhatsApp Cloud API requires exactly E.164 formatted numbers (e.g. `919876543210` without `+` or spaces). Bad user input leads to delivery failures.
+**The Solution:**
+- Implemented strict frontend validation on all primary phone inputs (SignUp, Complaint Create Step 1, Profile Edit, Unregistered SC Creation Modal) to enforce exactly 10 digits (`/^\d{10}$/`).
+- Frontend labels updated to display "WhatsApp Only - 10 digits".
+- Backend `sendWhatsApp` utility cleans input of special characters, checks if length is 10 digits, and automatically prepends `91` before posting to Meta.
+

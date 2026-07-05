@@ -601,5 +601,16 @@ graph TD
 
 ---
 
+### DEV-GRD-058 — WhatsApp: 10-Digit Phone Constraints & 6-Param Reminder
+- **Phase:** 14
+- **GRD Section:** 14 (WhatsApp Notifications)
+- **Type:** CHANGED
+- **Summary:**
+  - Standardized all primary phone number fields (`phone1`) across the frontend forms (New Complaint Step 1, SC Sign Up, SC Detail Edit, and Unregistered SC Creation Modal) to be strictly 10 digits and compulsory.
+  - WhatsApp Template 3 (`sc_assignment_reminder`) was updated in Meta to add the `Request Type` variable as parameter `{{1}}`, bringing its total parameter count from 5 to 6. Code was adjusted accordingly to supply all 6 parameters.
+
+---
+
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
+
