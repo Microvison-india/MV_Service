@@ -535,7 +535,7 @@ const acceptComplaint = async (req, res) => {
   res.status(200).json({ message: 'Complaint accepted.', complaint });
 
   // Trigger WA-04: Sent to Customer immediately on SC acceptance
-  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned';
+  const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned2';
   const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
   const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
   const scPhone = sc.phone1 || process.env.SUPPORT_PHONE || '90246 62315';

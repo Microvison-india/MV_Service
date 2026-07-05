@@ -33,9 +33,9 @@ This document serves as a technical journal logging specific bug fixes, complex 
 ## Phase 14: WhatsApp Messaging Integrations & Phone Validation
 
 ### 1. 7-Template Automation Flow
-**The Problem:** Reminders were completely manual, and immediate notifications were inconsistent or sent duplicates (e.g. customer_sc_assigned sent twice).
+**The Problem:** Reminders were completely manual, and immediate notifications were inconsistent or sent duplicates (e.g. customer_sc_assigned2 sent twice).
 **The Solution:**
-- Wired automated immediate notifications: SC assigned (`sc_new_assignment` / Template 2) fires on assignment; Customer notification (`customer_sc_assigned` / Template 1) fires only upon SC acceptance. Unregistered SCs skip SC notifications.
+- Wired automated immediate notifications: SC assigned (`sc_new_assignment` / Template 2) fires on assignment; Customer notification (`customer_sc_assigned2` / Template 1) fires only upon SC acceptance. Unregistered SCs skip SC notifications.
 - Created `whatsappReminder.js` cron job running every hour checking DB status timestamps (`assignedAt`, `scAcceptedAt`, `notDoneAt`, `partReceivedAt`).
 - Timers check: if `>= 23.5 hours` elapsed since last action and no reminder sent (or `>= 47.5 hours` elapsed since last reminder), fires WhatsApp template to SC.
 

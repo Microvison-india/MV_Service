@@ -9,6 +9,17 @@ if (!recipient) {
 
 const templates = [
   {
+    name: 'customer_sc_assigned2',
+    params: [
+      "MV-C-12345",                               // {{1}} Complaint ID
+      "LED TV",                                   // {{2}} Product
+      "installation",                             // {{3}} Request Type
+      "FixIt Fast",                               // {{4}} SC Name
+      "9876543210",                               // {{5}} SC Phone
+      "1800-123-4567"                             // {{6}} Support Number
+    ]
+  },
+  {
     name: 'sc_new_assignment',
     params: [
       "John Doe",                                 // {{1}} Customer Name
