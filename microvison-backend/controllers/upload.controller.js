@@ -26,24 +26,8 @@ const uploadImages = async (req, res) => {
 // @desc    Upload a single audio file (voice note)
 // @route   POST /api/upload/audio
 // @access  Private (Admin or active SC)
-const uploadAudio = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No audio file provided' });
-    }
-
-    res.status(200).json({
-      message: 'Audio uploaded successfully',
-      audio: {
-        url: req.file.path,
-        public_id: req.file.filename,
-      },
-    });
-  } catch (error) {
-    console.error('Upload Audio Error:', error);
-    res.status(500).json({ message: 'Server error during audio upload' });
-  }
-};
+// put here - code - 
+console.log("hello");
 
 module.exports = {
   uploadImages,
