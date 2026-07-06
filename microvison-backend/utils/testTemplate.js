@@ -7,14 +7,17 @@ if (!recipient) {
   process.exit(1);
 }
 
-const templateName = 'customer_sc_assigned';
+const templateName = 'sc_new_assignment';
 const params = [
-  "MV-C-12345",         // {{1}} Complaint ID
-  "LED TV",             // {{2}} Product
-  "installation",       // {{3}} Request Type
-  "FixIt Fast",         // {{4}} SC Name
-  "9876543210",         // {{5}} SC Phone
-  "1800-123-4567"       // {{6}} Support Number
+  "John Doe",           // {{1}} Customer Name
+  "9876543210",         // {{2}} Customer Phone
+  "123 Main St, Delhi", // {{3}} Customer Address
+  "LED TV",             // {{4}} Product
+  "MV-LED-43",          // {{5}} Model
+  "SN123456789",        // {{6}} Serial No
+  "Screen flickering",  // {{7}} Issue
+  "MV-C-12345",         // {{8}} Request ID
+  "https://www.microvisonservice.co.in/" // {{9}} Portal Link
 ];
 
 console.log(`Sending test template '${templateName}' to ${recipient}...`);

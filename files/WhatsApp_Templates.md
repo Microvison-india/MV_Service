@@ -2,7 +2,7 @@
 
 This file contains the exact Body text to be copy-pasted into the Meta WhatsApp Manager when creating templates.
 
-## 1. `customer_sc_assigned` (⏳ Verification Pending)
+## 1. `customer_sc_assigned2` (⏳ Verification Pending)
 - **Category:** Utility
 - **Language:** English
 - **Recipient:** Customer
