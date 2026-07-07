@@ -8,12 +8,12 @@ const { calculateWarranty } = require('../utils/warrantyCalculator');
 const makeComplaintIdPattern = (term) => {
   if (!term) return '';
   const clean = term.trim().toLowerCase();
-  
+
   if (clean.startsWith('m')) {
     const pattern = clean.replace(/[^a-z0-9]/g, '.*');
     return pattern;
   }
-  
+
   const digits = clean.replace(/[^0-9]/g, '');
   if (digits) {
     if (digits.startsWith('20') && digits.length >= 9) {
@@ -35,7 +35,7 @@ const makeComplaintIdPattern = (term) => {
 const searchProducts = async (req, res) => {
   try {
     const { phone, serial, name, address, trackingId } = req.query;
-    
+
     // Build query dynamically
     let query = {};
     const orConditions = [];
@@ -43,20 +43,20 @@ const searchProducts = async (req, res) => {
     if (trackingId) {
       orConditions.push({ trackingId: { $regex: trackingId, $options: 'i' } });
     }
-    
+
     if (serial) {
       orConditions.push({ serialNumber: { $regex: serial, $options: 'i' } });
     }
-    
+
     if (phone) {
       orConditions.push({ phone1: { $regex: phone, $options: 'i' } });
       orConditions.push({ phone2: { $regex: phone, $options: 'i' } });
     }
-    
+
     if (name) {
       orConditions.push({ customerName: { $regex: name, $options: 'i' } });
     }
-    
+
     if (address) {
       orConditions.push({ localAddress: { $regex: address, $options: 'i' } });
     }
@@ -112,7 +112,239 @@ const getProduct = async (req, res) => {
 // @route   POST /api/products
 // @access  Private (Admin only)
 // ─────────────────────────────────────────────────────────────
-// put code here - 
+const createProduct = async (req, res) => {
+  try {
+    const {
+      serialNumber,
+      product: productType,
+      customerName,
+      phone1,
+      phone2,
+      localAddress,
+      city,
+      district,
+      state,
+      locationText,
+      billPhoto,
+      billDate,
+      warrantyStatus, // manual fallback if passed
+      complaintType, // used for default calc
+      shopName,
+      modelNumber,
+      warrantyForceReason,
+      forceOverride,
+      manualReason,
+      missingFieldsWarning,
+    } = req.body;
+
+    if (serialNumber) {
+      const existing = await Product.findOne({ serialNumber });
+      if (existing) {
+        return res.status(400).json({ message: `Serial number already exists on Product ${existing.trackingId}.` });
+      }
+    }
+
+    const trackingId = await generateTrackingId(productType);
+
+    // Calculate warranty using new utility options object signature
+    const {
+      warrantyStatus: calcStatus,
+      warrantyExpiryDate,
+      warrantySource,
+      warrantyForceReason: forceReasonVal,
+    } = calculateWarranty({
+      billDate,
+      complaintType: complaintType || 'complaint',
+      manualSelection: warrantyStatus,
+      manualReason,
+      forceOverride,
+      forceReason: warrantyForceReason,
+    });
+
+    const productRecord = await Product.create({
+      trackingId,
+      serialNumber: serialNumber || undefined,
+      hasSerial: !!serialNumber,
+      product: productType,
+      customerName,
+      phone1,
+      phone2: phone2 || '',
+      localAddress,
+      city,
+      district,
+      state,
+      locationText: locationText || '',
+      billPhoto: billPhoto || '',
+      billDate: billDate || null,
+      shopName: shopName || '',
+      modelNumber: modelNumber || '',
+      warrantyStatus: calcStatus,
+      warrantyExpiryDate,
+      warrantySource,
+      warrantyForceReason: forceReasonVal || '',
+      missingFieldsWarning: missingFieldsWarning || [],
+      complaintHistory: [],
+    });
+
+    res.status(201).json({ message: 'Product created', product: productRecord });
+  } catch (error) {
+    console.error('Error creating product:', error);
+    res.status(500).json({ message: 'Server error while creating product.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// @desc    Update product record
+// @route   PUT /api/products/:trackingId
+// @access  Private (Admin only)
+// ─────────────────────────────────────────────────────────────
+const updateProduct = async (req, res) => {
+  try {
+    const { trackingId } = req.params;
+    const {
+      customerName,
+      phone1,
+      phone2,
+      localAddress,
+      city,
+      district,
+      state,
+      locationText,
+      billPhoto,
+      billDate,
+      warrantyStatus,
+      complaintType, // used for recalculation context
+      serialNumber,
+      shopName,
+      modelNumber,
+      warrantyForceReason,
+      forceOverride,
+      manualReason,
+      missingFieldsWarning,
+      overrideRevoke, // explicit admin un-revoke action
+    } = req.body;
+
+    const product = await Product.findOne({ trackingId });
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found.' });
+    }
+
+    if (serialNumber && serialNumber !== product.serialNumber) {
+      const existing = await Product.findOne({ serialNumber });
+      if (existing && existing.trackingId !== trackingId) {
+        return res.status(400).json({ message: `Serial number already exists on Product ${existing.trackingId}.` });
+      }
+      product.serialNumber = serialNumber;
+      product.hasSerial = true;
+    }
+
+    if (customerName) product.customerName = customerName;
+    if (phone1) product.phone1 = phone1;
+    if (phone2 !== undefined) product.phone2 = phone2;
+    if (localAddress) product.localAddress = localAddress;
+    if (city) product.city = city;
+    if (district) product.district = district;
+    if (state) product.state = state;
+    if (locationText !== undefined) product.locationText = locationText;
+    if (shopName !== undefined) product.shopName = shopName;
+    if (modelNumber !== undefined) product.modelNumber = modelNumber;
+    if (missingFieldsWarning !== undefined) product.missingFieldsWarning = missingFieldsWarning;
+
+    // ── Bill Date Erase Guard ─────────────────────────────────
+    // If the product already has a bill date, and the request sends null/empty,
+    // only allow if forceOverride is also set (meaning user made an explicit choice).
+    if (
+      billDate !== undefined &&
+      (billDate === null || billDate === '') &&
+      product.billDate &&
+      !forceOverride &&
+      !overrideRevoke
+    ) {
+      return res.status(400).json({
+        message: 'Bill date cannot be removed without a replacement action. Please provide a new date or use Force Override.',
+        code: 'BILL_DATE_ERASE_BLOCKED',
+      });
+    }
+
+    // Recalculate warranty if bill info or manual override is provided
+    if (
+      billDate !== undefined ||
+      warrantyStatus !== undefined ||
+      forceOverride !== undefined ||
+      warrantyForceReason !== undefined ||
+      overrideRevoke ||
+      shopName !== undefined ||
+      modelNumber !== undefined
+    ) {
+      product.billDate = billDate !== undefined ? (billDate || null) : product.billDate;
+      product.billPhoto = billPhoto !== undefined ? (billPhoto || '') : product.billPhoto;
+
+      const {
+        warrantyStatus: calcStatus,
+        warrantyExpiryDate,
+        warrantySource: calcSource,
+        warrantyForceReason: forceReasonVal,
+      } = calculateWarranty({
+        billDate: product.billDate,
+        complaintType: complaintType || 'complaint',
+        manualSelection: warrantyStatus !== undefined ? warrantyStatus : product.warrantyStatus,
+        manualReason,
+        forceOverride: forceOverride !== undefined ? forceOverride : (product.warrantySource === 'forced'),
+        forceReason: warrantyForceReason !== undefined ? warrantyForceReason : product.warrantyForceReason,
+        warrantySource: product.warrantySource,  // always pass so P0 (revoked) guard fires correctly
+        overrideRevoke: !!overrideRevoke,        // explicit un-revoke bypasses P0
+      });
+
+      product.warrantyStatus = calcStatus;
+      product.warrantyExpiryDate = warrantyExpiryDate;
+      product.warrantySource = calcSource;
+      product.warrantyForceReason = forceReasonVal || '';
+
+      // If admin explicitly un-revoked, clear all revocation metadata
+      if (overrideRevoke) {
+        product.revocationReason = '';
+        product.revocationDate = null;
+        product.revocationComplaintId = null;
+      }
+    }
+
+    await product.save();
+
+    // Sync product & warranty snapshot details to any active (non-closed) complaint linked to this product
+    await Complaint.updateMany(
+      {
+        trackingId: product._id,
+        status: { $nin: ['closed'] },
+      },
+      {
+        $set: {
+          customerName: product.customerName,
+          phone1: product.phone1,
+          phone2: product.phone2,
+          localAddress: product.localAddress,
+          city: product.city,
+          district: product.district,
+          state: product.state,
+          serialNumber: product.serialNumber,
+          shopName: product.shopName,
+          modelNumber: product.modelNumber,
+          billDate: product.billDate,
+          billPhoto: product.billPhoto,
+          warrantyStatus: product.warrantyStatus,
+          warrantyExpiryDate: product.warrantyExpiryDate,
+          warrantySource: product.warrantySource,
+          warrantyForceReason: product.warrantyForceReason,
+        },
+      }
+    );
+
+    res.status(200).json({ message: 'Product updated', product });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Server error while updating product.' });
+  }
+};
+
 
 // ─────────────────────────────────────────────────────────────
 // @desc    Update product record
@@ -274,7 +506,7 @@ const updateProduct = async (req, res) => {
 const getReopenCheck = async (req, res) => {
   try {
     const { trackingId } = req.params;
-    
+
     const product = await Product.findOne({ trackingId })
       .populate('lastComplaintId')
       .lean();
@@ -288,7 +520,7 @@ const getReopenCheck = async (req, res) => {
     }
 
     const lastComplaint = product.lastComplaintId;
-    
+
     // Eligibility 1: Must be closed
     if (lastComplaint.status !== 'closed') {
       return res.status(200).json({
@@ -302,7 +534,7 @@ const getReopenCheck = async (req, res) => {
     // (Using lastComplaintDate as snapshotted on the product, or complaint's createdAt/updatedAt)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     if (product.lastComplaintDate < thirtyDaysAgo) {
       return res.status(200).json({
         reopenEligible: false,
