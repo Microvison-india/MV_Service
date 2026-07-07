@@ -368,3 +368,85 @@ export default function StatusTimeline({ updates = [], complaint = null }) {
                                             )}
                                         </div>
                                     )}
+                                    {isClosedCustom && (
+                                        <div className="bg-green-50/20 border border-green-100/50 rounded-xl p-2.5 sm:p-3.5 space-y-2.5 text-xs">
+                                            <p className="text-[10px] font-bold text-green-800 uppercase tracking-wider border-b border-green-200/40 pb-1">🔒 Final Closure Details</p>
+
+                                            {closedNote && (
+                                                <div>
+                                                    <span className="text-[10px] text-green-700 uppercase tracking-wider font-semibold">Admin Closing Notes / Remarks:</span>
+                                                    <p className="text-xs text-green-950 font-medium mt-0.5 whitespace-pre-wrap">{closedNote}</p>
+                                                </div>
+                                            )}
+
+                                            {closedPetrolFinal != null && closedPetrolFinal > 0 && (
+                                                <div className="pt-2 border-t border-green-200/30 space-y-1">
+                                                    <span className="text-[10px] text-green-700 uppercase tracking-wider font-bold block mb-1">Petrol Allowance</span>
+                                                    <p className="text-xs text-foreground">
+                                                        {closedPetrolFinal === closedPetrolSC && closedPetrolSC > 0 ? (
+                                                            <>
+                                                                <span className="text-muted-foreground">Admin accepted SC Claim:</span>{" "}
+                                                                <strong className="font-extrabold text-green-950 text-sm">₹{closedPetrolFinal}</strong>
+                                                            </>
+                                                        ) : closedPetrolFinal === closedPetrolAdmin && closedPetrolAdmin > 0 ? (
+                                                            <>
+                                                                <span className="text-muted-foreground">Admin accepted initial estimate:</span>{" "}
+                                                                <strong className="font-extrabold text-green-950 text-sm">₹{closedPetrolFinal}</strong>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className="text-muted-foreground">Final Locked Petrol:</span>{" "}
+                                                                <strong className="font-extrabold text-green-950 text-sm">₹{closedPetrolFinal}</strong>
+                                                            </>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {filteredClosedCharges && filteredClosedCharges.length > 0 && (
+                                                <div className="pt-2 border-t border-green-200/30 space-y-1.5">
+                                                    <span className="text-[10px] text-green-700 uppercase tracking-wider font-bold block">Final Extra Charges Actions</span>
+                                                    <div className="space-y-1">
+                                                        {filteredClosedCharges.map((ec, idx) => (
+                                                            <div key={ec._id || idx} className="flex justify-between items-center bg-white/60 border border-green-100 rounded-lg p-2 text-xs">
+                                                                <div>
+                                                                    <p className="font-medium text-foreground">{ec.label}</p>
+                                                                    <span className="text-[9px] text-muted-foreground capitalize">Requested by: {ec.requestedBy}</span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="font-bold text-foreground">₹{ec.amount}</p>
+                                                                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${ec.status === 'approved' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                                                            ec.status === 'rejected' ? 'bg-red-100 text-red-800 border border-red-200' :
+                                                                                'bg-amber-100 text-amber-800 border border-amber-200'
+                                                                        }`}>
+                                                                        {ec.status === 'approved' ? 'Edited & Approved' : ec.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {closedScNotes && (
+                                                <div className="pt-2 border-t border-green-200/30">
+                                                    <span className="text-[10px] text-green-700 uppercase tracking-wider font-semibold">SC Done Notes / Remarks:</span>
+                                                    <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{closedScNotes}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {!update.note && !update.voiceUrl && (!update.images || update.images.length === 0) &&
+                                        !isPartPendingCustom && !isNotDoneCustom && !isDoneCustom && !isClosedCustom && (
+                                            <p className="text-[11px] text-muted-foreground italic">No additional details recorded for this status update.</p>
+                                        )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
