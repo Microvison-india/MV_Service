@@ -1,9 +1,4 @@
-// code here
-console.log("Hello");
-// code here
-console.log("Hello");
-// code here
-console.log("Hello"); import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Loader2, Link as LinkIcon } from 'lucide-react';
 import api from '../../api/axios';
 import {
@@ -150,6 +145,7 @@ export default function Step1CustomerInfo({ formData, setFormData }) {
         setShowMatchesModal(false);
         setShowManualSearch(false);
     };
+
     const unlinkProduct = () => {
         setFormData((prev) => ({
             ...prev,
@@ -293,3 +289,146 @@ export default function Step1CustomerInfo({ formData, setFormData }) {
                     />
                 </div>
 
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+                    {/* State */}
+                    <div>
+                        <label className={labelCls}>State <span className="text-red-500">*</span></label>
+                        <InlineSelect
+                            id="step1-state"
+                            value={formData.state || ''}
+                            options={uniqueStates}
+                            onChange={handleStateChange}
+                            placeholder="Select or enter new state"
+                            required
+                        />
+                    </div>
+
+                    {/* District */}
+                    <div>
+                        <label className={labelCls}>District <span className="text-red-500">*</span></label>
+                        <InlineSelect
+                            id="step1-district"
+                            value={formData.district || ''}
+                            options={filteredDistricts}
+                            onChange={handleDistrictChange}
+                            placeholder="Select or enter new district"
+                            required
+                        />
+                    </div>
+
+                    {/* City */}
+                    <div>
+                        <label className={labelCls}>City <span className="text-red-500">*</span></label>
+                        <InlineCitySelect
+                            value={formData.city || ''}
+                            filterState={formData.state || ''}
+                            filterDistrict={formData.district || ''}
+                            onChange={({ city, district, state }) => {
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    city,
+                                    district,
+                                    state
+                                }));
+                            }}
+                            onCityCreated={(newCity) => {
+                                setCities(prev => [...prev, newCity]);
+                            }}
+                            required
+                        />
+                    </div>
+                </div>
+
+                {/* Location / Action Text */}
+                <div className="sm:col-span-2">
+                    <label className={labelCls}>Location / Maps Link (optional)</label>
+                    <textarea
+                        id="step1-locationText"
+                        value={formData.locationText || ''}
+                        onChange={(e) => handleChange('locationText', e.target.value)}
+                        placeholder="Paste a Google Maps link, coordinates, or any navigation notes here. This will be sent to the SC."
+                        rows={3}
+                        className={inputCls}
+                    />
+                </div>
+            </div>
+
+            {/* Multi-Match Modal */}
+            <Dialog open={showMatchesModal} onOpenChange={setShowMatchesModal}>
+                <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Multiple Products Found</DialogTitle>
+                        <DialogDescription>
+                            We found multiple products linked to this phone number. Please select the correct one.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 mt-2">
+                        {productMatches.map(p => (
+                            <div key={p._id} className="border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition" onClick={() => linkProduct(p)}>
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="font-semibold text-sm">{p.trackingId}</span>
+                                    <span className="text-xs uppercase bg-primary/10 text-primary px-2 py-0.5 rounded">{p.product}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{p.customerName}</p>
+                                <p className="text-xs text-muted-foreground">{p.localAddress}, {p.city}</p>
+                            </div>
+                        ))}
+                        <Button variant="outline" className="w-full mt-2" onClick={() => setShowMatchesModal(false)}>
+                            None of these (Create new)
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manual Search Modal */}
+            <Dialog open={showManualSearch} onOpenChange={setShowManualSearch}>
+                <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Search Product Tracking</DialogTitle>
+                        <DialogDescription>
+                            Search by Tracking ID, Serial Number, Phone, Name, or Address.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex gap-2 mt-2 shrink-0">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                            placeholder="Enter search term..."
+                            className={inputCls}
+                            autoFocus
+                        />
+                        <Button onClick={handleManualSearch} disabled={searching}>
+                            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                        </Button>
+                    </div>
+
+                    <div className="mt-4 space-y-3 flex-1 overflow-y-auto min-h-[200px]">
+                        {searchResults.length === 0 && !searching && searchQuery && (
+                            <p className="text-center text-sm text-muted-foreground mt-8">No products found.</p>
+                        )}
+                        {searchResults.map(p => (
+                            <div key={p._id} className="border rounded-lg p-3 hover:bg-muted/50 transition">
+                                <div className="flex justify-between items-start mb-1">
+                                    <div>
+                                        <span className="font-semibold text-sm">{p.trackingId}</span>
+                                        {p.serialNumber && <span className="ml-2 text-xs text-muted-foreground">SN: {p.serialNumber}</span>}
+                                    </div>
+                                    <span className="text-xs uppercase bg-primary/10 text-primary px-2 py-0.5 rounded">{p.product}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-3 space-y-1">
+                                    <p>{p.customerName} • {p.phone1} {p.phone2 ? `/ ${p.phone2}` : ''}</p>
+                                    <p>{p.localAddress}, {p.city}</p>
+                                </div>
+                                <Button size="sm" variant="secondary" className="w-full text-xs h-8" onClick={() => linkProduct(p)}>
+                                    Select this product
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
