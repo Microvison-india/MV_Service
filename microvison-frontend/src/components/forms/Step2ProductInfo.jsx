@@ -43,14 +43,14 @@ export default function Step2ProductInfo({ formData, setFormData }) {
       const bDate = new Date(formData.billDate);
       const expiry = new Date(bDate);
       expiry.setFullYear(expiry.getFullYear() + 3);
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const expiryEndOfDay = new Date(expiry);
       expiryEndOfDay.setHours(23, 59, 59, 999);
-      
+
       const calcStatus = today <= expiryEndOfDay ? 'in_warranty' : 'out_of_warranty';
-      
+
       if (formData.warrantyStatus !== calcStatus || formData.warrantySource !== 'auto_calculated') {
         setFormData(prev => ({
           ...prev,
@@ -186,7 +186,6 @@ export default function Step2ProductInfo({ formData, setFormData }) {
           {renderChangeWarning('billPhoto', 'Bill Photo')}
         </div>
       </div>
-
       {/* Warranty Section */}
       <div className="border-t border-border pt-5 mt-6">
         <h4 className="text-sm font-semibold text-foreground mb-3">Warranty Determination</h4>
@@ -316,3 +315,4 @@ export default function Step2ProductInfo({ formData, setFormData }) {
     </div>
   );
 }
+

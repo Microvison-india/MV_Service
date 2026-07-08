@@ -8,12 +8,12 @@ const { calculateWarranty } = require('../utils/warrantyCalculator');
 const makeComplaintIdPattern = (term) => {
   if (!term) return '';
   const clean = term.trim().toLowerCase();
-  
+
   if (clean.startsWith('m')) {
     const pattern = clean.replace(/[^a-z0-9]/g, '.*');
     return pattern;
   }
-  
+
   const digits = clean.replace(/[^0-9]/g, '');
   if (digits) {
     if (digits.startsWith('20') && digits.length >= 9) {
@@ -35,7 +35,7 @@ const makeComplaintIdPattern = (term) => {
 const searchProducts = async (req, res) => {
   try {
     const { phone, serial, name, address, trackingId } = req.query;
-    
+
     // Build query dynamically
     let query = {};
     const orConditions = [];
@@ -43,20 +43,20 @@ const searchProducts = async (req, res) => {
     if (trackingId) {
       orConditions.push({ trackingId: { $regex: trackingId, $options: 'i' } });
     }
-    
+
     if (serial) {
       orConditions.push({ serialNumber: { $regex: serial, $options: 'i' } });
     }
-    
+
     if (phone) {
       orConditions.push({ phone1: { $regex: phone, $options: 'i' } });
       orConditions.push({ phone2: { $regex: phone, $options: 'i' } });
     }
-    
+
     if (name) {
       orConditions.push({ customerName: { $regex: name, $options: 'i' } });
     }
-    
+
     if (address) {
       orConditions.push({ localAddress: { $regex: address, $options: 'i' } });
     }
@@ -145,7 +145,7 @@ const createProduct = async (req, res) => {
     }
 
     const trackingId = await generateTrackingId(productType);
-    
+
     // Calculate warranty using new utility options object signature
     const {
       warrantyStatus: calcStatus,
@@ -345,6 +345,7 @@ const updateProduct = async (req, res) => {
   }
 };
 
+
 // ─────────────────────────────────────────────────────────────
 // @desc    Check reopen eligibility for a given product
 // @route   GET /api/products/:trackingId/reopen-check
@@ -353,7 +354,7 @@ const updateProduct = async (req, res) => {
 const getReopenCheck = async (req, res) => {
   try {
     const { trackingId } = req.params;
-    
+
     const product = await Product.findOne({ trackingId })
       .populate('lastComplaintId')
       .lean();
@@ -367,7 +368,7 @@ const getReopenCheck = async (req, res) => {
     }
 
     const lastComplaint = product.lastComplaintId;
-    
+
     // Eligibility 1: Must be closed
     if (lastComplaint.status !== 'closed') {
       return res.status(200).json({
@@ -381,7 +382,7 @@ const getReopenCheck = async (req, res) => {
     // (Using lastComplaintDate as snapshotted on the product, or complaint's createdAt/updatedAt)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     if (product.lastComplaintDate < thirtyDaysAgo) {
       return res.status(200).json({
         reopenEligible: false,
