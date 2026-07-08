@@ -186,4 +186,133 @@ export default function Step2ProductInfo({ formData, setFormData }) {
           {renderChangeWarning('billPhoto', 'Bill Photo')}
         </div>
       </div>
+      {/* Warranty Section */}
+      <div className="border-t border-border pt-5 mt-6">
+        <h4 className="text-sm font-semibold text-foreground mb-3">Warranty Determination</h4>
+
+        {formData.billDate ? (
+          /* Case A: Bill Date is filled -> auto-calculated + force override option */
+          <div className="bg-card border rounded-lg p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Calculated Status:</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${formData.warrantyStatus === 'in_warranty' ? 'bg-green-100 dark:bg-green-950/30 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-950/30 text-red-800 dark:text-red-300'}`}>
+                    {formData.warrantyStatus === 'in_warranty' ? 'IN WARRANTY' : 'OUT OF WARRANTY'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Based on 3 years from bill date (Expires: {expiryStr || 'N/A'}).
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const val = !overrideOpen;
+                  setOverrideOpen(val);
+                  handleChange('forceOverride', val);
+                  if (val) {
+                    handleChange('warrantySource', 'forced');
+                  } else {
+                    handleChange('warrantySource', 'auto_calculated');
+                    handleChange('warrantyForceReason', '');
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${overrideOpen ? 'bg-amber-100 dark:bg-amber-950/30 border-amber-300 text-amber-800 dark:text-amber-300' : 'bg-background hover:bg-muted'}`}
+              >
+                {overrideOpen ? '✓ Force Override Active' : '⚠ Force Override'}
+              </button>
+            </div>
+
+            {overrideOpen && (
+              <div className="pt-3 border-t border-dashed space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Override Warranty Status</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="forcedStatus"
+                        checked={formData.warrantyStatus === 'in_warranty'}
+                        onChange={() => handleChange('warrantyStatus', 'in_warranty')}
+                      />
+                      Force In-Warranty
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="forcedStatus"
+                        checked={formData.warrantyStatus === 'out_of_warranty'}
+                        onChange={() => handleChange('warrantyStatus', 'out_of_warranty')}
+                      />
+                      Force Out-of-Warranty
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Reason for Force Override <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.warrantyForceReason || ''}
+                    onChange={(e) => handleChange('warrantyForceReason', e.target.value)}
+                    placeholder="Enter reason for overriding the calculated warranty"
+                    className={inputCls}
+                    required={formData.forceOverride}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Case B: Bill Date is NOT filled -> Manual Selection required */
+          <div className="bg-card border rounded-lg p-4 space-y-4">
+            <div className="rounded bg-amber-50 dark:bg-amber-950/10 text-amber-800 dark:text-amber-300 text-xs p-2.5 border border-amber-100 dark:border-amber-900/30">
+              No bill date entered. Warranty status must be selected manually.
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Manual Warranty Status</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualStatus"
+                      checked={formData.warrantyStatus === 'in_warranty'}
+                      onChange={() => handleChange('warrantyStatus', 'in_warranty')}
+                    />
+                    In-Warranty
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualStatus"
+                      checked={formData.warrantyStatus === 'out_of_warranty'}
+                      onChange={() => handleChange('warrantyStatus', 'out_of_warranty')}
+                    />
+                    Out-of-Warranty
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Reason for Manual Selection <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={formData.manualReason || ''}
+                  onChange={(e) => handleChange('manualReason', e.target.value)}
+                  placeholder="e.g. Free LED Installation, Customer verified orally"
+                  className={inputCls}
+                  required={!formData.billDate}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
