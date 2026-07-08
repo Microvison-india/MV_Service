@@ -105,3 +105,85 @@ export default function Step2ProductInfo({ formData, setFormData }) {
     }
     return null;
   };
+
+  return (
+    <div className="space-y-6">
+      {isProductLocked && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 p-3 text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+          <span>ℹ️</span>
+          <span>Product details pre-filled from linked tracking ID: <strong>{formData.trackingId}</strong>.</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {/* Bill Date */}
+        <div>
+          <label className={labelCls}>Date of purchase / installation bill</label>
+          <input
+            type="date"
+            value={formData.billDate ? formData.billDate.split('T')[0] : ''}
+            max={new Date().toISOString().split('T')[0]}
+            onChange={(e) => handleChange('billDate', e.target.value)}
+            className={inputCls}
+          />
+          {renderChangeWarning('billDate', 'Bill Date')}
+        </div>
+
+        {/* Shop Name */}
+        <div>
+          <label className={labelCls}>Shop / dealer name</label>
+          <input
+            type="text"
+            value={formData.shopName || ''}
+            onChange={(e) => handleChange('shopName', e.target.value)}
+            placeholder="Enter dealer shop name"
+            className={inputCls}
+          />
+          {renderChangeWarning('shopName', 'Shop Name')}
+        </div>
+
+        {/* Serial Number */}
+        <div>
+          <label className={labelCls}>Serial Number</label>
+          <input
+            type="text"
+            value={formData.serialNumber || ''}
+            onChange={(e) => handleChange('serialNumber', e.target.value)}
+            placeholder="Enter product serial number"
+            className={inputCls}
+          />
+          {renderChangeWarning('serialNumber', 'Serial Number')}
+        </div>
+
+        {/* Model Number */}
+        <div>
+          <label className={labelCls}>Model number / variant</label>
+          <input
+            type="text"
+            value={formData.modelNumber || ''}
+            onChange={(e) => handleChange('modelNumber', e.target.value)}
+            placeholder="e.g. MV-43LED, MV-COOLER-MAX"
+            className={inputCls}
+          />
+          {renderChangeWarning('modelNumber', 'Model Number')}
+        </div>
+
+        {/* Bill Photo */}
+        <div className="sm:col-span-2">
+          <label className={labelCls}>Invoice / Bill Photo</label>
+          {formData.billPhoto ? (
+            <div className="flex items-center gap-3 border rounded-lg p-3 bg-muted/40">
+              <a href={formData.billPhoto} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline font-medium truncate max-w-xs">
+                📄 View Bill Photo
+              </a>
+              <button type="button" onClick={() => handleChange('billPhoto', '')} className="text-xs text-red-500 hover:text-red-700 font-semibold ml-auto">
+                Remove Photo
+              </button>
+            </div>
+          ) : (
+            <ImageUploader maxFiles={1} uploadedUrls={[]} onUpload={handleBillUpload} />
+          )}
+          {renderChangeWarning('billPhoto', 'Bill Photo')}
+        </div>
+      </div>
+
