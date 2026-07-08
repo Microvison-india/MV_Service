@@ -80,3 +80,37 @@ export default function Step3ProductType({ formData, setFormData }) {
                     })}
                 </div>
             </div>
+            {/* Complaint Type */}
+            {formData.product && (
+                <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                        Complaint Type <span className="text-red-500">*</span>
+                    </p>
+                    {formData.product === 'cooler' ? (
+                        <div className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
+                            Cooler complaints are always of type <strong>Complaint</strong> (no installation option).
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-3">
+                            {[
+                                { value: 'installation', label: 'Installation', icon: '🔧' },
+                                { value: 'complaint', label: 'Complaint / Service', icon: '🛠️' },
+                            ].map((t) => (
+                                <button
+                                    key={t.value}
+                                    type="button"
+                                    id={`step3-type-${t.value}`}
+                                    onClick={() => handleTypeChange(t.value)}
+                                    className={`${cardBase} ${formData.complaintType === t.value ? cardActive : cardInactive}`}
+                                >
+                                    <div className="text-2xl mb-1">{t.icon}</div>
+                                    <div className="text-sm font-semibold">{t.label}</div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
