@@ -34,37 +34,3 @@ export default function PresetSelector({ type, onSelect, value, required = false
     };
   }, [type]);
 
-  const handleChange = (e) => {
-    const selectedId = e.target.value;
-    if (!selectedId) {
-      onSelect({ presetId: null, presetPrice: 0 });
-      return;
-    }
-
-    const preset = presets.find((p) => p._id === selectedId);
-    if (preset) {
-      onSelect({ presetId: preset._id, presetPrice: preset.price });
-    }
-  };
-
-  return (
-    <div className="space-y-1 w-full">
-      <select
-        value={value || ''}
-        onChange={handleChange}
-        required={required}
-        disabled={loading || !type}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition disabled:opacity-50"
-      >
-        <option value="">
-          {loading ? 'Loading presets...' : 'Select a preset package'}
-        </option>
-        {presets.map((p) => (
-          <option key={p._id} value={p._id}>
-            {p.name} {p.modelNo ? `(${p.modelNo})` : ''} - ₹{p.price}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
