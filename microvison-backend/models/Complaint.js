@@ -11,11 +11,11 @@ const extraChargeSchema = new mongoose.Schema({
 
 // Change 6A: Multi-stage customer payment entry sub-schema
 const customerPaymentSchema = new mongoose.Schema({
-  amount:      { type: Number, required: true },
-  route:       { type: String, enum: ['to_microvison', 'to_sc'], required: true },
-  reason:      { type: String, default: '' }, // stage / reason free text
-  recordedAt:  { type: Date, default: () => new Date() },
-  recordedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  amount: { type: Number, required: true },
+  route: { type: String, enum: ['to_microvison', 'to_sc'], required: true },
+  reason: { type: String, default: '' }, // stage / reason free text
+  recordedAt: { type: Date, default: () => new Date() },
+  recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 });
 
 const complaintSchema = new mongoose.Schema(
@@ -122,13 +122,13 @@ const complaintSchema = new mongoose.Schema(
     partReceivedAt: { type: Date, default: null },
     distanceTravelled: { type: Number, default: null },
     totalVisits: { type: Number, default: null },
-    
+
     // WhatsApp reminders tracking
     scAssignmentReminderSentAt: { type: Date, default: null },
     scPostAcceptReminderSentAt: { type: Date, default: null },
-    scNotDoneReminderSentAt:    { type: Date, default: null },
+    scNotDoneReminderSentAt: { type: Date, default: null },
     scPartReceivedReminderSentAt: { type: Date, default: null },
-    notDoneAt:                  { type: Date, default: null },
+    notDoneAt: { type: Date, default: null },
 
     // ── Status (per GRD Section 7.2) ──────────────────────────
     status: {
@@ -144,7 +144,6 @@ const complaintSchema = new mongoose.Schema(
         'not_done',
         'part_pending',
         'part_received',
-        'reopened',
         'closed',
       ],
       default: 'new',
@@ -156,19 +155,13 @@ const complaintSchema = new mongoose.Schema(
 
     // ── Payment Status ─────────────────────────────────────────
     paymentStatus: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
-    paidAt:        { type: Date, default: null },   // Last time it was marked paid. Null if unpaid.
-    paidBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Admin who marked it paid
+    paidAt: { type: Date, default: null },   // Last time it was marked paid. Null if unpaid.
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Admin who marked it paid
 
     // ── Billing Month/Year (for fast invoice queries) ─────────
     billedMonth: { type: Number, default: null }, // 1-12
     billedYear: { type: Number, default: null },
 
-    // ── Reopen Flow ───────────────────────────────────────────
-    isReopened: { type: Boolean, default: false },
-    reopenedAt: { type: Date, default: null },
-    reopenParentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint', default: null },
-    reopenNotes: { type: String, default: '' },   // Required on reopen
-    reopenPhotos: [{ type: String }],
 
     // ── WhatsApp ──────────────────────────────────────────────
     whatsappSent: { type: Boolean, default: false },
