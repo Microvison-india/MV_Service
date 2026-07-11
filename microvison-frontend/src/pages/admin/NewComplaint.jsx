@@ -71,7 +71,7 @@ export default function NewComplaint() {
   const navigate = useNavigate();
   const location = useLocation();
   const prefill = location.state?.prefill || {};
-  // Stable flag: true when the page was opened via navigate with prefill state (link product, reopen flow)
+  // Stable flag: true when the page was opened via navigate with prefill state
   const hasPrefill = Object.keys(prefill).some((k) => prefill[k]);
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -154,7 +154,7 @@ export default function NewComplaint() {
     // Don't auto-save while: draft screen shown, still loading, submitting, or just resuming a draft
     if (showDraftSelection || loadingDrafts || submitting || resuming) return;
 
-    // Don't auto-save on a prefill navigation (linking product or reopen)
+    // Don't auto-save on a prefill navigation
     if (hasPrefill && !currentDraftId) return;
 
     // Don't save a completely blank form

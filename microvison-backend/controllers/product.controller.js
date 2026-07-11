@@ -1,6 +1,5 @@
 const Product = require('../models/Product');
 const Complaint = require('../models/Complaint');
-const ComplaintUpdate = require('../models/ComplaintUpdate');
 const generateTrackingId = require('../utils/generateTrackingId');
 const { calculateWarranty } = require('../utils/warrantyCalculator');
 
@@ -346,83 +345,10 @@ const updateProduct = async (req, res) => {
 };
 
 
-// ─────────────────────────────────────────────────────────────
-// @desc    Check reopen eligibility for a given product
-// @route   GET /api/products/:trackingId/reopen-check
-// @access  Private (Admin + SC)
-// ─────────────────────────────────────────────────────────────
-const getReopenCheck = async (req, res) => {
-  try {
-    const { trackingId } = req.params;
-
-    const product = await Product.findOne({ trackingId })
-      .populate('lastComplaintId')
-      .lean();
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found.' });
-    }
-
-    if (!product.lastComplaintId) {
-      return res.status(200).json({ reopenEligible: false, reason: 'No complaint history.' });
-    }
-
-    const lastComplaint = product.lastComplaintId;
-
-    // Eligibility 1: Must be closed
-    if (lastComplaint.status !== 'closed') {
-      return res.status(200).json({
-        reopenEligible: false,
-        reason: 'Last complaint is not closed.',
-        lastComplaint
-      });
-    }
-
-    // Eligibility 2: Must be within 30 days of creation/closure 
-    // (Using lastComplaintDate as snapshotted on the product, or complaint's createdAt/updatedAt)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    if (product.lastComplaintDate < thirtyDaysAgo) {
-      return res.status(200).json({
-        reopenEligible: false,
-        reason: 'Last complaint is older than 30 days.',
-        lastComplaint
-      });
-    }
-
-    // Eligibility 3: Must have been resolved as done or not_done
-    const updateLog = await ComplaintUpdate.findOne({
-      complaintId: lastComplaint._id,
-      newStatus: 'closed',
-    }).sort({ createdAt: -1 }).lean();
-
-    if (!updateLog || !['done', 'not_done'].includes(updateLog.oldStatus)) {
-      return res.status(200).json({
-        reopenEligible: false,
-        reason: 'Last complaint was not resolved as Done or Not Done.',
-        lastComplaint
-      });
-    }
-
-    // Fully eligible
-    return res.status(200).json({
-      reopenEligible: true,
-      lastComplaint,
-      warrantyStatus: product.warrantyStatus,
-      warrantyExpiryDate: product.warrantyExpiryDate
-    });
-
-  } catch (error) {
-    console.error('Error checking reopen eligibility:', error);
-    res.status(500).json({ message: 'Server error while checking reopen eligibility.' });
-  }
-};
-
 module.exports = {
   searchProducts,
   getProduct,
   createProduct,
-  updateProduct,
-  getReopenCheck
+  updateProduct
 };
+
