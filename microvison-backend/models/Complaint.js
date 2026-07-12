@@ -162,7 +162,6 @@ const complaintSchema = new mongoose.Schema(
     billedMonth: { type: Number, default: null }, // 1-12
     billedYear: { type: Number, default: null },
 
-
     // ── WhatsApp ──────────────────────────────────────────────
     whatsappSent: { type: Boolean, default: false },
 

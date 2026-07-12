@@ -962,3 +962,4 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
     </>
   );
 }
+
