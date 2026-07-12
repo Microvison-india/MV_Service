@@ -144,7 +144,6 @@ const complaintSchema = new mongoose.Schema(
         'not_done',
         'part_pending',
         'part_received',
-        'reopened',
         'closed',
       ],
       default: 'new',
@@ -162,13 +161,6 @@ const complaintSchema = new mongoose.Schema(
     // ── Billing Month/Year (for fast invoice queries) ─────────
     billedMonth: { type: Number, default: null }, // 1-12
     billedYear: { type: Number, default: null },
-
-    // ── Reopen Flow ───────────────────────────────────────────
-    isReopened: { type: Boolean, default: false },
-    reopenedAt: { type: Date, default: null },
-    reopenParentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Complaint', default: null },
-    reopenNotes: { type: String, default: '' },   // Required on reopen
-    reopenPhotos: [{ type: String }],
 
     // ── WhatsApp ──────────────────────────────────────────────
     whatsappSent: { type: Boolean, default: false },

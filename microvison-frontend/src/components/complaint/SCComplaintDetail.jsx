@@ -388,27 +388,6 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 </div>
               )}
 
-              {/* Reopened Complaint details */}
-              {c.isReopened && c.reopenNotes && (
-                <div className="border-t border-border/40 pt-3.5 space-y-3">
-                  <div>
-                    <span className="text-red-700 uppercase font-bold tracking-wider text-[9px] block mb-1">⚠️ Reopen Notes (Admin)</span>
-                    <p className="text-xs bg-red-50/50 border border-red-100 p-3.5 rounded-xl text-red-900 font-medium whitespace-pre-wrap leading-relaxed">{c.reopenNotes}</p>
-                  </div>
-                  {c.reopenPhotos?.length > 0 && (
-                    <div>
-                      <span className="text-red-700 uppercase font-bold tracking-wider text-[9px] block mb-1.5">Reopen Reference Photos</span>
-                      <div className="flex gap-2 flex-wrap">
-                        {c.reopenPhotos.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="hover:opacity-90 transition">
-                            <img src={url} alt="" className="w-20 h-20 object-cover rounded-xl border border-red-200" />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </AccordionSection>
 
@@ -988,3 +967,4 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
     </>
   );
 }
+

@@ -3,8 +3,6 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { isAdmin, isSC, isAdminOrSC } = require('../middleware/rbac');
 const {
-  reopenCheck,
-  reopenComplaint,
   createComplaint,
   assignComplaint,
   getMyComplaints,
@@ -41,8 +39,6 @@ const {
 // GET  /api/complaints — Get all complaints (with filters)
 router.get('/', auth, isAdmin, getAllComplaints);
 
-// GET  /api/complaints/reopen-check?phone1=&product=&complaintType=
-router.get('/reopen-check', auth, isAdmin, reopenCheck);
 
 // POST /api/complaints — Create a new complaint
 router.post('/', auth, isAdmin, createComplaint);
@@ -50,8 +46,6 @@ router.post('/', auth, isAdmin, createComplaint);
 // PATCH /api/complaints/:id/assign — Assign to an SC
 router.patch('/:id/assign', auth, isAdmin, assignComplaint);
 
-// POST /api/complaints/:id/reopen — Reopen a closed complaint
-router.post('/:id/reopen', auth, isAdmin, reopenComplaint);
 
 // ── Admin Draft Routes ──────────────────────────────────────────
 router.get('/drafts', auth, isAdmin, getDrafts);
@@ -122,3 +116,4 @@ router.patch('/:id/status', auth, isAdminOrSC, updateStatus);
 // PATCH /api/complaints/:id/part-received — SC marks part received (SC Flow v1.1)
 router.patch('/:id/part-received', auth, isAdminOrSC, markPartReceived);
 module.exports = router;
+
