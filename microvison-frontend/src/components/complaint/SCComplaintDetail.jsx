@@ -66,11 +66,11 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   // Ref so the polling interval always reads the latest extraCharges without stale closure
   const extraChargesRef = useRef([]);
   useEffect(() => { extraChargesRef.current = extraCharges; }, [extraCharges]);
-  
+
   // Controlled state for "Add Charge" form (replaces uncontrolled document.getElementById usage)
   const [newChargeLabel, setNewChargeLabel] = useState('');
   const [newChargeAmount, setNewChargeAmount] = useState('');
-  
+
   const [markingReceived, setMarkingReceived] = useState(false);
 
   // Phase 21 State Variables
@@ -82,7 +82,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   useEffect(() => {
     let active = true;
     let isFirst = true;
-    
+
     // Reset form states to clean slate when loading a different/updated complaint
     Promise.resolve().then(() => {
       if (!active) return;
@@ -151,7 +151,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   }, [initial._id]);
 
   const [submitting, setSubmitting] = useState(false);
-  
+
   const isProcessing = markingGoing || markingReceived || submitting;
 
   const canMarkGoing = c.status === 'accepted';
@@ -327,7 +327,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
       {/* Drawer slide panel */}
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-background shadow-2xl flex flex-col">
-        
+
         {/* Sticky Header */}
         <div className="sticky top-0 bg-background border-b border-border px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10 shadow-sm">
           <div>
@@ -346,7 +346,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
 
         {/* Scrollable Container */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 pb-36">
-          
+
           {/* Section 1: Admin Remarks & Description Accordion */}
           <AccordionSection title="Admin Remarks & Description" icon="📣" defaultOpen={true}>
             <div className="space-y-4 text-xs">
@@ -388,27 +388,6 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 </div>
               )}
 
-              {/* Reopened Complaint details */}
-              {c.isReopened && c.reopenNotes && (
-                <div className="border-t border-border/40 pt-3.5 space-y-3">
-                  <div>
-                    <span className="text-red-700 uppercase font-bold tracking-wider text-[9px] block mb-1">⚠️ Reopen Notes (Admin)</span>
-                    <p className="text-xs bg-red-50/50 border border-red-100 p-3.5 rounded-xl text-red-900 font-medium whitespace-pre-wrap leading-relaxed">{c.reopenNotes}</p>
-                  </div>
-                  {c.reopenPhotos?.length > 0 && (
-                    <div>
-                      <span className="text-red-700 uppercase font-bold tracking-wider text-[9px] block mb-1.5">Reopen Reference Photos</span>
-                      <div className="flex gap-2 flex-wrap">
-                        {c.reopenPhotos.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="hover:opacity-90 transition">
-                            <img src={url} alt="" className="w-20 h-20 object-cover rounded-xl border border-red-200" />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </AccordionSection>
 
@@ -442,11 +421,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
               <div className="space-y-1">
                 <span className="text-muted-foreground uppercase font-bold tracking-wider text-[9px]">Warranty Status</span>
                 <div>
-                  <span className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] uppercase ${
-                    latestWarrantyStatus === 'in_warranty' 
-                      ? 'bg-green-100 text-green-800' 
+                  <span className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] uppercase ${latestWarrantyStatus === 'in_warranty'
+                      ? 'bg-green-100 text-green-800'
                       : 'bg-orange-100 text-orange-800'
-                  }`}>
+                    }`}>
                     {latestWarrantyStatus === 'in_warranty' ? '✅ In Warranty' : '⚠️ Out of Warranty'}
                   </span>
                 </div>
@@ -516,7 +494,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 </div>
               </div>
             </div>
-            
+
             {/* Petrol field (Read-only on SC side pricing context - editing only allowed in Done form) */}
             <div className="bg-muted/10 border border-border/80 rounded-xl p-3.5 space-y-1.5 mt-3">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Petrol Claimed</span>
@@ -527,7 +505,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                 editCount={c.petrolEditCount}
                 locked={c.petrolLocked}
                 userRole="readonly"
-                onSave={() => {}}
+                onSave={() => { }}
               />
             </div>
 
@@ -536,9 +514,9 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
               <div className="space-y-1.5 mt-3">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider pl-1">Extra Charges (SC Requests / Approved)</span>
                 <div className="bg-muted/10 border border-border/80 rounded-xl p-3.5 shadow-sm">
-                  <ExtraChargesList 
-                    complaintId={c._id} 
-                    extraCharges={c.extraCharges} 
+                  <ExtraChargesList
+                    complaintId={c._id}
+                    extraCharges={c.extraCharges}
                     readOnly={true}
                   />
                 </div>
@@ -555,39 +533,36 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
           {canSubmitFinal && (
             <AccordionSection title="Conclude Complaint Action" icon="📋" defaultOpen={true}>
               <div className="space-y-5 bg-card">
-                
+
                 {/* Clean tabs */}
                 <div className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-xl border border-border/80">
                   <button
                     type="button"
                     onClick={() => { setActiveForm('done'); setError(''); }}
-                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      activeForm === 'done'
+                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeForm === 'done'
                         ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <span>✅</span> Done
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveForm('not_done'); setError(''); }}
-                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      activeForm === 'not_done'
+                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeForm === 'not_done'
                         ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <span>❌</span> Not Done
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveForm('part_pending'); setError(''); }}
-                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      activeForm === 'part_pending'
+                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeForm === 'part_pending'
                         ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <span>⏳</span> Part Pending
                   </button>
@@ -760,7 +735,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                     {/* Extra Charges Claim inside Done Form */}
                     <div className="space-y-3 pt-3 border-t border-border">
                       <span className={labelCls}>Claim Extra Charges (Optional)</span>
-                      
+
                       {extraCharges.length > 0 && (
                         <div className="space-y-1.5">
                           {extraCharges.map((item, idx) => (
@@ -774,11 +749,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                               <div className="flex items-center gap-3">
                                 <span className="font-bold text-foreground">₹{item.amount}</span>
                                 {item._id ? (
-                                  <span className={`text-[10px] font-bold uppercase ${
-                                    item.status === 'approved' ? 'text-green-700' :
-                                    item.status === 'rejected' ? 'text-red-700' :
-                                    'text-yellow-600'
-                                  }`}>
+                                  <span className={`text-[10px] font-bold uppercase ${item.status === 'approved' ? 'text-green-700' :
+                                      item.status === 'rejected' ? 'text-red-700' :
+                                        'text-yellow-600'
+                                    }`}>
                                     {item.status}
                                   </span>
                                 ) : (
@@ -957,7 +931,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
               <p className="text-xs text-green-800 font-semibold">📦 Admin marked part "{c.partDetails}" as delivered!</p>
               {c.partDeliveredNote && <p className="text-[11px] text-green-900 italic">"Courier details: {c.partDeliveredNote}"</p>}
-              
+
               <button
                 onClick={handleMarkReceived}
                 disabled={isProcessing}
@@ -988,3 +962,4 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
     </>
   );
 }
+

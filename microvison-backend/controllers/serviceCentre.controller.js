@@ -11,12 +11,12 @@ const populateSCStats = async (serviceCentres) => {
 
   const scIds = serviceCentres.map((sc) => sc._id);
 
-  // 1. Get Assigned count: status in ['assigned', 'accepted', 'going', 'part_pending', 'part_received', 'reopened']
+  // 1. Get Assigned count for active in-progress work
   const assignedCounts = await Complaint.aggregate([
     {
       $match: {
         assignedCentreId: { $in: scIds },
-        status: { $in: ['assigned', 'accepted', 'going', 'part_pending', 'part_received', 'reopened'] }
+        status: { $in: ['assigned', 'accepted', 'going', 'part_pending', 'part_received'] }
       }
     },
     {

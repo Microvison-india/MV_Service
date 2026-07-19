@@ -32,26 +32,6 @@ const makeComplaintIdPattern = (term) => {
 };
 
 
-// ─────────────────────────────────────────────────────────────
-// @desc    Check if a customer's phone number is reopen-eligible
-// @route   GET /api/complaints/reopen-check
-// @access  Private (Admin only)
-// Query params: phone1, product, complaintType
-// ─────────────────────────────────────────────────────────────
-const reopenCheck = async (req, res) => {
-  return res.status(200).json({ reopenEligible: false, existingComplaint: null });
-};
-
-// ─────────────────────────────────────────────────────────────
-// @desc    Reopen a closed complaint (creates a new complaint referencing the old one)
-// @route   POST /api/complaints/:id/reopen
-// @access  Private (Admin only)
-// ─────────────────────────────────────────────────────────────
-const reopenComplaint = async (req, res) => {
-  return res.status(410).json({ message: 'Reopen is no longer supported. Register a new complaint instead.' });
-};
-
-// ─────────────────────────────────────────────────────────────
 // @desc    Create a new complaint (status = 'unassigned', no SC assigned yet)
 // @route   POST /api/complaints
 // @access  Private (Admin only)
@@ -92,12 +72,6 @@ const createComplaint = async (req, res) => {
     voiceNoteUrl,
     adminPhotos,    // Array of Cloudinary URLs
 
-    // Reopen flow
-    isReopened,
-    reopenParentId,
-    reopenNotes,
-    reopenPhotos,
-
     // Change 6A Refinement: Inline customer payment at registration
     initialCustomerPayment,
   } = req.body;
@@ -134,13 +108,6 @@ const createComplaint = async (req, res) => {
     return res
       .status(400)
       .json({ message: 'A preset or custom manual preset must be provided for all complaints.' });
-  }
-
-  // Reopen: reopenNotes is required (GRD Section 8)
-  if (isReopened && (!reopenNotes || !reopenNotes.trim())) {
-    return res
-      .status(400)
-      .json({ message: 'Reopen notes are required when reopening a complaint.' });
   }
 
   // ── Snapshot preset price (locked forever at creation) ────
@@ -309,10 +276,6 @@ const createComplaint = async (req, res) => {
     notes: notes || '',
     voiceNoteUrl: voiceNoteUrl || '',
     adminPhotos: Array.isArray(adminPhotos) ? adminPhotos : [],
-    isReopened: !!isReopened,
-    reopenParentId: isReopened ? reopenParentId : null,
-    reopenNotes: isReopened ? reopenNotes : '',
-    reopenPhotos: isReopened && Array.isArray(reopenPhotos) ? reopenPhotos : [],
     status: 'unassigned',
     createdBy: req.user.id,
   });
@@ -337,7 +300,7 @@ const createComplaint = async (req, res) => {
     role: 'admin',
     oldStatus: '',
     newStatus: 'unassigned',
-    note: isReopened ? `Complaint reopened. Notes: ${reopenNotes}` : 'Complaint registered.',
+    note: 'Complaint registered.',
   });
 
   res.status(201).json({
@@ -346,28 +309,16 @@ const createComplaint = async (req, res) => {
   });
 
   // Asynchronous WhatsApp notification (only if configured in .env and not hello_world)
-  if (isReopened) {
-    const templateReopened = process.env.WHATSAPP_TEMPLATE_REOPENED;
-    if (templateReopened && templateReopened !== 'hello_world') {
-      sendWhatsApp(complaint.phone1, templateReopened, [
-        complaint.customerName,
-        complaint.complaintId,
-        reopenNotes || '',
-        new Date(complaint.createdAt).toLocaleDateString('en-IN')
-      ]);
-    }
-  } else {
-    const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED;
-    if (templateName && templateName !== 'hello_world') {
-      const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
-      sendWhatsApp(complaint.phone1, templateName, [
-        complaint.customerName,
-        complaint.complaintId,
-        complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
-        complaint.complaintType,
-        complaintDate
-      ]);
-    }
+  const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED;
+  if (templateName && templateName !== 'hello_world') {
+    const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
+    sendWhatsApp(complaint.phone1, templateName, [
+      complaint.customerName,
+      complaint.complaintId,
+      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+      complaint.complaintType,
+      complaintDate
+    ]);
   }
 };
 
@@ -1264,7 +1215,7 @@ const getComplaintById = async (req, res) => {
       path: 'trackingId',
       populate: {
         path: 'complaintHistory.complaintId',
-        select: 'status assignedCentreId reopenParentId isReopened'
+        select: 'status assignedCentreId'
       }
     });
 
@@ -1294,8 +1245,6 @@ const getComplaintById = async (req, res) => {
         complaintId: compId,
         status: liveStatus,
         assignedCentreId: assignedCentreId,
-        reopenParentId: compObj.reopenParentId || null,
-        isReopened: compObj.isReopened || false,
         isCurrent: String(compId) === String(complaint._id)
       };
     });
@@ -1342,7 +1291,7 @@ const getActionItems = async (req, res) => {
     .populate('assignedCentreId', 'ownerName businessName phone1')
     .sort({ updatedAt: -1 });
 
-  // 6. Unassigned Complaints (New/reopened complaints with no SC assigned)
+  // 6. Unassigned Complaints
   const unassignedComplaints = await Complaint.find({
     status: 'unassigned'
   })
@@ -1527,9 +1476,6 @@ const getAllComplaints = async (req, res) => {
       scCapability,
       dateFrom,
       dateTo,
-      isReopened,
-      reopenedOnly,
-      originalOnly,
       serialNumber,
       trackingId
     } = req.query;
@@ -1602,16 +1548,7 @@ const getAllComplaints = async (req, res) => {
       }
     }
 
-    // 7. Reopened flag filter (handles reopenedOnly, originalOnly, and legacy isReopened)
-    if (reopenedOnly === 'true') {
-      query.isReopened = true;
-    } else if (originalOnly === 'true') {
-      query.isReopened = { $ne: true };
-    } else if (isReopened !== undefined) {
-      query.isReopened = isReopened === 'true';
-    }
-
-    // 8. Tracking ID filter
+    // 7. Tracking ID filter
     // If trackingId is provided, we need to find the Product first, then filter complaints by its _id
     if (trackingId) {
       const Product = require('../models/Product'); // lazy load
@@ -1939,8 +1876,6 @@ const updateCustomerPayment = async (req, res) => {
 
 module.exports = {
   saveCriticalAction,
-  reopenCheck,
-  reopenComplaint,
   createComplaint,
   assignComplaint,
   getMyComplaints,
@@ -1964,3 +1899,5 @@ module.exports = {
   deleteCustomerPayment,
   updateCustomerPayment,
 };
+
+

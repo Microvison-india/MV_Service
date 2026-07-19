@@ -185,7 +185,7 @@ export default function Step4Charges({ formData, setFormData }) {
               Did the customer pay anything upfront? This will be recorded in the complaint immediately.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Amount (₹)</label>
@@ -211,7 +211,7 @@ export default function Step4Charges({ formData, setFormData }) {
               </select>
             </div>
           </div>
-          
+
           <div>
             <label className="block text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1">Payment Reason / Note</label>
             <input
