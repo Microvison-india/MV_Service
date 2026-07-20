@@ -160,6 +160,14 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const canSubmitFinal = ['accepted', 'going', 'not_done', 'part_received'].includes(c.status);
   const alreadyClosed = c.status === 'closed';
   const alreadyDone = c.status === 'done';
+  // When complaint is already not_done, SC cannot re-submit not_done — force to 'done' tab
+  const isAlreadyNotDone = c.status === 'not_done';
+  useEffect(() => {
+    if (isAlreadyNotDone && activeForm === 'not_done') {
+      setActiveForm('done');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAlreadyNotDone]);
 
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
 
@@ -548,10 +556,14 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setActiveForm('not_done'); setError(''); }}
-                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeForm === 'not_done'
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
+                    disabled={isAlreadyNotDone}
+                    title={isAlreadyNotDone ? 'Already marked as Not Done. Select Done or Part Pending to proceed.' : ''}
+                    onClick={() => { if (!isAlreadyNotDone) { setActiveForm('not_done'); setError(''); } }}
+                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${isAlreadyNotDone
+                        ? 'opacity-40 cursor-not-allowed text-muted-foreground'
+                        : activeForm === 'not_done'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
                       }`}
                   >
                     <span>❌</span> Not Done

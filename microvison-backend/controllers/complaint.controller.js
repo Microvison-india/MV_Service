@@ -668,6 +668,14 @@ const updateStatus = async (req, res) => {
     });
   }
 
+  // Idempotency guard: prevent duplicate not_done → not_done submissions
+  // SC can still change from not_done → done or not_done → part_pending
+  if (complaint.status === 'not_done' && newStatus === 'not_done') {
+    return res.status(400).json({
+      message: 'Complaint is already marked as Not Done. Please select Done or Part Pending to proceed.',
+    });
+  }
+
   const photos = Array.isArray(proofPhotos) ? proofPhotos : [];
   const oldStatus = complaint.status;
   let timelineNote = '';
