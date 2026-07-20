@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../../api/axios';
 import ImageUploader from '../forms/ImageUploader';
 import PetrolEditField from './PetrolEditField';
@@ -151,6 +151,12 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   }, [initial._id]);
 
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous in-flight guards — prevents rapid clicks from firing duplicate API calls.
+  // React's setState is async so isProcessing/disabled won't block re-entrant clicks;
+  // refs are read synchronously and are reliable as mutexes.
+  const submittingRef = useRef(false);
+  const markingGoingRef = useRef(false);
+  const markingReceivedRef = useRef(false);
 
   const isProcessing = markingGoing || markingReceived || submitting;
 
@@ -160,14 +166,6 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const canSubmitFinal = ['accepted', 'going', 'not_done', 'part_received'].includes(c.status);
   const alreadyClosed = c.status === 'closed';
   const alreadyDone = c.status === 'done';
-  // When complaint is already not_done, SC cannot re-submit not_done — force to 'done' tab
-  const isAlreadyNotDone = c.status === 'not_done';
-  useEffect(() => {
-    if (isAlreadyNotDone && activeForm === 'not_done') {
-      setActiveForm('done');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAlreadyNotDone]);
 
   const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
 
@@ -200,6 +198,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   };
 
   const handleMarkGoing = async () => {
+    if (markingGoingRef.current) return;
+    markingGoingRef.current = true;
     setMarkingGoing(true);
     setError('');
     try {
@@ -210,10 +210,13 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setError(err?.response?.data?.message || 'Failed to update status.');
     } finally {
       setMarkingGoing(false);
+      markingGoingRef.current = false;
     }
   };
 
   const handleMarkReceived = async () => {
+    if (markingReceivedRef.current) return;
+    markingReceivedRef.current = true;
     setMarkingReceived(true);
     setError('');
     setSuccess('');
@@ -226,10 +229,14 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setError(err?.response?.data?.message || 'Failed to update status.');
     } finally {
       setMarkingReceived(false);
+      markingReceivedRef.current = false;
     }
   };
 
   const handleSubmitFinal = async () => {
+    // Synchronous guard: if a submission is already in-flight, ignore this click entirely.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setSuccess('');
 
@@ -256,6 +263,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       if (isBillInfoMissing) {
         if (!scBillPhotoUrl && !skipBillPhoto) {
           setError('Please upload the product bill photo or check "Skip for now".');
+          submittingRef.current = false; // release lock on validation exit
           return;
         }
         body.scBillPhotoUrl = scBillPhotoUrl || undefined;
@@ -264,6 +272,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       if (isSerialInfoMissing) {
         if (!scSerialSlipPhotoUrl && !skipSerialPhoto) {
           setError('Please upload the product serial/model sticker photo or check "Skip for now".');
+          submittingRef.current = false; // release lock on validation exit
           return;
         }
         body.scSerialSlipPhotoUrl = scSerialSlipPhotoUrl || undefined;
@@ -296,6 +305,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       // Photos, voice note, and text notes optional
       if (!partDetails || !partDetails.trim()) {
         setError('Parts detail description is compulsory.');
+        submittingRef.current = false; // release lock on validation exit
         return;
       }
 
@@ -313,6 +323,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setError(err?.response?.data?.message || 'Submission failed. Please try again.');
     } finally {
       setSubmitting(false);
+      submittingRef.current = false; // release lock only after request completes
     }
   };
 
@@ -556,14 +567,10 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
                   </button>
                   <button
                     type="button"
-                    disabled={isAlreadyNotDone}
-                    title={isAlreadyNotDone ? 'Already marked as Not Done. Select Done or Part Pending to proceed.' : ''}
-                    onClick={() => { if (!isAlreadyNotDone) { setActiveForm('not_done'); setError(''); } }}
-                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${isAlreadyNotDone
-                        ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                        : activeForm === 'not_done'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
+                    onClick={() => { setActiveForm('not_done'); setError(''); }}
+                    className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeForm === 'not_done'
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
                       }`}
                   >
                     <span>❌</span> Not Done
