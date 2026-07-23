@@ -69,3 +69,32 @@ const saveDraft = async (req, res) => {
     res.status(500).json({ message: 'Server error while saving draft.' });
   }
 };
+
+
+// @desc    Delete a draft permanently
+// @route   DELETE /api/complaints/drafts/:id
+// @access  Private (Admin only)
+const deleteDraft = async (req, res) => {
+  try {
+    const draft = await ComplaintDraft.findOneAndDelete({
+      _id: req.params.id,
+      createdBy: req.user.id,
+    });
+
+    if (!draft) {
+      return res.status(404).json({ message: 'Draft not found.' });
+    }
+
+    res.status(200).json({ message: 'Draft deleted successfully.' });
+  } catch (error) {
+    console.error('Error in deleteDraft:', error);
+    res.status(500).json({ message: 'Server error while deleting draft.' });
+  }
+};
+
+module.exports = {
+  getDrafts,
+  getDraft,
+  saveDraft,
+  deleteDraft,
+};
