@@ -10,33 +10,10 @@
  */
 function parseLocalDate(dateStr, offsetHeader, isEndOfDay = false) {
   if (!dateStr) return null;
-  
+
   // If it's already a full ISO timestamp (contains T), parse directly
   if (dateStr.includes('T')) {
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // Construct UTC base for start or end of local day
-  const timeSuffix = isEndOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
-  const utcDate = new Date(dateStr + timeSuffix);
-  
-  if (isNaN(utcDate.getTime())) {
-    const fallback = new Date(dateStr);
-    return isNaN(fallback.getTime()) ? null : fallback;
-  }
-
-  // Adjust for timezone offset
-  if (offsetHeader !== undefined && offsetHeader !== null) {
-    const offset = parseInt(offsetHeader, 10);
-    if (!isNaN(offset)) {
-      // clientTime = utcTime - offset
-      // So utcTime = clientTime + offset
-      utcDate.setMinutes(utcDate.getMinutes() + offset);
-    }
-  }
-
-  return utcDate;
-}
-
-module.exports = { parseLocalDate };
