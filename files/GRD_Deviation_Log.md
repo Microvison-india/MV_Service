@@ -455,3 +455,118 @@ graph TD
   - All 5 are saved to the `Product` record and persist for all future complaints on the same product.
   - If a linked product already has these values, they come pre-filled. Editing a pre-filled value shows a change warning.
   - Warranty preview is shown live in this step as values are entered.
+
+  ### DEV-GRD-044
+- **Phase:** 21
+- **GRD Section:** 6.2 (Step 2 → now Step 3 — Product & Type) — Warranty Logic
+- **Type:** CHANGED (Supersedes DEV-GRD-018, DEV-GRD-020 from Addendum v1.2)
+- **Summary:** Warranty logic is fully consolidated and moved from Step 3 (formerly Step 2) into the new **Step 2 — Product Info**. Step 3 (Product & Type) now only handles product type (LED/Cooler) and complaint type (Installation/Complaint) — no warranty fields. The warranty rules in v1.3 Change 3G (4 priority rules) supersede the simpler rules in Addendum v1.2. Updated warranty rule priority order:
+  1. **Rule 1 — Bill Date present:** `warrantyExpiryDate = billDate + 3 years`. Auto-calculated status. `warrantySource = 'auto_calculated'`.
+  2. **Rule 2 — No Bill Date:** Admin manually selects In/Out Warranty and provides a required reason text. `warrantySource = 'manual'`.
+  3. **Rule 3 — LED Installation, no data:** Defaults to `in_warranty`. `warrantySource = 'manual'`.
+  4. **Rule 4 — Force Override:** Admin can always override any auto-calculated or manual value. Requires a reason text. `warrantySource = 'forced'`. Force reason is **admin-only** — SC sees only the final In/Out status.
+
+### DEV-GRD-045
+- **Phase:** 21
+- **GRD Section:** 10.2 (SC Done Form) / 7.3 (Status Transitions)
+- **Type:** ADDED
+- **Summary:** When the SC submits their Done form, the system checks which Step 2 fields are missing on the linked Product record and demands them from the SC:
+  - **Missing Bill Date / Bill Photo / Shop Name:** SC is asked to upload a bill/receipt photo. Bypassable with explicit "Skip for now" per item.
+  - **Missing Serial Number / Model Number:** SC is asked to photograph the serial/model sticker on the product. Bypassable with explicit "Skip for now" per item.
+  - SC-uploaded bill photo auto-saves to the `Product.billPhoto` field and triggers a warranty recalculation.
+  - SC-uploaded serial sticker photo is stored on the `Complaint` record for the admin to view and manually transcribe — it does NOT auto-fill the serial/model fields.
+  - Neither upload is visible to the SC after submission — both go to the admin's product info view only.
+
+### DEV-GRD-046
+- **Phase:** 21
+- **GRD Section:** 11.1 (Admin Confirm Done / Closing Flow)
+- **Type:** ADDED
+- **Summary:** Before the admin can confirm Done and close a complaint, the system checks all 5 Step 2 fields on the linked Product record. Missing fields trigger a warning dialog listing what is empty. Admin must either fill them (using SC-uploaded photos if available) or explicitly bypass each field individually (no single "skip all"). If bypassed:
+  - Missing field names are stored on the `Complaint.missingFieldsBypassed[]` array.
+  - Missing field names are appended to `Product.missingFieldsWarning[]` for future visibility.
+  - A **persistent yellow warning indicator** appears on the Product record card in ALL future complaints for this product, visible to every admin handling that product — until the fields are eventually filled. This cannot be dismissed — only filling the field removes the warning.
+
+---
+
+## Phase 22 — Advanced Billing Filters + Mark as Paid (v1.3 Change 4)
+
+### DEV-GRD-047
+- **Phase:** 22
+- **GRD Section:** 9 (Billing Logic) / 11.4 (Billing Dashboard)
+- **Type:** CHANGED
+- **Summary:** GRD v1.1 Section 11.4 specified Month + Year dropdowns as the primary billing filter. **System Changes v1.3 Change 4A** replaces these with an exact **From Date → To Date** range picker, giving the admin precision control over any billing period. Default on load: first day of current month → today. Quick shortcuts available: `This Month`, `Last Month`, `Last 7 Days`, `Last 30 Days`, `Custom`. Both the *Per Complaint Bills* tab and the *Monthly Invoice Summaries* tab respect this date range.
+
+### DEV-GRD-048
+- **Phase:** 22
+- **GRD Section:** 9 (Billing Logic) / 11.4 (Billing Dashboard)
+- **Type:** ADDED
+- **Summary:** A **Payment Status** system is added to the billing layer. GRD v1.1 had no concept of marking bills as paid — bills were generated and shown, but there was no tracking of whether Microvison had actually paid the SC. New fields added to each bill record: `paymentStatus` (enum: `unpaid`/`paid`, default `unpaid`), `paidAt` (timestamp of last payment mark), `paidBy` (admin user who marked it). Three methods to mark bills as paid from the dashboard:
+  1. **Bulk — selected SC + date range:** A "Mark All as Paid" button marks all unpaid bills in the current filtered view.
+  2. **Bulk — all SCs in date range:** Same button with "All Service Centres" selected — marks all unpaid bills across all SCs.
+  3. **Manual selection:** Checkboxes on each row → "Mark Selected as Paid" action bar button.
+  Reversals to unpaid are allowed with a confirmation warning. `paidAt` always reflects the most recent payment timestamp only (full reversal history is not stored).
+
+### DEV-GRD-049
+- **Phase:** 22
+- **GRD Section:** 9 (Billing Logic) / 11.4 (Billing Dashboard)
+- **Type:** ADDED
+- **Summary:** Two **running totals** are now shown below the Per Complaint Bills table, both live-updating as filters change:
+  - **Total (all bills in view):** Sum of all bills (paid + unpaid combined) in the current filtered view.
+  - **Unpaid Total:** Sum of only unpaid bills — representing what Microvison currently owes the SC(s) in the selected period.
+  - If a specific SC is selected, totals reflect that SC only. If "All Service Centres" is selected, totals reflect all SCs combined.
+  - Default view on opening the Billing Dashboard (no filters changed): current month, all SCs — giving an instant financial overview.
+  - An optional **"Mark as Paid immediately"** checkbox/toggle is also added to the Confirm Done flow: when the admin closes a complaint and generates the bill, they can optionally mark it paid in the same action rather than visiting the Billing Dashboard separately.
+
+---
+
+## Phase 28 — Complaint Draft System
+
+### DEV-GRD-050
+- **Phase:** 28
+- **GRD Section:** 6 (Complaint Registration Steps / Wizard)
+- **Type:** ADDED
+- **Summary:** Introduced a persistent, database-backed **Complaint Draft System** for the 5-step complaint registration wizard (`NewComplaint.jsx`). Since admins can close the app, switch laptops/devices, or switch tabs, local storage is not sufficient.
+  - As the admin fills out the wizard steps, progress is auto-saved to MongoDB every 2 seconds with a debounce.
+  - When opening the New Complaint page, if any incomplete drafts exist for the logged-in admin, the page halts and shows a list of incomplete drafts.
+  - The admin can click **Resume** (pre-fills all form values and navigates to the saved step), **Delete** (permanently deletes draft from MongoDB), or **Start Fresh** (discards draft history and opens a blank step 1 form).
+  - Drafts are stored in a separate collection so they do not pollute the unassigned complaints queue or active dashboard.
+  - Upon successful complaint creation and submission, the draft is automatically cleaned up and deleted from MongoDB.
+
+---
+
+## Phase 29 — Service Centre Complaints History Tab
+
+### DEV-GRD-051
+- **Phase:** 29
+- **GRD Section:** 11.2 (Service Centres Tab -> Details Page)
+- **Type:** ADDED
+- **Summary:** Implemented the "Complaints" history tab inside the Service Centre Details page (`SCDetail.jsx`). Previously, this tab rendered a static placeholder text "Complaint history for this service centre will be shown here once Phase 7 is complete". It now shows the full paginated list of complaints assigned to the selected service centre (both desktop table and mobile list card layouts). Clicking any complaint in this list opens the admin details slide-over drawer (`AdminComplaintDetail.jsx`) so the admin can review it.
+
+---
+
+## Phase 30 — Upgraded Reassignment Panel in Complaint Detail Drawer
+
+### DEV-GRD-052
+- **Phase:** 30
+- **GRD Section:** 11.1 (Complaint Details Drawer) / 6.4 (Assignment / Step 5)
+- **Type:** CHANGED
+- **Summary:** Upgraded the "Assign Service Centre" panel at the bottom of the Admin Complaint Details drawer (`AdminComplaintDetail.jsx`) from a simple dropdown select list to the full feature-rich interface used in Wizard Step 5.
+  - Recommended service centres in the customer's district are displayed as selectable cards showing business name, owner name, city, contact number, capabilities, and live Load Stats (Assigned & Pending jobs).
+  - Admins can select cards directly to bind the active service centre choice.
+  - Added an inline "Create Unregistered SC" button opening a form dialog to register unregistered SCs on the fly.
+  - Integrated the advanced "More Options" search and filtering panel to search the entire system directory by name, phone, city, state, district, capability, and registration type.
+
+---
+
+## Phase 31 — Admin Force Close Panel for Complaints
+
+### DEV-GRD-053
+- **Phase:** 31
+- **GRD Section:** 11.1 (Complaint Details Drawer) / 7.3 (Status Transitions)
+- **Type:** ADDED
+- **Summary:** Added a dedicated "Close Complaint (No Work Done)" section in the Admin Complaint Details drawer (`AdminComplaintDetail.jsx`). 
+  - This section only appears when no work has been done yet by the Service Centre (complaint status is in `['new', 'unassigned', 'assigned', 'accepted', 'rejected_by_sc']`).
+  - It allows the admin to close the complaint directly (e.g. if cancelled by the customer or created by mistake) by typing a reason/note and clicking "Close Complaint".
+  - This flow is independent of the normal closing flow (which requires completing missing Step 2 product details and generates billing charges). No bill is generated for complaints closed via this force-close action.
+
+---
