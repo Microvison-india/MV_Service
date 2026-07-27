@@ -570,3 +570,45 @@ graph TD
   - This flow is independent of the normal closing flow (which requires completing missing Step 2 product details and generates billing charges). No bill is generated for complaints closed via this force-close action.
 
 ---
+## Phase 32 — Editable Billing, Negative Balances & UI Polish
+
+### DEV-GRD-054
+- **Phase:** 32
+- **GRD Section:** 8.4 (Invoice & Billing Module)
+- **Type:** CHANGED
+- **Summary:** The original requirement assumed Microvison always pays the Service Centre a positive sum. Due to the out-of-warranty flow (Change 6), SCs can collect cash directly from customers, which is recorded as `customerPaymentAmount`. The net payout formula (`gross - deductions`) is no longer clamped to zero. If an SC owes Microvison money, the invoice net payout goes into negative numbers, and is visually represented in the Admin UI with red text formatting.
+
+### DEV-GRD-055
+- **Phase:** 32
+- **GRD Section:** 8.2 (Admin Action Centre)
+- **Type:** CHANGED
+- **Summary:** All money fields (Preset Price, Petrol, Extra Charges, Customer Payments) are now fully editable by the admin immediately prior to closing the complaint. A pre-close money summary panel displays the net calculations and any active overrides, replacing the abandoned Reopen-flow billing logic.
+
+---
+
+### DEV-GRD-056 — WhatsApp: Reopen Trigger Removed (Change 6B)
+- **Phase:** 32
+- **GRD Section:** 14.2 (Trigger 2 — Complaint Reopened WhatsApp)
+- **Type:** REMOVED
+- **Summary:** GRD Section 14.2 defined a second WA trigger specifically for reopened complaints (`COMPLAINT REOPENED` label + original complaint ID reference). This trigger is completely removed. Reopen flow is abandoned in Change 6B. Repeat complaints for the same product are now plain new complaints with new IDs. The SC receives a standard `NEW COMPLAINT ASSIGNED` WA-01 — the same message they would receive for any brand new complaint. No separate Meta template is needed for reopen. The GRD-mandated dual-template model (new + reopen) is reduced to a single WA-01 template.
+
+### DEV-GRD-057 — WhatsApp: Out-of-Warranty Payment Recording Has Zero WA Impact (Change 6A)
+- **Phase:** 32
+- **GRD Section:** 8.4 (Invoice & Billing Module) / 14 (WhatsApp Notifications)
+- **Type:** CLARIFICATION
+- **Summary:** The new multi-stage customer payment tracking system (Change 6A) introduced a `customerPayments[]` array on the Complaint model. No WhatsApp trigger fires at any point when an admin records, edits, or removes a payment entry. Payment data is strictly internal (admin sees it in the complaint panel; SC sees the deductions read-only on their billing page). The `customerPayments` array is never included in any WhatsApp message content. This is intentional — customer payment information is confidential billing data and must not be shared with SCs via automated messages.
+
+---
+
+### DEV-GRD-058 — WhatsApp: 10-Digit Phone Constraints & 6-Param Reminder
+- **Phase:** 14
+- **GRD Section:** 14 (WhatsApp Notifications)
+- **Type:** CHANGED
+- **Summary:**
+  - Standardized all primary phone number fields (`phone1`) across the frontend forms (New Complaint Step 1, SC Sign Up, SC Detail Edit, and Unregistered SC Creation Modal) to be strictly 10 digits and compulsory.
+  - WhatsApp Template 3 (`sc_assignment_reminder`) was updated in Meta to add the `Request Type` variable as parameter `{{1}}`, bringing its total parameter count from 5 to 6. Code was adjusted accordingly to supply all 6 parameters.
+
+---
+
+## Future Phases
+*(Entries will be added here as each phase is built.)*
