@@ -276,3 +276,54 @@ graph TD
 ---
 
 ---
+## Phase 8.5 — Full SC Flow v1.1 (SC Portal Rebuild)
+
+> Source document: `files/Microvison_SC_Flow_v1.1.txt`
+
+### DEV-GRD-026
+- **Phase:** 8.5
+- **GRD Section:** 7.3 / 10.2 (SC Complaint Flow)
+- **Type:** CHANGED
+- **Summary:** GRD previously treated SC statuses somewhat generically. Addendum SC Flow v1.1 introduces a highly structured 3-path system:
+  1. **Done:** Requires photo(s). Petrol and extras are submitted here as OVERALL totals for the entire complaint lifecycle. 
+  2. **Not Done:** Requires text reason OR voice note. Does NOT close the complaint. Complaint remains open for SC to return later.
+  3. **Part Pending:** Requires voice note, text notes, part details, and photos. Admin must physically arrange the part and mark it **Delivered** (timeline entry only). SC must then tap **Mark as Received** (changes status to `part_received`).
+  - **Replacement** is no longer a separate status. It is handled through the Part Pending flow where the 'part' is the full unit.
+
+### DEV-GRD-027
+- **Phase:** 8.5
+- **GRD Section:** 9 (Billing Logic)
+- **Type:** DECISION
+- **Summary:** GRD billing logic is refined per SC Flow v1.1. Billing is ONLY generated when the admin confirms `Done` (closing the complaint). Complaints that stay in `not_done` or `part_pending` never generate bills. Out-of-warranty travel/petrol is NOT covered by Microvison. SC collects payment from customer directly, which is logged for record-keeping but excluded from the Microvison invoice.
+
+## Phase 14 — WhatsApp Integrations (SC Flow v1.1 Triggers)
+
+### DEV-GRD-028
+- **Phase:** 14
+- **GRD Section:** 6.4 (Assignment) / 8 (Reopen)
+- **Type:** CHANGED
+- **Summary:** GRD mentioned WhatsApp triggers sparsely. SC Flow v1.1 Section 9 defines the complete trigger set, replacing any previous assumptions:
+  - **Immediate:** WA-01 (SC assigned), WA-04 (SC accepts - sent to customer), WA-06 (Admin marks part delivered - sent to SC).
+  - **Scheduled/Reminders:** WA-02/03/04B/05/07 and WA-0X (repeaters) to chase SCs who haven't acted. Requires cron scheduler.
+  - **Exclusions:** NO WhatsApp to customer on Done/Not Done/Part Pending. NO WhatsApp to SC on bill generation or confirm done.
+
+## Phase 15 — Timeline Snapshots & Card Details Refinements
+
+### DEV-GRD-029
+- **Phase:** 15
+- **GRD Section:** 7.2 (Status Flow) / 10.2 / 11.1 (Complaint detail views)
+- **Type:** ADDED
+- **Summary:** Implemented chronological historical snapshots for each timeline node in the Activity Timeline. Instead of older nodes overriding their contents with live/latest complaint values, they now store and render:
+  - **Done Node:** Snapshots of SC claimed petrol (`petrolSC`), visits, distance, SC done notes, closing voice, and proof photos. It only displays the petrol section if `petrolSC > 0`, and only lists extra charges requested by the SC.
+  - **Closed Node:** A custom final closure card showing Admin closing remarks, final locked petrol (`petrolFinal`) with clear source explanations, and a filtered extra charges list displaying only items that were rejected or edited (amount changed) by the Admin.
+  - **Part Pending Node:** Snapshot of requested part details and the specific dispatch (`partDeliveredAt`/`partDeliveredNote`) and receipt (`partReceivedAt`) records linked to that request cycle.
+  - **Not Done Node:** Snapshots of not done reasons, closing notes, voice note, and proof photos.
+
+---
+
+## System Changes v1.3 — Phases 19–22
+
+> Source document: `files/Microvison_System_Changes_v1.3.md`
+> These entries document every departure from GRD v1.1 introduced by the four new features: Skip SC Assignment, Unregistered SC, New Step 2 (Product Info), and Billing Paid System. They supersede and extend GRD v1.1 Sections 6.1–6.4, 7.1–7.3, 9, 11.1, and 11.3. Addendum v1.2 remains in force for all Product Tracking sections not overridden below.
+
+---
