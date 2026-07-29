@@ -56,3 +56,62 @@ export default function SCComplaintCard({ complaint: c, mode, onAction, onOpenDe
                     {statusKey.replace(/_/g, ' ').toUpperCase()}
                 </span>
             </div>
+            {/* ── Tags row ── */}
+            <div className="flex flex-wrap items-center gap-2 mb-5 text-sm font-medium text-muted-foreground">
+                <span className="text-foreground font-semibold border border-border px-2 py-0.5 rounded-md shadow-sm">
+                    {PRODUCT_LABELS[c.product] || c.product}
+                </span>
+                <span className="capitalize border border-border px-2 py-0.5 rounded-md shadow-sm">
+                    {c.complaintType}
+                </span>
+                <span className={c.warrantyStatus === 'in_warranty' ? 'text-foreground border border-border px-2 py-0.5 rounded-md shadow-sm' : 'text-foreground border border-border px-2 py-0.5 rounded-md shadow-sm'}>
+                    {c.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty'}
+                </span>
+            </div>
+
+            {/* ── Preset info (in-warranty only) ── */}
+            {c.warrantyStatus === 'in_warranty' && c.presetName && (
+                <div className="bg-muted/50 rounded-lg px-4 py-3 mb-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">Pricing</p>
+                    <p className="text-sm font-medium text-foreground">
+                        {c.presetName} — <span className="font-bold">₹{c.presetPrice}</span>
+                        {c.petrolAdmin != null && (
+                            <span className="text-muted-foreground"> + ₹{c.petrolAdmin} petrol est.</span>
+                        )}
+                    </p>
+                </div>
+            )}
+
+            {/* ── Admin notes ── */}
+            {c.notes && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 mb-4">
+                    <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">Admin Note</p>
+                    <p className="text-sm text-yellow-900">{c.notes}</p>
+                </div>
+            )}
+
+            {/* ── Voice note ── */}
+            {c.voiceNoteUrl && (
+                <div className="mb-4">
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-2">Voice Note</p>
+                    <audio src={c.voiceNoteUrl} controls className="w-full rounded-lg" />
+                </div>
+            )}
+
+            {/* ── Admin photos ── */}
+            {c.adminPhotos?.length > 0 && (
+                <div className="mb-4">
+                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-2">Admin Photos</p>
+                    <div className="flex gap-3 flex-wrap">
+                        {c.adminPhotos.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                    src={url}
+                                    alt={`Admin photo ${i + 1}`}
+                                    className="w-24 h-24 object-cover rounded-lg border border-border hover:opacity-80 transition"
+                                />
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
