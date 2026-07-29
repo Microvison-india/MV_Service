@@ -174,4 +174,40 @@ export default function SCComplaintCard({ complaint: c, mode, onAction, onOpenDe
                 </div>
             )}
 
+            {/* ── Reject Modal ── */}
+            {showRejectModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-card rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-border">
+                        <p className="text-lg font-bold text-foreground mb-2">Reject Complaint?</p>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            This will send the complaint back to the admin for reassignment. Optionally tell them why.
+                        </p>
+                        <textarea
+                            rows={3}
+                            value={rejectNote}
+                            onChange={(e) => setRejectNote(e.target.value)}
+                            placeholder="Reason for rejection (optional)..."
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition mb-4"
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowRejectModal(false)}
+                                className="flex-1 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleReject}
+                                disabled={acting}
+                                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition"
+                            >
+                                {acting ? 'Rejecting...' : 'Yes, Reject'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
