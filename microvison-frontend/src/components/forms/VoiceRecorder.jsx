@@ -20,3 +20,52 @@ export default function VoiceRecorder({ onUpload, uploadedUrl = '' }) {
             }
         };
     }, []);
+    const startRecording = async () => {
+        try {
+            setError('');
+            audioChunksRef.current = [];
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // Determine supported mimeType (Fallback for iOS Safari)
+            let mimeType = 'audio/webm';
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                mimeType = 'audio/mp4';
+            } else if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                // Very old safari fallback
+                mimeType = '';
+            }
+
+            const options = mimeType ? { mimeType } : undefined;
+            const mediaRecorder = new MediaRecorder(stream, options);
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunksRef.current.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/mp4' });
+                // Stop all tracks to release mic
+                stream.getTracks().forEach(track => track.stop());
+                await uploadAudio(audioBlob);
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setTimeLeft(60);
+
+            // Start 60s countdown
+            timerRef.current = setInterval(() => {
+                setTimeLeft((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timerRef.current);
+                        mediaRecorder.stop();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+
