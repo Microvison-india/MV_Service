@@ -147,4 +147,24 @@ export default function SCFilters({ filters, onChange }) {
                         onChange={handleSelect}
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                     >
+                        <option value="">All SCs</option>
+                        <option value="false">Registered Only</option>
+                        <option value="true">Unregistered Only</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Reset */}
+            <div className="mt-3 flex justify-end">
+                <button
+                    id="sc-filter-reset"
+                    onClick={handleReset}
+                    className="text-xs text-muted-foreground hover:text-foreground underline transition"
+                >
+                    Reset Filters
+                </button>
+            </div>
+        </div>
+    );
+}
 
