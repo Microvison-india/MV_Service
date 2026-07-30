@@ -151,6 +151,12 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   }, [initial._id]);
 
   const [submitting, setSubmitting] = useState(false);
+  // Synchronous in-flight guards — prevents rapid clicks from firing duplicate API calls.
+  // React's setState is async so isProcessing/disabled won't block re-entrant clicks;
+  // refs are read synchronously and are reliable as mutexes.
+  const submittingRef = useRef(false);
+  const markingGoingRef = useRef(false);
+  const markingReceivedRef = useRef(false);
 
   const isProcessing = markingGoing || markingReceived || submitting;
 
@@ -192,6 +198,8 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   };
 
   const handleMarkGoing = async () => {
+    if (markingGoingRef.current) return;
+    markingGoingRef.current = true;
     setMarkingGoing(true);
     setError('');
     try {
@@ -202,10 +210,13 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setError(err?.response?.data?.message || 'Failed to update status.');
     } finally {
       setMarkingGoing(false);
+      markingGoingRef.current = false;
     }
   };
 
   const handleMarkReceived = async () => {
+    if (markingReceivedRef.current) return;
+    markingReceivedRef.current = true;
     setMarkingReceived(true);
     setError('');
     setSuccess('');
@@ -218,10 +229,14 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setError(err?.response?.data?.message || 'Failed to update status.');
     } finally {
       setMarkingReceived(false);
+      markingReceivedRef.current = false;
     }
   };
 
   const handleSubmitFinal = async () => {
+    // Synchronous guard: if a submission is already in-flight, ignore this click entirely.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setSuccess('');
 
@@ -248,6 +263,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       if (isBillInfoMissing) {
         if (!scBillPhotoUrl && !skipBillPhoto) {
           setError('Please upload the product bill photo or check "Skip for now".');
+          submittingRef.current = false; // release lock on validation exit
           return;
         }
         body.scBillPhotoUrl = scBillPhotoUrl || undefined;
@@ -256,6 +272,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       if (isSerialInfoMissing) {
         if (!scSerialSlipPhotoUrl && !skipSerialPhoto) {
           setError('Please upload the product serial/model sticker photo or check "Skip for now".');
+          submittingRef.current = false; // release lock on validation exit
           return;
         }
         body.scSerialSlipPhotoUrl = scSerialSlipPhotoUrl || undefined;
@@ -288,6 +305,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       // Photos, voice note, and text notes optional
       if (!partDetails || !partDetails.trim()) {
         setError('Parts detail description is compulsory.');
+        submittingRef.current = false; // release lock on validation exit
         return;
       }
 
@@ -305,6 +323,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
       setError(err?.response?.data?.message || 'Submission failed. Please try again.');
     } finally {
       setSubmitting(false);
+      submittingRef.current = false; // release lock only after request completes
     }
   };
 

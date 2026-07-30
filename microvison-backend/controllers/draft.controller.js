@@ -70,6 +70,7 @@ const saveDraft = async (req, res) => {
   }
 };
 
+
 // @desc    Delete a draft permanently
 // @route   DELETE /api/complaints/drafts/:id
 // @access  Private (Admin only)

@@ -10,7 +10,7 @@
  */
 function parseLocalDate(dateStr, offsetHeader, isEndOfDay = false) {
   if (!dateStr) return null;
-  
+
   // If it's already a full ISO timestamp (contains T), parse directly
   if (dateStr.includes('T')) {
     const d = new Date(dateStr);
@@ -20,7 +20,7 @@ function parseLocalDate(dateStr, offsetHeader, isEndOfDay = false) {
   // Construct UTC base for start or end of local day
   const timeSuffix = isEndOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
   const utcDate = new Date(dateStr + timeSuffix);
-  
+
   if (isNaN(utcDate.getTime())) {
     const fallback = new Date(dateStr);
     return isNaN(fallback.getTime()) ? null : fallback;

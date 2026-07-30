@@ -50,6 +50,7 @@ Each entry follows this structure:
 - **Summary:** GRD stated "50+ currently, up to 100+ in 2 years" for cities covered. To ensure comprehensive coverage and future-proofing, the database was seeded with **313 actual cities** across Rajasthan (225) and Punjab (88) using a comprehensive master list.
 
 ---
+---
 
 ## Phase 5 — Service Centre Management
 
@@ -275,7 +276,6 @@ graph TD
 ---
 
 ---
-
 ## Phase 8.5 — Full SC Flow v1.1 (SC Portal Rebuild)
 
 > Source document: `files/Microvison_SC_Flow_v1.1.txt`
@@ -456,7 +456,7 @@ graph TD
   - If a linked product already has these values, they come pre-filled. Editing a pre-filled value shows a change warning.
   - Warranty preview is shown live in this step as values are entered.
 
-### DEV-GRD-044
+  ### DEV-GRD-044
 - **Phase:** 21
 - **GRD Section:** 6.2 (Step 2 → now Step 3 — Product & Type) — Warranty Logic
 - **Type:** CHANGED (Supersedes DEV-GRD-018, DEV-GRD-020 from Addendum v1.2)
@@ -570,7 +570,6 @@ graph TD
   - This flow is independent of the normal closing flow (which requires completing missing Step 2 product details and generates billing charges). No bill is generated for complaints closed via this force-close action.
 
 ---
-
 ## Phase 32 — Editable Billing, Negative Balances & UI Polish
 
 ### DEV-GRD-054
@@ -613,4 +612,3 @@ graph TD
 
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
-
