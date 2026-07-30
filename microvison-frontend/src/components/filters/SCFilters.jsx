@@ -103,4 +103,48 @@ export default function SCFilters({ filters, onChange }) {
                         ))}
                     </select>
                 </div>
+                {/* District */}
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">District</label>
+                    <select
+                        id="sc-filter-district"
+                        name="district"
+                        value={filters.district || ''}
+                        onChange={handleSelect}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    >
+                        <option value="">All Districts</option>
+                        {uniqueDistricts.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Product Capability */}
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capability</label>
+                    <select
+                        id="sc-filter-capability"
+                        name="productCapability"
+                        value={filters.productCapability || ''}
+                        onChange={handleSelect}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    >
+                        <option value="">All Types</option>
+                        {CAPABILITY_OPTIONS.map((c) => (
+                            <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Registration Type */}
+                <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reg. Type</label>
+                    <select
+                        id="sc-filter-regtype"
+                        name="isUnregistered"
+                        value={filters.isUnregistered || ''}
+                        onChange={handleSelect}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    >
 
