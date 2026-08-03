@@ -665,7 +665,10 @@
     - All admin & SC views (`Step5AssignSC.jsx`, `AdminComplaintDetail.jsx`, `SCDetail.jsx`, `ServiceCentres.jsx`, `ActionCentre.jsx`, `AllComplaints.jsx`, `BillingTable.jsx`, `SCFilters.jsx`, `ComplaintFilters.jsx`, `MyComplaints.jsx`): Updated filter dropdowns, badges, and capability rendering to support array capabilities and new products cleanly.
   - [x] **Database Migration & Dual-Field Sync:**
     - Executed non-destructive migration on both Local (`microvison`) and Production (`microvison-production`) MongoDB databases. Updated all existing SC records to set both `productCapabilities` and `productCapability`.
-  - [x] **Vercel Cache-Busting & Auto-Reload:**
-    - Added `vercel.json` with strict `Cache-Control: no-cache, no-store, must-revalidate` headers for `index.html` to force instant auto-updates across all devices without requiring manual hard-refreshes.
-    - Added global unhandled chunk error listener in `main.jsx` for auto-reloading stale scripts on deployment.
+  - [x] **Vercel Cache-Busting, Automatic Version Polling & Auto-Reload:**
+    - `generate-version.js` + `package.json`: Automated build script to stamp a unique timestamp into `public/version.json` on every Vercel build.
+    - `vercel.json`: Added strict `Cache-Control: no-cache, no-store, must-revalidate` headers for `index.html`, `/`, and `/version.json`. Configured explicit rewrite rule for `/version.json` so it is served directly as a static file rather than being intercepted by the SPA rewrite.
+    - `main.jsx`: Added 3-trigger auto-refresh mechanism (on load, every 2-minute polling interval, and on `visibilitychange` tab/app return) to silently check `/version.json` and trigger a hard reload + SW unregistration if a new deployment timestamp is detected. Preserved `localStorage` JWT token so users stay logged in seamlessly.
+    - `vite.config.js`: Enabled `selfDestroying: true` on `VitePWA` plugin to automatically unregister stale PWA Service Worker caches across all mobile and desktop devices.
+
 

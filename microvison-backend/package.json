@@ -4,8 +4,8 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node init && node server.js",
+    "dev": "node init && nodemon server.js",
     "seed": "node utils/seedCities.js",
     "test-whatsapp": "node utils/testWhatsApp.js",
     "test": "echo \"Error: no test specified\" && exit 1"
