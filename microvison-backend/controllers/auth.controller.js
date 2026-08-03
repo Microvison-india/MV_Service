@@ -74,13 +74,23 @@ const registerSC = async (req, res) => {
             city,
             district,
             state,
-            productCapability,
+            productCapabilities,
             password,
         } = req.body;
 
         // Backend validations per GRD Section 3.2 & user request
-        if (!ownerName || !businessName || !phone1 || !email1 || !city || !district || !state || !productCapability || !password) {
+        if (!ownerName || !businessName || !phone1 || !email1 || !city || !district || !state || !password) {
             return res.status(400).json({ message: 'All required fields must be filled.' });
+        }
+
+        if (!Array.isArray(productCapabilities) || productCapabilities.length === 0) {
+            return res.status(400).json({ message: 'Please select at least one product capability.' });
+        }
+
+        const validCapabilities = ['led', 'cooler', 'washing_machine', 'induction'];
+        const invalidCaps = productCapabilities.filter(c => !validCapabilities.includes(c));
+        if (invalidCaps.length > 0) {
+            return res.status(400).json({ message: `Invalid product capabilities: ${invalidCaps.join(', ')}` });
         }
 
         if (password.length < 6) {
@@ -121,7 +131,7 @@ const registerSC = async (req, res) => {
             city,
             district,
             state,
-            productCapability,
+            productCapabilities,
             status: 'pending',
         });
 

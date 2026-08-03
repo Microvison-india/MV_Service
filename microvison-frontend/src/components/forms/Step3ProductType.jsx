@@ -1,35 +1,41 @@
 // GRD Section 6.3 — Step 3 (was Step 2): Product & Complaint Type
-// Handles selecting product type (LED/Cooler) and complaint type (installation/complaint).
+// Handles selecting product type (LED/Cooler/Washing Machine/Induction) and complaint type.
+// Washing Machine (2yr warranty) and Induction (1yr warranty) are complaint-only products.
 // Product type is locked if linked from Step 1 product tracking.
 // Warranty and bill info have been moved to the new Step 2 (Step2ProductInfo.jsx).
 
 import { useEffect } from 'react';
 
 const PRODUCTS = [
-    { value: 'led', label: 'LED', icon: '💡' },
-    { value: 'cooler', label: 'Cooler', icon: '❄️' },
+    { value: 'led',             label: 'LED TV',          icon: '💡', allowsInstallation: true },
+    { value: 'cooler',          label: 'Cooler',           icon: '❄️', allowsInstallation: false },
+    { value: 'washing_machine', label: 'Washing Machine',  icon: '🫧', allowsInstallation: false },
+    { value: 'induction',       label: 'Induction',        icon: '🔥', allowsInstallation: false },
 ];
 
 export default function Step3ProductType({ formData, setFormData }) {
     // If a product was linked in Step 1, its product type is locked
     const isProductLocked = !!formData.trackingId;
 
-    // Coolers always have complaintType = complaint
+    const selectedProduct = PRODUCTS.find(p => p.value === formData.product);
+
+    // Complaint-only products always have complaintType = complaint
     useEffect(() => {
-        if (formData.product === 'cooler' && formData.complaintType !== 'complaint') {
+        if (selectedProduct && !selectedProduct.allowsInstallation && formData.complaintType !== 'complaint') {
             setFormData((prev) => ({ ...prev, complaintType: 'complaint' }));
         }
-    }, [formData.product, formData.complaintType, setFormData]);
+    }, [formData.product, formData.complaintType, setFormData, selectedProduct]);
 
     const handleProductChange = (product) => {
         if (isProductLocked) return;
 
-        // Coolers always have complaintType = complaint
-        const newType = product === 'cooler' ? 'complaint' : (formData.complaintType || '');
+        const prod = PRODUCTS.find(p => p.value === product);
+        // If switching to complaint-only product, force complaintType = complaint
+        const newType = (prod && !prod.allowsInstallation) ? 'complaint' : (formData.complaintType || '');
         setFormData((prev) => ({
             ...prev,
             product,
-            complaintType: product === 'cooler' ? 'complaint' : newType,
+            complaintType: newType,
         }));
     };
 
@@ -42,6 +48,8 @@ export default function Step3ProductType({ formData, setFormData }) {
     const cardInactive = 'border-border bg-card text-foreground hover:border-ring cursor-pointer';
     const cardLockedActive = 'border-primary bg-primary text-primary-foreground shadow-md opacity-90 cursor-not-allowed';
     const cardLockedInactive = 'border-border bg-card/50 text-muted-foreground opacity-50 cursor-not-allowed hidden';
+
+    const isComplaintOnly = selectedProduct && !selectedProduct.allowsInstallation;
 
     return (
         <div className="space-y-8 relative">
@@ -86,9 +94,9 @@ export default function Step3ProductType({ formData, setFormData }) {
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                         Complaint Type <span className="text-red-500">*</span>
                     </p>
-                    {formData.product === 'cooler' ? (
+                    {isComplaintOnly ? (
                         <div className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
-                            Cooler complaints are always of type <strong>Complaint</strong> (no installation option).
+                            <strong>{selectedProduct.label}</strong> complaints are always of type <strong>Complaint</strong> (no installation option).
                         </div>
                     ) : (
                         <div className="flex flex-wrap gap-3">
@@ -114,3 +122,4 @@ export default function Step3ProductType({ formData, setFormData }) {
         </div>
     );
 }
+

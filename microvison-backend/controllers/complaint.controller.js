@@ -95,12 +95,12 @@ const createComplaint = async (req, res) => {
     }
   }
 
-  // ── Business rules ────────────────────────────────────────
-  // Coolers cannot be "installation" type (GRD Section 6.2)
-  if (product === 'cooler' && complaintType === 'installation') {
+  // Only LED (and 'both') supports installation complaint type
+  const complaintOnlyProducts = ['cooler', 'washing_machine', 'induction'];
+  if (complaintOnlyProducts.includes(product) && complaintType === 'installation') {
     return res
       .status(400)
-      .json({ message: 'Coolers do not support installation complaints.' });
+      .json({ message: `${product} does not support installation complaints. Only complaint type is allowed.` });
   }
 
   // In Change 6A, ALL complaints (even OOW) require a preset because the SC gets paid by Microvison.
@@ -151,6 +151,7 @@ const createComplaint = async (req, res) => {
   // Calculate final warranty based on provided bill info, forceOverride and manual selection
   const calculated = calculateWarranty({
     billDate,
+    product,
     complaintType,
     manualSelection: warrantyStatus,
     manualReason,
@@ -312,10 +313,11 @@ const createComplaint = async (req, res) => {
   const templateName = process.env.WHATSAPP_TEMPLATE_COMPLAINT_RECEIVED;
   if (templateName && templateName !== 'hello_world') {
     const complaintDate = new Date(complaint.createdAt).toLocaleDateString('en-IN');
+    const PRODUCT_LABELS = { led: 'LED TV', cooler: 'Cooler', washing_machine: 'Washing Machine', induction: 'Induction Stove' };
     sendWhatsApp(complaint.phone1, templateName, [
       complaint.customerName,
       complaint.complaintId,
-      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',
+      PRODUCT_LABELS[complaint.product] || complaint.product,
       complaint.complaintType,
       complaintDate
     ]);
@@ -390,11 +392,12 @@ const assignComplaint = async (req, res) => {
     const templateSC = process.env.WHATSAPP_TEMPLATE_COMPLAINT_SC || 'sc_new_assignment';
     const customerAddress = `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
 
+      const WA_PRODUCT_LABELS = { led: 'LED TV', cooler: 'Cooler', washing_machine: 'Washing Machine', induction: 'Induction Stove' };
     sendWhatsApp(sc.phone1, templateSC, [
       complaint.customerName,                                           // {{1}} Customer Name
       complaint.phone1,                                                 // {{2}} Customer Phone
       customerAddress,                                                  // {{3}} Full Address (localAddress, city, district, state)
-      complaint.product === 'cooler' ? 'Cooler' : 'LED TV',           // {{4}} Product
+      WA_PRODUCT_LABELS[complaint.product] || complaint.product,       // {{4}} Product
       complaint.complaintType === 'installation' ? 'Installation' : 'Complaint', // {{5}} Request Type
       complaint.warrantyStatus === 'in_warranty' ? 'In Warranty' : 'Out of Warranty', // {{6}} Warranty
       complaint.serialNumber || 'N/A',                                 // {{7}} Serial No
@@ -487,7 +490,8 @@ const acceptComplaint = async (req, res) => {
 
   // Trigger WA-04: Sent to Customer immediately on SC acceptance
   const templateCustomer = process.env.WHATSAPP_TEMPLATE_SC_DETAILS || 'customer_sc_assigned2';
-  const productType = complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
+  const WA_PRODUCT_LABELS_ACCEPT = { led: 'LED TV', cooler: 'Cooler', washing_machine: 'Washing Machine', induction: 'Induction Stove' };
+  const productType = WA_PRODUCT_LABELS_ACCEPT[complaint.product] || complaint.product;
   const complaintType = complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';
   const scPhone = sc.phone1 || process.env.SUPPORT_PHONE || '90246 62315';
 
@@ -780,6 +784,7 @@ const updateStatus = async (req, res) => {
           // Re-run warranty calculation for the Product record
           const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource } = calculateWarranty({
             billDate: product.billDate,
+            product: product.product,
             complaintType: complaint.complaintType || 'complaint',
             manualSelection: product.warrantyStatus,
             forceOverride: product.warrantySource === 'forced',
@@ -960,6 +965,7 @@ const confirmDone = async (req, res) => {
         // Re-run warranty calculator — always pass warrantySource so P0 (revoked) guard fires correctly
         const { warrantyStatus: calcStatus, warrantyExpiryDate, warrantySource: calcSource } = calculateWarranty({
           billDate: product.billDate,
+          product: product.product,
           complaintType: complaint.complaintType || 'complaint',
           manualSelection: closeWarrantyStatus || product.warrantyStatus,
           forceOverride: closeForceOverride !== undefined ? closeForceOverride : (product.warrantySource === 'forced'),
@@ -1529,8 +1535,9 @@ const getAllComplaints = async (req, res) => {
     }
 
     // 5. SC Product Capability filter (subquery on ServiceCentre)
+    // productCapabilities is an array; MongoDB matches docs where the array contains scCapability
     if (scCapability) {
-      const scs = await ServiceCentre.find({ productCapability: scCapability }).select('_id').lean();
+      const scs = await ServiceCentre.find({ productCapabilities: scCapability }).select('_id').lean();
       const scIds = scs.map((s) => s._id);
       query.assignedCentreId = { $in: scIds };
     }

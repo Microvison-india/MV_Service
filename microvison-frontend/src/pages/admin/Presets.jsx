@@ -13,6 +13,8 @@ const formatType = (type) => {
     'installation_led': 'LED Installation',
     'complaint_led': 'LED Complaint',
     'complaint_cooler': 'Cooler Complaint',
+    'complaint_washing_machine': 'Washing Machine Complaint',
+    'complaint_induction': 'Induction Complaint',
   };
   return map[type] || type;
 };
@@ -231,6 +233,8 @@ export default function Presets() {
                   <option value="installation_led">LED Installation</option>
                   <option value="complaint_led">LED Complaint</option>
                   <option value="complaint_cooler">Cooler Complaint</option>
+                  <option value="complaint_washing_machine">Washing Machine Complaint</option>
+                  <option value="complaint_induction">Induction Complaint</option>
                 </select>
               </div>
             )}

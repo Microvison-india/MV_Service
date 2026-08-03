@@ -4,7 +4,7 @@ const presetSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ['installation_led', 'complaint_led', 'complaint_cooler'],
+      enum: ['installation_led', 'complaint_led', 'complaint_cooler', 'complaint_washing_machine', 'complaint_induction'],
       required: true,
     },
     name: { type: String, required: true, trim: true },   // e.g., "Standard LED Installation"

@@ -5,9 +5,10 @@ import SCFilters from '../../components/filters/SCFilters';
 import Pagination from '../../components/ui/Pagination';
 
 const CAPABILITY_LABELS = {
-  led_only: 'LED Only',
-  cooler_only: 'Cooler Only',
-  both: 'LED + Cooler',
+  led: 'LED',
+  cooler: 'Cooler',
+  washing_machine: 'Washing Machine',
+  induction: 'Induction',
 };
 
 const STATUS_STYLES = {
@@ -144,7 +145,9 @@ export default function ServiceCentres() {
                         <span className="text-muted-foreground">, {sc.district}</span>
                       </td>
                       <td className="px-4 py-3 text-foreground">
-                        {sc.isUnregistered ? 'LED + Cooler' : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability)}
+                        {Array.isArray(sc.productCapabilities)
+                          ? sc.productCapabilities.map(c => CAPABILITY_LABELS[c] || c).join(', ')
+                          : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability || '—')}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[sc.status] || 'bg-gray-100 text-gray-600'}`}>

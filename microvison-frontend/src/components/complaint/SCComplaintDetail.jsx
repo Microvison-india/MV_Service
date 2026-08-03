@@ -167,7 +167,7 @@ export default function SCComplaintDetail({ complaint: initial, onClose, onUpdat
   const alreadyClosed = c.status === 'closed';
   const alreadyDone = c.status === 'done';
 
-  const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
+  const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', washing_machine: 'Washing Machine', induction: 'Induction' };
 
   // Sourced from Product tracking if populated to always show the latest info
   const productInfo = c.trackingId || {};

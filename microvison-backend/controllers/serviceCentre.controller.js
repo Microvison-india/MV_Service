@@ -109,7 +109,7 @@ const getAll = async (req, res) => {
     if (district) filter.district = { $regex: district, $options: 'i' };
     if (state) filter.state = { $regex: state, $options: 'i' };
     if (status) filter.status = status;
-    if (productCapability) filter.productCapability = productCapability;
+    if (productCapability) filter.productCapabilities = productCapability;
 
     if (isUnregistered === 'true') {
       filter.isUnregistered = true;
@@ -293,7 +293,7 @@ const update = async (req, res) => {
     const sc = await ServiceCentre.findById(req.params.id);
     if (!sc) return res.status(404).json({ message: 'Service Centre not found' });
 
-    const allowedFields = ['ownerName', 'businessName', 'phone1', 'phone2', 'email2', 'fullAddress', 'city', 'district', 'state', 'productCapability'];
+    const allowedFields = ['ownerName', 'businessName', 'phone1', 'phone2', 'email2', 'fullAddress', 'city', 'district', 'state', 'productCapabilities'];
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
         sc[field] = req.body[field];
@@ -356,7 +356,7 @@ const getStats = async (req, res) => {
 // @access  Admin
 const createUnregistered = async (req, res, next) => {
   try {
-    const { name, phone1, phone2, city, district, state, fullAddress, productCapability } = req.body;
+    const { name, phone1, phone2, city, district, state, fullAddress, productCapabilities } = req.body;
 
     if (!name || !phone1 || !city || !state) {
       return res.status(400).json({ message: 'Business Name, Phone 1, City, and State are required.' });
@@ -389,7 +389,9 @@ const createUnregistered = async (req, res, next) => {
       district: normalizedDistrict,
       state: normalizedState,
       fullAddress: fullAddress ? fullAddress.trim() : '',
-      productCapability: productCapability || 'both',
+      productCapabilities: Array.isArray(productCapabilities) && productCapabilities.length > 0
+        ? productCapabilities
+        : ['led', 'cooler'],
       isUnregistered: true,
       status: 'active',
       userId: null

@@ -9,7 +9,7 @@ const productSchema = new mongoose.Schema(
       unique: true, // Only unique if present
     },
     hasSerial: { type: Boolean, default: false },
-    product: { type: String, enum: ['led', 'cooler'], required: true }, // Locked once set
+    product: { type: String, enum: ['led', 'cooler', 'washing_machine', 'induction'], required: true }, // Locked once set
 
     // Customer / Location Data (Latest)
     customerName: { type: String, required: true, trim: true },

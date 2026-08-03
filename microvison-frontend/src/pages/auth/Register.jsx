@@ -4,11 +4,12 @@ import api from '../../api/axios';
 import InlineSelect from '../../components/ui/InlineSelect';
 import InlineCitySelect from '../../components/ui/InlineCitySelect';
 
-// All SC registration fields per GRD Section 3.2
+// SC capability checkboxes — 4 products per new product scope
 const CAPABILITY_OPTIONS = [
-  { value: 'led_only', label: 'LED Only' },
-  { value: 'cooler_only', label: 'Cooler Only' },
-  { value: 'both', label: 'Both (LED + Cooler)' },
+  { value: 'led',             label: 'LED TV / Television' },
+  { value: 'cooler',          label: 'Cooler (Air Cooler)' },
+  { value: 'washing_machine', label: 'Washing Machine' },
+  { value: 'induction',       label: 'Induction (Electric Stove)' },
 ];
 
 export default function Register() {
@@ -24,7 +25,7 @@ export default function Register() {
     city: '',
     district: '',
     state: '',
-    productCapability: '',
+    productCapabilities: [],
     password: '',
     confirmPassword: '',
   });
@@ -40,6 +41,17 @@ export default function Register() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setError('');
+  };
+
+  const handleCapabilityChange = (value) => {
+    setFormData((prev) => {
+      const current = prev.productCapabilities;
+      const updated = current.includes(value)
+        ? current.filter((c) => c !== value)
+        : [...current, value];
+      return { ...prev, productCapabilities: updated };
+    });
     setError('');
   };
 
@@ -110,8 +122,8 @@ export default function Register() {
       setError('Please select a city.');
       return;
     }
-    if (!formData.productCapability) {
-      setError('Please select product capability.');
+    if (!formData.productCapabilities || formData.productCapabilities.length === 0) {
+      setError('Please select at least one product capability.');
       return;
     }
     const phoneRegex = /^\d{10}$/;
@@ -233,22 +245,31 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Product Capability — 3 options per GRD Section 5.2 */}
-            <div className="space-y-1">
-              <label htmlFor="productCapability" className="text-sm font-medium text-foreground">Product Capability *</label>
-              <select
-                id="productCapability"
-                name="productCapability"
-                required
-                value={formData.productCapability}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-              >
-                <option value="">Select capability</option>
+            {/* Product Capabilities — 4 checkboxes */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Product Capabilities (select all that apply) <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {CAPABILITY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <label
+                    key={opt.value}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition ${
+                      formData.productCapabilities.includes(opt.value)
+                        ? 'border-primary bg-primary/5 text-foreground'
+                        : 'border-border bg-background text-foreground hover:border-ring'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      id={`capability-${opt.value}`}
+                      value={opt.value}
+                      checked={formData.productCapabilities.includes(opt.value)}
+                      onChange={() => handleCapabilityChange(opt.value)}
+                      className="h-4 w-4 rounded border-border text-primary accent-primary"
+                    />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
 
             {/* Password */}

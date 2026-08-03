@@ -12,16 +12,15 @@ import { Loader2, X, Plus } from 'lucide-react';
 // assigned later from the Action Centre or complaint detail view (v1.3 Change 1A).
 
 const CAPABILITY_LABELS = {
-  led_only: 'LED Only',
-  cooler_only: 'Cooler Only',
-  both: 'LED + Cooler',
+  led: 'LED',
+  cooler: 'Cooler',
+  washing_machine: 'Washing Machine',
+  induction: 'Induction',
 };
 
-// Map product to required capability
+// Map product to the capability value(s) the SC must have
 const getRequiredCapabilities = (product) => {
-  if (product === 'led') return ['led_only', 'both'];
-  if (product === 'cooler') return ['cooler_only', 'both'];
-  if (product === 'both') return ['both'];
+  if (product) return [product];
   return [];
 };
 
@@ -40,7 +39,7 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
     district: formData.district || '',
     state: formData.state || '',
     fullAddress: '',
-    productCapability: 'both',
+    productCapabilities: ['led', 'cooler'],
   });
   const [creatingSC, setCreatingSC] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -103,10 +102,11 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
         const allSCs = data.serviceCentres || [];
         const required = getRequiredCapabilities(formData.product);
 
-        // Recommended SCs in customer's district matching capabilities
+        // Recommended SCs: unregistered or those whose productCapabilities array contains the required product
         const districtMatches = allSCs.filter(
           (sc) =>
-            sc.isUnregistered === true || required.includes(sc.productCapability)
+            sc.isUnregistered === true ||
+            required.every(r => Array.isArray(sc.productCapabilities) ? sc.productCapabilities.includes(r) : sc.productCapability === r)
         );
 
         setCandidates(districtMatches);
@@ -205,7 +205,7 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
         district: formData.district || '',
         state: formData.state || '',
         fullAddress: '',
-        productCapability: 'both',
+        productCapabilities: ['led', 'cooler'],
       });
     } catch (err) {
       setCreateError(err.response?.data?.message || 'Failed to create unregistered SC.');
@@ -286,7 +286,9 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
                     <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
                       <span>📞 {sc.phone1}</span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                        {sc.isUnregistered ? 'LED + Cooler' : CAPABILITY_LABELS[sc.productCapability]}
+                        {Array.isArray(sc.productCapabilities)
+                          ? sc.productCapabilities.map(c => CAPABILITY_LABELS[c] || c).join(', ')
+                          : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability || '—')}
                       </span>
                     </div>
                   </div>
@@ -400,9 +402,10 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
                   className="flex h-9 w-full rounded-lg border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="">All Capabilities</option>
-                  <option value="led_only">LED Only</option>
-                  <option value="cooler_only">Cooler Only</option>
-                  <option value="both">LED + Cooler</option>
+                  <option value="led">LED</option>
+                  <option value="cooler">Cooler</option>
+                  <option value="washing_machine">Washing Machine</option>
+                  <option value="induction">Induction</option>
                 </select>
               </div>
 
@@ -464,7 +467,9 @@ export default function Step5AssignSC({ formData, setFormData, onSubmit, submitt
                             <div className="flex gap-3 mt-1.5 text-xs text-muted-foreground">
                               <span>📞 {sc.phone1}</span>
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium text-[10px]">
-                                {sc.isUnregistered ? 'LED + Cooler' : CAPABILITY_LABELS[sc.productCapability]}
+                                {Array.isArray(sc.productCapabilities)
+                                  ? sc.productCapabilities.map(c => CAPABILITY_LABELS[c] || c).join(', ')
+                                  : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability || '—')}
                               </span>
                             </div>
                           </div>

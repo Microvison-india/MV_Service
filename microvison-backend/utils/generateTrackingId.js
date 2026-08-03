@@ -8,7 +8,8 @@ const Product = require('../models/Product');
  * @param {string} productType - 'led' or 'cooler'
  */
 const generateTrackingId = async (productType) => {
-    const productCode = productType === 'cooler' ? 'C' : 'L';
+    const productCodeMap = { cooler: 'C', washing_machine: 'W', induction: 'I' };
+    const productCode = productCodeMap[productType] || 'L'; // default to L (LED)
 
     // We scan the last 10 products sorted by creation order to find the highest sequence counter
     const lastProducts = await Product.find({}, 'trackingId')
@@ -23,8 +24,8 @@ const generateTrackingId = async (productType) => {
             if (p.trackingId.startsWith('PT-')) {
                 // Legacy format: PT-000001
                 numStr = p.trackingId.split('-')[1];
-            } else if (p.trackingId.startsWith('PL') || p.trackingId.startsWith('PC')) {
-                // New format: PL000001 or PC000001
+            } else if (/^P[LCWI]/.test(p.trackingId)) {
+                // New format: PL/PC/PW/PI + 6 digits
                 numStr = p.trackingId.substring(2);
             }
             const num = parseInt(numStr, 10);

@@ -4,6 +4,8 @@ import api from '../../api/axios';
 const PRODUCT_OPTIONS = [
   { value: 'led', label: 'LED' },
   { value: 'cooler', label: 'Cooler' },
+  { value: 'washing_machine', label: 'Washing Machine' },
+  { value: 'induction', label: 'Induction' },
 ];
 
 const COMPLAINT_TYPE_OPTIONS = [
@@ -30,9 +32,10 @@ const STATUS_OPTIONS = [
 ];
 
 const CAPABILITY_OPTIONS = [
-  { value: 'led_only', label: 'LED Only' },
-  { value: 'cooler_only', label: 'Cooler Only' },
-  { value: 'both', label: 'Both' },
+  { value: 'led', label: 'LED' },
+  { value: 'cooler', label: 'Cooler' },
+  { value: 'washing_machine', label: 'Washing Machine' },
+  { value: 'induction', label: 'Induction' },
 ];
 
 const inputCls =

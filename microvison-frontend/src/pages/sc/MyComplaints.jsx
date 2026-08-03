@@ -22,6 +22,8 @@ const PRODUCT_OPTIONS = [
   { value: '', label: 'All Products' },
   { value: 'led', label: 'LED' },
   { value: 'cooler', label: 'Cooler' },
+  { value: 'washing_machine', label: 'Washing Machine' },
+  { value: 'induction', label: 'Induction' },
 ];
 
 const COMPLAINT_TYPE_OPTIONS = [

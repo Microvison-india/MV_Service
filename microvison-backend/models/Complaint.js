@@ -35,7 +35,7 @@ const complaintSchema = new mongoose.Schema(
     // ── Product ───────────────────────────────────────────────
     trackingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null }, // Required going forward, null for legacy
     serialNumber: { type: String, default: null },
-    product: { type: String, enum: ['led', 'cooler', 'both'], required: true },
+    product: { type: String, enum: ['led', 'cooler', 'both', 'washing_machine', 'induction'], required: true },
     complaintType: { type: String, enum: ['installation', 'complaint'], required: true },
     warrantyStatus: { type: String, enum: ['in_warranty', 'out_of_warranty'], required: true },
     warrantyExpiryDate: { type: Date, default: null },

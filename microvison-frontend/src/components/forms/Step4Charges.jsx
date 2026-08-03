@@ -30,14 +30,16 @@ export default function Step4Charges({ formData, setFormData }) {
       try {
         // Map product + complaintType to preset type
         let presetType = '';
-        if (formData.complaintType === 'installation' && (formData.product === 'led' || formData.product === 'both')) {
+        if (formData.complaintType === 'installation' && formData.product === 'led') {
           presetType = 'installation_led';
         } else if (formData.product === 'led') {
           presetType = 'complaint_led';
         } else if (formData.product === 'cooler') {
           presetType = 'complaint_cooler';
-        } else if (formData.product === 'both') {
-          presetType = 'complaint_both';
+        } else if (formData.product === 'washing_machine') {
+          presetType = 'complaint_washing_machine';
+        } else if (formData.product === 'induction') {
+          presetType = 'complaint_induction';
         }
 
         const { data } = await api.get('/api/presets', { params: { type: presetType, status: 'active' } });

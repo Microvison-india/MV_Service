@@ -13,9 +13,9 @@ const serviceCentreSchema = new mongoose.Schema(
     city: { type: String, required: true },
     district: { type: String, required: true },
     state: { type: String, required: true },
-    productCapability: {
-      type: String,
-      enum: ['led_only', 'cooler_only', 'both'],
+    productCapabilities: {
+      type: [String],
+      enum: ['led', 'cooler', 'washing_machine', 'induction'],
       required: true,
     },
     status: {

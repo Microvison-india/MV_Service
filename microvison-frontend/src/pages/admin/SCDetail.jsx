@@ -7,9 +7,10 @@ import AdminComplaintDetail from '../../components/complaint/AdminComplaintDetai
 import Pagination from '../../components/ui/Pagination';
 
 const CAPABILITY_LABELS = {
-  led_only: 'LED Only',
-  cooler_only: 'Cooler Only',
-  both: 'LED + Cooler',
+  led: 'LED',
+  cooler: 'Cooler',
+  washing_machine: 'Washing Machine',
+  induction: 'Induction',
 };
 
 const STATUS_BADGE_STYLES = {
@@ -28,7 +29,8 @@ const STATUS_BADGE_STYLES = {
 const PRODUCT_LABELS = {
   led: 'LED',
   cooler: 'Cooler',
-  both: 'LED + Cooler',
+  washing_machine: 'Washing Machine',
+  induction: 'Induction',
 };
 
 const STATUS_STYLES = {
@@ -100,7 +102,7 @@ export default function SCDetail() {
             city: data.city,
             district: data.district,
             state: data.state,
-            productCapability: data.productCapability,
+            productCapabilities: Array.isArray(data.productCapabilities) ? data.productCapabilities : (data.productCapability ? [data.productCapability] : []),
           });
         }
       } catch {
@@ -237,7 +239,9 @@ export default function SCDetail() {
                   {sc.status}
                 </span>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {CAPABILITY_LABELS[sc.productCapability]}
+                  {Array.isArray(sc.productCapabilities)
+                    ? sc.productCapabilities.map(c => CAPABILITY_LABELS[c] || c).join(', ')
+                    : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability || '—')}
                 </span>
               </div>
             </div>
@@ -378,18 +382,35 @@ export default function SCDetail() {
                       className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium text-foreground">Product Capability</label>
-                    <select
-                      id="sc-edit-capability"
-                      value={editData.productCapability || ''}
-                      onChange={(e) => setEditData((prev) => ({ ...prev, productCapability: e.target.value }))}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                    >
-                      <option value="led_only">LED Only</option>
-                      <option value="cooler_only">Cooler Only</option>
-                      <option value="both">Both (LED + Cooler)</option>
-                    </select>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium text-foreground">Product Capabilities</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'led', label: 'LED TV' },
+                        { value: 'cooler', label: 'Cooler' },
+                        { value: 'washing_machine', label: 'Washing Machine' },
+                        { value: 'induction', label: 'Induction' },
+                      ].map((opt) => {
+                        const currentCaps = editData.productCapabilities || [];
+                        const isChecked = currentCaps.includes(opt.value);
+                        return (
+                          <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer border rounded-lg p-2 bg-background">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...currentCaps, opt.value]
+                                  : currentCaps.filter(c => c !== opt.value);
+                                setEditData(prev => ({ ...prev, productCapabilities: next }));
+                              }}
+                              className="h-4 w-4 rounded border-border text-primary accent-primary"
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -424,7 +445,7 @@ export default function SCDetail() {
                   { label: 'City', value: sc.city },
                   { label: 'District', value: sc.district },
                   { label: 'State', value: sc.state },
-                  { label: 'Product Capability', value: CAPABILITY_LABELS[sc.productCapability] },
+                  { label: 'Product Capability', value: Array.isArray(sc.productCapabilities) ? sc.productCapabilities.map(c => CAPABILITY_LABELS[c] || c).join(', ') : (CAPABILITY_LABELS[sc.productCapability] || sc.productCapability || '—') },
                   { label: 'Full Address', value: sc.fullAddress },
                   { label: 'Registered On', value: new Date(sc.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) },
                 ].map(({ label, value }) => (

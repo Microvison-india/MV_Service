@@ -5,8 +5,15 @@ const sendWhatsApp = require('./sendWhatsApp');
 const getCustomerAddress = (complaint) =>
     `${complaint.localAddress}, ${complaint.city}, ${complaint.district}, ${complaint.state}`;
 
+const WA_PRODUCT_LABELS = {
+    led: 'LED TV',
+    cooler: 'Cooler',
+    washing_machine: 'Washing Machine',
+    induction: 'Induction Stove',
+};
+
 const getProduct = (complaint) =>
-    complaint.product === 'cooler' ? 'Cooler' : 'LED TV';
+    WA_PRODUCT_LABELS[complaint.product] || complaint.product || 'N/A';
 
 const getRequestType = (complaint) =>
     complaint.complaintType === 'installation' ? 'Installation' : 'Complaint';

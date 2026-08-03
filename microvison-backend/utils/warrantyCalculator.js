@@ -3,6 +3,7 @@
  * 
  * @param {Object} options
  * @param {Date|null} options.billDate - The invoice date provided
+ * @param {String} options.product - Product type: 'led', 'cooler', 'washing_machine', 'induction', 'both'
  * @param {String} options.complaintType - 'installation' or 'complaint'
  * @param {String|null} options.manualSelection - 'in_warranty' or 'out_of_warranty' explicitly set by admin
  * @param {String|null} options.manualReason - reason text for manual selection
@@ -12,8 +13,19 @@
  * @param {Boolean} options.overrideRevoke - when true, admin explicitly un-revokes; skip the permanent revoke guard
  * @returns {Object} { warrantyStatus, warrantyExpiryDate, warrantySource, warrantyForceReason }
  */
+
+// Warranty duration in years per product type
+const WARRANTY_YEARS = {
+  led: 3,
+  cooler: 3,
+  both: 3,            // legacy LED+Cooler combined complaints
+  washing_machine: 2,
+  induction: 1,
+};
+
 const calculateWarranty = ({
   billDate,
+  product,
   complaintType,
   manualSelection,
   manualReason,
@@ -43,11 +55,12 @@ const calculateWarranty = ({
     };
   }
 
-  // Rule 1 (Bill Date present)
+  // Rule 1 (Bill Date present) — duration depends on product type
   if (billDate) {
     const bDate = new Date(billDate);
     const expiryDate = new Date(bDate);
-    expiryDate.setFullYear(expiryDate.getFullYear() + 3);
+    const yearsToAdd = WARRANTY_YEARS[product] ?? 3; // default 3 years for unknown/legacy
+    expiryDate.setFullYear(expiryDate.getFullYear() + yearsToAdd);
 
     const today = new Date();
     // Normalize to start of day for accurate comparison
@@ -77,7 +90,7 @@ const calculateWarranty = ({
     };
   }
 
-  // Rule 3 (LED Installation, nothing provided)
+  // Rule 3 (LED Installation only — default in_warranty for new installs)
   if (complaintType === 'installation') {
     return {
       warrantyStatus: 'in_warranty',
@@ -87,7 +100,7 @@ const calculateWarranty = ({
     };
   }
 
-  // Default fallback (e.g. cooler complaint with nothing provided)
+  // Default fallback (cooler/washing_machine/induction complaint with nothing provided)
   return {
     warrantyStatus: 'out_of_warranty',
     warrantyExpiryDate: null,

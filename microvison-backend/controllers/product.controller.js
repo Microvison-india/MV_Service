@@ -153,6 +153,7 @@ const createProduct = async (req, res) => {
       warrantyForceReason: forceReasonVal,
     } = calculateWarranty({
       billDate,
+      product: productType,
       complaintType: complaintType || 'complaint',
       manualSelection: warrantyStatus,
       manualReason,
@@ -285,6 +286,7 @@ const updateProduct = async (req, res) => {
         warrantyForceReason: forceReasonVal,
       } = calculateWarranty({
         billDate: product.billDate,
+        product: product.product,
         complaintType: complaintType || 'complaint',
         manualSelection: warrantyStatus !== undefined ? warrantyStatus : product.warrantyStatus,
         manualReason,

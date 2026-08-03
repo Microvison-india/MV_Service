@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import api from '../../api/axios';
 
 const CAPABILITY_OPTIONS = [
-  { value: 'led_only', label: 'LED Only' },
-  { value: 'cooler_only', label: 'Cooler Only' },
-  { value: 'both', label: 'Both (LED + Cooler)' },
+  { value: 'led', label: 'LED' },
+  { value: 'cooler', label: 'Cooler' },
+  { value: 'washing_machine', label: 'Washing Machine' },
+  { value: 'induction', label: 'Induction' },
 ];
 
 const STATUS_OPTIONS = [

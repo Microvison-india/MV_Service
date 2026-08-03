@@ -20,7 +20,8 @@ const STATUS_BADGE_STYLES = {
 const PRODUCT_LABELS = {
   led: 'LED',
   cooler: 'Cooler',
-  both: 'LED + Cooler',
+  washing_machine: 'Washing Machine',
+  induction: 'Induction',
 };
 
 export default function AllComplaints() {

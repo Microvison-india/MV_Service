@@ -38,11 +38,13 @@ export default function Step2ProductInfo({ formData, setFormData }) {
       return;
     }
 
-    // 2. Bill Date calculation
+    // 2. Bill Date calculation (duration depends on product type)
     if (formData.billDate) {
+      const WARRANTY_YEARS = { led: 3, cooler: 3, both: 3, washing_machine: 2, induction: 1 };
+      const yearsToAdd = WARRANTY_YEARS[formData.product] ?? 3;
       const bDate = new Date(formData.billDate);
       const expiry = new Date(bDate);
-      expiry.setFullYear(expiry.getFullYear() + 3);
+      expiry.setFullYear(expiry.getFullYear() + yearsToAdd);
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -76,9 +78,11 @@ export default function Step2ProductInfo({ formData, setFormData }) {
   // Compute expiry date string for preview
   let expiryStr = '';
   if (formData.billDate && formData.warrantySource === 'auto_calculated') {
+    const WARRANTY_YEARS = { led: 3, cooler: 3, both: 3, washing_machine: 2, induction: 1 };
+    const yearsToAdd = WARRANTY_YEARS[formData.product] ?? 3;
     const bDate = new Date(formData.billDate);
     const expiry = new Date(bDate);
-    expiry.setFullYear(expiry.getFullYear() + 3);
+    expiry.setFullYear(expiry.getFullYear() + yearsToAdd);
     expiryStr = expiry.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 

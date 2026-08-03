@@ -17,7 +17,7 @@ const STATUS_COLORS = {
     closed: 'bg-gray-200 text-gray-700',
 };
 
-const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', both: 'LED + Cooler' };
+const PRODUCT_LABELS = { led: 'LED', cooler: 'Cooler', washing_machine: 'Washing Machine', induction: 'Induction' };
 
 export default function SCComplaintCard({ complaint: c, mode, onAction, onOpenDetail }) {
     const [showRejectModal, setShowRejectModal] = useState(false);

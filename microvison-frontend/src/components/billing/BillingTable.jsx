@@ -3,7 +3,8 @@ import React from 'react';
 const PRODUCT_LABELS = {
   led: 'LED',
   cooler: 'Cooler',
-  both: 'LED + Cooler',
+  washing_machine: 'Washing Machine',
+  induction: 'Induction',
 };
 
 /** Format a rupee amount — shows negative with ₹- prefix and red styling hint */
