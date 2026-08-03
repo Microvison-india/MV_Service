@@ -678,9 +678,14 @@ Each entry follows this structure:
 
 ### DEV-TBP-076
 - **Phase:** 33
-- **TBP Section / File:** `vercel.json` + `main.jsx`
+- **TBP Section / File:** `vercel.json`, `generate-version.js`, `package.json`, `main.jsx`, `vite.config.js`
 - **Type:** ADDED
-- **Summary:** Added Vercel configuration `vercel.json` setting `Cache-Control: no-cache, no-store, must-revalidate` for `index.html` and SPA routing rewrites. Added an unhandled script error listener in `main.jsx` for automatic seamless page reloads on deployment.
+- **Summary:** Built an automated, multi-tiered cache-busting and live update system to force seamless background updates across all client devices (web, PWA, Android, iOS, Windows):
+  - **`generate-version.js` & `package.json`**: Build script generates a unique timestamp into `public/version.json` on every Vercel build.
+  - **`vercel.json`**: Enforces strict `Cache-Control: no-cache, no-store, must-revalidate` for `index.html`, `/`, and `/version.json`. Adds an explicit rewrite rule for `/version.json` so it is served directly as a static file without being intercepted by SPA routing.
+  - **`main.jsx`**: Implemented a 3-trigger auto-refresh mechanism (on app load, 2-minute interval polling, and `visibilitychange` when returning to tab/PWA from background/sleep). Automatically detects new server deployment timestamps, clears lingering Service Worker caches, and triggers a hard reload. Preserves `localStorage` JWT token so user login states are never interrupted.
+  - **`vite.config.js`**: Configured `selfDestroying: true` on `VitePWA` to unregister stale PWA Service Worker caches across all installed devices automatically.
+
 
 ---
 
