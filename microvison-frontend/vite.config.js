@@ -15,6 +15,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      selfDestroying: true,
       registerType: 'autoUpdate',
       manifest: {
         name: 'Microvison',
