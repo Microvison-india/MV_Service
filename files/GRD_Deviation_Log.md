@@ -600,6 +600,28 @@ graph TD
 
 ---
 
+## Phase 33 — Washing Machine & Induction Integration, 4-Checkbox SC Capabilities & Cache Control
+
+### DEV-GRD-058
+- **Phase:** 33
+- **GRD Section:** 6.1 (Supported Products & Warranties) / 5.2 (SC Registration Capabilities)
+- **Type:** CHANGED / EXPANDED
+- **Summary:** Scope expanded to introduce two new product lines into the system:
+  1. **Washing Machine:** Configured with a 2-year warranty from invoice date. Restricted to complaint-only requests (installation requests are blocked).
+  2. **Induction (Electric Stove):** Configured with a 1-year warranty from invoice date. Restricted to complaint-only requests (installation requests are blocked).
+  - Tracking ID prefixes extended: `PW` for Washing Machine (e.g. `PW000001`) and `PI` for Induction (e.g. `PI000001`).
+  - SC capabilities transformed from single-select enum (`led_only`, `cooler_only`, `both`) to a **4-option tick-box set** (`LED`, `Cooler`, `Washing Machine`, `Induction`), saved as an array `productCapabilities`.
+  - For backward compatibility with legacy APIs and deployed frontend builds, `productCapability` string field is maintained alongside `productCapabilities` array.
+
+### DEV-GRD-059
+- **Phase:** 33
+- **GRD Section:** Technical Architecture / Deployment Strategy
+- **Type:** ADDED
+- **Summary:** Added `vercel.json` with strict `Cache-Control: no-cache, no-store, must-revalidate` headers for `index.html` and SPA routing. Also added an unhandled script error listener in `main.jsx` for automatic seamless reloads when a new release is deployed, preventing stale browser caching across all user devices.
+
+
+---
+
 ### DEV-GRD-058 — WhatsApp: 10-Digit Phone Constraints & 6-Param Reminder
 - **Phase:** 14
 - **GRD Section:** 14 (WhatsApp Notifications)

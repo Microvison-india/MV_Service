@@ -664,6 +664,26 @@ Each entry follows this structure:
 
 ---
 
+## Phase 33 — Washing Machine & Induction Integration, 4-Checkbox SC Capabilities & Cache Control
+
+### DEV-TBP-075
+- **Phase:** 33
+- **TBP Section / File:** Backend Models (`ServiceCentre.js`, `Product.js`, `Complaint.js`, `Preset.js`), Controllers & Utils (`warrantyCalculator.js`, `generateTrackingId.js`, `complaint.controller.js`, `serviceCentre.controller.js`, `auth.controller.js`)
+- **Type:** EXTENDED / ADDED
+- **Summary:** Integrated support for Washing Machine (2yr warranty) and Induction Stove (1yr warranty) as complaint-only products.
+  - Added `productCapabilities` array to `ServiceCentre.js` and preserved `productCapability` string field for dual-field backward compatibility.
+  - Updated `warrantyCalculator.js` to support 2-year duration for Washing Machine and 1-year duration for Induction Stove.
+  - Updated `generateTrackingId.js` to produce `PW` and `PI` tracking prefixes.
+  - Updated controllers to save dual fields and restrict installation complaints for non-LED products.
+
+### DEV-TBP-076
+- **Phase:** 33
+- **TBP Section / File:** `vercel.json` + `main.jsx`
+- **Type:** ADDED
+- **Summary:** Added Vercel configuration `vercel.json` setting `Cache-Control: no-cache, no-store, must-revalidate` for `index.html` and SPA routing rewrites. Added an unhandled script error listener in `main.jsx` for automatic seamless page reloads on deployment.
+
+---
+
 ### DEV-TBP-074 — WhatsApp: 10-Digit Phone Constraints & 6-Param Reminder
 - **Phase:** 14
 - **TBP Section / File:** `utils/sendWhatsApp.js` / Frontend Forms Validation / `models/Complaint.js`
@@ -678,4 +698,5 @@ Each entry follows this structure:
 
 ## Future Phases
 *(Entries will be added here as each phase is built.)*
+
 

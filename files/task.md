@@ -645,3 +645,27 @@
   - [x] **Negative Billing Logic:** Remove `Math.max(0, ...)` clamp in `billingCalculator.js` so net payouts can go negative if SC owes Microvison. Add red text styling in Admin UI for negative balances.
   - [x] **Timezone Date Parsing:** Switch to `parseLocalDate` to fix midnight UTC shift bugs when filtering complaints and invoices.
   - [x] **UI/UX Overhaul & Polling Fix:** Transition from uncontrolled to controlled inputs using `useRef` to prevent 5-second polling wipes on forms. Update cards, buttons, dialogs with softer shadows (`shadow-sm`), rounded corners (`rounded-2xl`), and replace heavy colored pill badges with simpler text tags. Update logos and headers with glassmorphism blur.
+
+- [x] **Phase 33 — Washing Machine & Induction Stove Integration, 4-Checkbox SC Capability System & Cache Control (Addendum v1.4)**
+  - [x] **Backend Schemas & Enums:**
+    - `ServiceCentre.js`: Added `productCapabilities` (Array of Strings `['led', 'cooler', 'washing_machine', 'induction']`) and preserved `productCapability` (Legacy String) for dual-field backward compatibility.
+    - `Product.js` & `Complaint.js`: Expanded `product` enum to include `'washing_machine'` and `'induction'`.
+    - `Preset.js`: Added preset types `'complaint_washing_machine'` and `'complaint_induction'`.
+  - [x] **Warranty Engine & Product Generator:**
+    - `warrantyCalculator.js`: Added 2-year warranty calculation for Washing Machine and 1-year warranty for Induction Stove (LED/Cooler remain at 3 years).
+    - `generateTrackingId.js`: Added `PW` (Washing Machine) and `PI` (Induction) tracking ID prefixes.
+  - [x] **Controllers & API Logic:**
+    - `complaint.controller.js`: Blocked installation complaints for Washing Machine and Induction (complaint-only flow). Formatted WhatsApp product names (`LED TV`, `Cooler`, `Washing Machine`, `Induction Stove`). Updated SC candidate query for array matching.
+    - `serviceCentre.controller.js` & `auth.controller.js`: Enabled multi-select checkbox payload processing and dual-field saving (`productCapabilities` array + auto-derived `productCapability` string).
+    - `whatsappReminder.js`: Updated cron reminder parameter formatter to support all 4 products.
+  - [x] **Frontend Overhaul:**
+    - `Register.jsx`: Replaced single dropdown with 4 checkboxes (`LED TV`, `Cooler`, `Washing Machine`, `Induction`).
+    - `Step3ProductType.jsx` & `Step2ProductInfo.jsx`: Added product cards, complaint-only auto-lock, and dynamic 2-yr/1-yr warranty duration preview.
+    - `Step4Charges.jsx` & `Presets.jsx`: Added preset mapping and admin pricing for Washing Machine & Induction.
+    - All admin & SC views (`Step5AssignSC.jsx`, `AdminComplaintDetail.jsx`, `SCDetail.jsx`, `ServiceCentres.jsx`, `ActionCentre.jsx`, `AllComplaints.jsx`, `BillingTable.jsx`, `SCFilters.jsx`, `ComplaintFilters.jsx`, `MyComplaints.jsx`): Updated filter dropdowns, badges, and capability rendering to support array capabilities and new products cleanly.
+  - [x] **Database Migration & Dual-Field Sync:**
+    - Executed non-destructive migration on both Local (`microvison`) and Production (`microvison-production`) MongoDB databases. Updated all existing SC records to set both `productCapabilities` and `productCapability`.
+  - [x] **Vercel Cache-Busting & Auto-Reload:**
+    - Added `vercel.json` with strict `Cache-Control: no-cache, no-store, must-revalidate` headers for `index.html` to force instant auto-updates across all devices without requiring manual hard-refreshes.
+    - Added global unhandled chunk error listener in `main.jsx` for auto-reloading stale scripts on deployment.
+
