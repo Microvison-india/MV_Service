@@ -31,4 +31,31 @@ window.addEventListener('error', (event) => {
   }
 });
 
+// Periodic version check to auto-refresh all clients (phones, laptops) upon new deployments
+let currentAppVersion = null;
+const checkAppVersion = () => {
+  fetch(`/version.json?t=${new Date().getTime()}`, { cache: 'no-store' })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!currentAppVersion) {
+        currentAppVersion = data.version;
+      } else if (currentAppVersion !== data.version) {
+        console.log('New deployment detected! Auto-refreshing...');
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (let registration of registrations) {
+              registration.unregister();
+            }
+          });
+        }
+        window.location.reload(true);
+      }
+    })
+    .catch(() => {}); // Ignore network errors
+};
+
+// Check immediately, then every 2 minutes
+checkAppVersion();
+setInterval(checkAppVersion, 2 * 60 * 1000);
+
 createRoot(document.getElementById('root')).render(<App />);
