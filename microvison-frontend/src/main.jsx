@@ -35,12 +35,17 @@ window.addEventListener('error', (event) => {
 let currentAppVersion = null;
 const checkAppVersion = () => {
   fetch(`/version.json?t=${new Date().getTime()}`, { cache: 'no-store' })
-    .then((res) => res.json())
+    .then((res) => {
+      if (!res.ok) return null;
+      return res.json();
+    })
     .then((data) => {
+      if (!data) return;
       if (!currentAppVersion) {
         currentAppVersion = data.version;
       } else if (currentAppVersion !== data.version) {
         console.log('New deployment detected! Auto-refreshing...');
+        // Unregister any stale service workers first
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then((registrations) => {
             for (let registration of registrations) {
@@ -48,14 +53,24 @@ const checkAppVersion = () => {
             }
           });
         }
+        // Hard reload bypasses browser cache
         window.location.reload(true);
       }
     })
-    .catch(() => {}); // Ignore network errors
+    .catch(() => {}); // Silently ignore network errors (offline, etc.)
 };
 
-// Check immediately, then every 2 minutes
+// 1. Check on first load
 checkAppVersion();
+
+// 2. Check every 2 minutes for users who leave the tab open
 setInterval(checkAppVersion, 2 * 60 * 1000);
+
+// 3. Check immediately when user returns to the tab/app (phone waking from sleep, switching apps)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    checkAppVersion();
+  }
+});
 
 createRoot(document.getElementById('root')).render(<App />);
