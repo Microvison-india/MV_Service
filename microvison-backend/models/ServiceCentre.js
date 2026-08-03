@@ -16,7 +16,12 @@ const serviceCentreSchema = new mongoose.Schema(
     productCapabilities: {
       type: [String],
       enum: ['led', 'cooler', 'washing_machine', 'induction'],
-      required: true,
+      default: ['led', 'cooler'],
+    },
+    // Backward compatibility string field for legacy APIs / older frontend builds
+    productCapability: {
+      type: String,
+      default: 'both',
     },
     status: {
       type: String,

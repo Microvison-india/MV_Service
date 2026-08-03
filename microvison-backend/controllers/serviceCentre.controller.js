@@ -293,12 +293,21 @@ const update = async (req, res) => {
     const sc = await ServiceCentre.findById(req.params.id);
     if (!sc) return res.status(404).json({ message: 'Service Centre not found' });
 
-    const allowedFields = ['ownerName', 'businessName', 'phone1', 'phone2', 'email2', 'fullAddress', 'city', 'district', 'state', 'productCapabilities'];
+    const allowedFields = ['ownerName', 'businessName', 'phone1', 'phone2', 'email2', 'fullAddress', 'city', 'district', 'state', 'productCapabilities', 'productCapability'];
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
         sc[field] = req.body[field];
       }
     });
+
+    if (req.body.productCapabilities && Array.isArray(req.body.productCapabilities)) {
+      const caps = req.body.productCapabilities;
+      sc.productCapability = (caps.length === 1 && caps[0] === 'led')
+        ? 'led_only'
+        : (caps.length === 1 && caps[0] === 'cooler')
+        ? 'cooler_only'
+        : 'both';
+    }
 
     await sc.save();
     res.status(200).json({ message: 'Service Centre updated', sc });
@@ -381,6 +390,15 @@ const createUnregistered = async (req, res, next) => {
       });
     }
 
+    const caps = Array.isArray(productCapabilities) && productCapabilities.length > 0
+      ? productCapabilities
+      : ['led', 'cooler'];
+    const legacyCap = (caps.length === 1 && caps[0] === 'led')
+      ? 'led_only'
+      : (caps.length === 1 && caps[0] === 'cooler')
+      ? 'cooler_only'
+      : 'both';
+
     const newSC = await ServiceCentre.create({
       businessName: name.trim(),
       phone1: phone1.trim(),
@@ -389,9 +407,8 @@ const createUnregistered = async (req, res, next) => {
       district: normalizedDistrict,
       state: normalizedState,
       fullAddress: fullAddress ? fullAddress.trim() : '',
-      productCapabilities: Array.isArray(productCapabilities) && productCapabilities.length > 0
-        ? productCapabilities
-        : ['led', 'cooler'],
+      productCapabilities: caps,
+      productCapability: legacyCap,
       isUnregistered: true,
       status: 'active',
       userId: null

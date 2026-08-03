@@ -118,6 +118,13 @@ const registerSC = async (req, res) => {
             status: 'pending',
         });
 
+        // Compute legacy string representation for backward compatibility
+        const legacyCapability = (productCapabilities.length === 1 && productCapabilities[0] === 'led')
+          ? 'led_only'
+          : (productCapabilities.length === 1 && productCapabilities[0] === 'cooler')
+          ? 'cooler_only'
+          : 'both';
+
         // Create Service Centre Profile
         await ServiceCentre.create({
             userId: user._id,
@@ -132,6 +139,7 @@ const registerSC = async (req, res) => {
             district,
             state,
             productCapabilities,
+            productCapability: legacyCapability,
             status: 'pending',
         });
 
